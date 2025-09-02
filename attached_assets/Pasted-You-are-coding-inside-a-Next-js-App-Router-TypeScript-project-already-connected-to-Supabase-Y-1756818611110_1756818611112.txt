@@ -1,0 +1,58 @@
+You are coding inside a Next.js (App Router, TypeScript) project already connected to Supabase.  
+Your task is to build the **EntizNet Store module** with the following requirements:
+
+1. **Supabase Database Schema (SQL migrations):**
+   - `products` table:
+     - id (uuid, primary key, default uuid_generate_v4())
+     - provider_id (uuid, references auth.users.id)
+     - title (text, required)
+     - description (text, required)
+     - price (numeric, required)
+     - images (text[] for multiple file URLs)
+     - created_at (timestamptz default now())
+   - `orders` table:
+     - id (uuid, primary key)
+     - buyer_id (uuid, references auth.users.id)
+     - product_id (uuid, references products.id)
+     - quantity (int, default 1)
+     - total_price (numeric)
+     - status (enum: 'pending', 'paid', 'delivered', 'disputed', 'refunded')
+     - created_at (timestamptz default now())
+   - `escrow` table:
+     - id (uuid, primary key)
+     - order_id (uuid, references orders.id)
+     - held_amount (numeric)
+     - released (boolean default false)
+     - created_at (timestamptz default now())
+
+2. **RLS (Row Level Security):**
+   - Providers can only CRUD their own `products`.
+   - Buyers can only CRUD their own `orders`.
+   - Escrow release can only be updated by admin or system functions.
+
+3. **Supabase Functions (RPCs):**
+   - `create_order(product_id, quantity)` → inserts into `orders` and `escrow` atomically.
+   - `mark_delivered(order_id)` → buyer confirms, triggers escrow release.
+   - `raise_dispute(order_id)` → flags order for admin review.
+
+4. **Next.js API Routes (App Router):**
+   - `/api/store/products` → CRUD for products.
+   - `/api/store/orders` → create order, list buyer orders.
+   - `/api/store/escrow` → admin-only endpoint to release or refund.
+
+5. **UI Pages:**
+   - `/store` → list products with title, image, price, provider name.
+   - `/store/[id]` → product detail + “Buy Now” button.
+   - `/dashboard/store` (provider view) → manage products, see orders.
+   - `/dashboard/orders` (buyer view) → see past orders + delivery confirmation.
+
+6. **File Uploads:**
+   - Product images must be uploaded to Supabase Storage bucket `store-products`.
+
+⚠️ Important:
+- Generate the SQL migrations under `supabase/migrations/`.
+- Use Supabase client in `lib/supabase/client.ts`.
+- Write TypeScript types in `types/database.ts` if needed.
+- Follow EntizNet’s role system: providers = EntiZer role, buyers = EntizNate role.
+
+Now create the migrations, RLS policies, RPC functions, API routes, and starter UI pages for this Store module.
