@@ -1,0 +1,45 @@
+Context:
+- Next.js App Router on Replit.
+- Supabase already linked; tables: products (public read), orders, escrow.
+- Storage bucket: store-products (public).
+- /store lists products; /store/[id] and /internal/upload-product-image already work.
+Goal:
+- Add a minimal provider auth stub (email/password) and a “My products” page that shows only the signed-in user’s products.
+- DO NOT change existing /store or /internal routes and DO NOT modify app/layout.tsx styling.
+
+Tasks:
+1) Create `app/auth/sign-in/page.tsx` (client component):
+   - Email + Password inputs, Sign in button using `supabase.auth.signInWithPassword`.
+   - Links: “Create account” (optional stub) and “Continue as guest” (link to /store).
+   - On success: `router.replace('/dashboard/store')`.
+
+2) Create `app/auth/sign-out/page.tsx` (client):
+   - A single “Sign out” button that calls `supabase.auth.signOut()` then `router.replace('/store')`.
+
+3) Create `app/dashboard/store/page.tsx` (client):
+   - On mount, get current user with `supabase.auth.getUser()`; if no user → redirect to `/auth/sign-in`.
+   - Query `products` where `owner = user.id`, select: id, title, price, images.
+   - Render a simple table/list of the user’s products with hero image (images[0]), title, price, and a link to `/store/[id]`.
+   - Add an empty state: “You have no products yet.”
+   - Add a small button “Upload image” that deep-links to `/internal/upload-product-image?pid=<productId>` (no nav changes elsewhere).
+
+4) DB + RLS adjustments:
+   - If `products.owner` (uuid) column doesn’t exist, add it.
+   - Create/ensure policies:
+     a) Public read policy (keep).
+     b) Insert: authenticated users can insert rows where `owner = auth.uid()`.
+     c) Update/Delete: only owner (`owner = auth.uid()`).
+   - IMPORTANT: do not break existing public read.
+
+5) Quality:
+   - Use existing `lib/supabase/client.ts`.
+   - Keep TypeScript; no eslint/prettier churn.
+   - Keep UI minimal (Tailwind ok).
+   - Don’t touch other routes or layout.
+   - Show me a short summary of files changed.
+
+Acceptance:
+- Visiting `/auth/sign-in` lets me sign in; success routes to `/dashboard/store`.
+- `/dashboard/store` soft-guards on client: if not signed in, it redirects to `/auth/sign-in`.
+- My products list shows only rows where `owner = current user id`.
+- RLS prevents other users from updating my rows.
