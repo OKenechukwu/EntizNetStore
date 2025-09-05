@@ -1,6 +1,6 @@
 run = "npm run dev"
 entrypoint = "index.js"
-modules = ["nodejs-20:v9-20231020-a3526c9"]
+modules = ["nodejs-20:v9-20231020-a3526c9", "postgresql-16"]
 hidden = [".config", "package-lock.json", ".next", ".swc"]
 
 [nix]
@@ -22,5 +22,33 @@ externalPort = 80
 localPort = 3001
 externalPort = 3001
 
+[[ports]]
+localPort = 5000
+externalPort = 80
+
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Next.js Development Server"
+
+[[workflows.workflow]]
+name = "Next.js Development Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- --hostname 0.0.0.0 --port 5000"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
