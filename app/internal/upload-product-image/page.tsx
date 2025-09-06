@@ -1,8 +1,9 @@
 // app/internal/upload-product-image/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { supabase } from "../../../lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 
 type Product = {
@@ -12,8 +13,11 @@ type Product = {
 };
 
 export default function UploadProductImagePage() {
+  const search = useSearchParams();
+  const pidFromLink = useMemo(() => search.get("pid") ?? "", [search]);
+
   const [products, setProducts] = useState<Product[]>([]);
-  const [productId, setProductId] = useState<string>("");
+  const [productId, setProductId] = useState<string>(pidFromLink || "");
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -27,12 +31,19 @@ export default function UploadProductImagePage() {
 
       if (error) {
         setMessage(`Error loading products: ${error.message}`);
-      } else {
-        setProducts(data || []);
+        return;
+      }
+
+      const list = data || [];
+      setProducts(list);
+
+      // If ?pid is present and exists in the list, preselect it
+      if (pidFromLink && list.some((p) => p.id === pidFromLink)) {
+        setProductId(pidFromLink);
       }
     };
     load();
-  }, []);
+  }, [pidFromLink]);
 
   const handleUpload = async () => {
     setMessage("");
@@ -42,7 +53,7 @@ export default function UploadProductImagePage() {
     try {
       setIsUploading(true);
 
-      const ext = file.name.split(".").pop() || "jpg";
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
       const safeName = `${uuidv4()}.${ext}`;
       const path = `${productId}/${safeName}`;
 
@@ -117,6 +128,12 @@ export default function UploadProductImagePage() {
               </option>
             ))}
           </select>
+          {pidFromLink && !productId && (
+            <p className="text-xs text-amber-600 mt-1">
+              Heads up: The product id in the URL wasn’t found. Please pick one
+              from the list.
+            </p>
+          )}
         </label>
 
         <label className="block">
@@ -140,8 +157,9 @@ export default function UploadProductImagePage() {
         {message && <p className="text-sm mt-2">{message}</p>}
 
         <div className="pt-6 text-xs text-gray-500">
-          Tip: The newest upload becomes <code>images[0]</code>. Your `/store`
-          list already uses <code>images[0]</code> as preview.
+          Tip: The newest upload becomes <code>images[0]</code>. Your{" "}
+          <code>/store</code> list already uses <code>images[0]</code> as
+          preview.
         </div>
       </div>
     </div>

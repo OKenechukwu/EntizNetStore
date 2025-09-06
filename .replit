@@ -1,33 +1,20 @@
+entrypoint = "package.json"
 run = "npm run dev"
-entrypoint = "index.js"
-modules = ["nodejs-20:v9-20231020-a3526c9", "postgresql-16"]
-hidden = [".config", "package-lock.json", ".next", ".swc"]
+modules = ["nodejs-20"]
 
-[nix]
-channel = "stable-23_05"
-
-[env]
-NEXT_TELEMETRY_DISABLED = "1"
-
-[deployment]
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
-deploymentTarget = "cloudrun"
+[agent]
+expertMode = true
 
 [[ports]]
 localPort = 3000
 externalPort = 80
 
 [[ports]]
-localPort = 3001
-externalPort = 3001
-
-[[ports]]
 localPort = 5000
 externalPort = 80
 
-[agent]
-expertMode = true
+[nix]
+channel = "stable-25_05"
 
 [workflows]
 runButton = "Project"

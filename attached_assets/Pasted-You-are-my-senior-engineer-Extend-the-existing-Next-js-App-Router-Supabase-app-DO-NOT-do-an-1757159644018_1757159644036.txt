@@ -1,0 +1,45 @@
+You are my senior engineer. Extend the existing Next.js App Router + Supabase app. 
+⚠️ DO NOT do any of the following:
+- Do NOT create or connect any local Postgres or Prisma. Use ONLY the existing Supabase client.
+- Do NOT edit Supabase RLS policies, tables, or run any SQL/migrations.
+- Do NOT change env/secrets, storage buckets, .replit, package.json, ports, or networking.
+- Do NOT modify /store, /internal/* routes, or global layout.
+- Do NOT overwrite lib/supabase/* files.
+
+Context
+- Supabase + RLS set: products(owner uuid). Public SELECT; owner-only INSERT/UPDATE/DELETE.
+- Auth works. /dashboard/store is server-gated via lib/supabase/server.ts (createServerSupabase).
+- /internal/upload-product-image works and accepts ?pid=<id>.
+
+Build ALL of this now:
+
+1) /dashboard/store/new  — server page + small client form
+   - Server: read session; if no session redirect('/auth/sign-in').
+   - Form fields: title (required), description (optional), price (number, required).
+   - On submit (client): insert into products with { owner = auth.uid(), title, description, price, images = [] }.
+   - After success: redirect('/dashboard/store').
+
+2) /dashboard/store/[id]/edit  — server page + client form
+   - Server: read session; fetch product by id where owner = auth.uid(). If not owner/not found → redirect('/dashboard/store').
+   - Prefill form; allow update of title, description, price.
+   - On submit (client): update row (still owner-guarded by RLS).
+   - After success: redirect('/dashboard/store').
+
+3) Delete on the edit page
+   - Button “Delete product” with confirm().
+   - Deletes only if owner = auth.uid(); then redirect('/dashboard/store').
+
+4) Dashboard UX
+   - On /dashboard/store, add a small “New product” link to /dashboard/store/new.
+   - Keep the “Upload image” link to /internal/upload-product-image?pid=<id>.
+
+Implementation details
+- Use lib/supabase/server for server session+queries in server components.
+- Use the existing browser client from lib/supabase/client in client components.
+- TypeScript + Tailwind, minimal UI. No unrelated refactors.
+- At the end, print a concise list of created/edited files.
+
+Acceptance
+- I can create at /dashboard/store/new; it appears on /dashboard/store.
+- I can edit & delete at /dashboard/store/[id]/edit (only my products).
+- Public /store and /store/[id] still work. Internal routes unchanged.
