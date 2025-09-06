@@ -84,7 +84,23 @@ export default function DashboardStorePage() {
   if (products.length === 0) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">My Products</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">My Products</h1>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/store/new"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              New Product
+            </Link>
+            <Link
+              href="/auth/sign-out"
+              className="text-sm text-gray-600 hover:text-gray-800"
+            >
+              Sign out
+            </Link>
+          </div>
+        </div>
         <p className="text-sm text-gray-500 mb-4">You have no products yet.</p>
       </div>
     );
@@ -94,12 +110,20 @@ export default function DashboardStorePage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Products</h1>
-        <Link
-          href="/auth/sign-out"
-          className="text-sm text-gray-600 hover:text-gray-800"
-        >
-          Sign out
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard/store/new"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            New Product
+          </Link>
+          <Link
+            href="/auth/sign-out"
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Sign out
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -154,6 +178,12 @@ export default function DashboardStorePage() {
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       View
+                    </Link>
+                    <Link
+                      href={`/dashboard/store/${product.id}/edit`}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      Edit
                     </Link>
                     <Link
                       href={`/internal/upload-product-image?pid=${product.id}`}
