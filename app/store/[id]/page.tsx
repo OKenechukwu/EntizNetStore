@@ -1,39 +1,34 @@
 // app/store/[id]/page.tsx
+import { cookies } from "next/headers";
+import { formatPrice } from "@/lib/format";
+import {
+  getFxRates,
+  convertFromBase,
+  BASE_CURRENCY,
+  DEFAULT_CURRENCY,
+} from "@/lib/currency";
 import { createClient } from "@supabase/supabase-js";
-import Image from "next/image";
 import Link from "next/link";
 
 type Product = {
   id: string;
   title: string | null;
   description: string | null;
-  price: number | null;
+  price: number | null; // stored in BASE_CURRENCY
   images: string[] | null;
 };
-
-function formatPrice(n?: number | null) {
-  if (n == null) return "—";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: "USD",
-    }).format(n);
-  } catch {
-    return `$${n.toFixed(2)}`;
-  }
-}
 
 export default async function ProductDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
+  // Supabase fetch (server)
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
-  // Fetch single product by id
   const { data, error } = await supabase
     .from("products")
     .select("id, title, description, price, images")
@@ -59,6 +54,16 @@ export default async function ProductDetailPage({
     ? product.images.filter(Boolean)
     : [];
   const hero = gallery[0] ?? "/placeholder.png";
+
+  // Currency preference + FX conversion
+  const userCurrency =
+    cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
+  const rates = await getFxRates(BASE_CURRENCY);
+  const displayAmount = convertFromBase(
+    Number(product.price ?? 0),
+    userCurrency,
+    rates,
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -104,7 +109,11 @@ export default async function ProductDetailPage({
           <h1 className="text-3xl font-bold">
             {product.title ?? "Untitled product"}
           </h1>
-          <p className="text-2xl font-semibold">{formatPrice(product.price)}</p>
+
+          {/* Price in user's selected currency */}
+          <p className="text-2xl font-semibold">
+            {formatPrice(displayAmount, userCurrency)}
+          </p>
 
           <div className="prose max-w-none">
             <p className="whitespace-pre-wrap">
@@ -112,7 +121,6 @@ export default async function ProductDetailPage({
             </p>
           </div>
 
-          {/* Placeholder button area (e.g., “Add to cart”) */}
           <div className="pt-4">
             <button
               className="px-4 py-2 rounded-lg bg-black text-white hover:opacity-90"

@@ -1,102 +1,88 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { supabase } from '../../../lib/supabase/client';
+// app/dashboard/store/page.tsx
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import CurrencyPicker from "@/components/CurrencyPicker";
+import { formatPrice } from "@/lib/format";
+import {
+  getFxRates,
+  convertFromBase,
+  BASE_CURRENCY,
+  DEFAULT_CURRENCY,
+} from "@/lib/currency";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 type Product = {
   id: string;
   title: string | null;
-  price: number | null;
+  price: number | null; // stored in BASE_CURRENCY
   images: string[] | null;
 };
 
-function formatPrice(n?: number | null) {
-  if (n == null) return '—';
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: 'USD',
-    }).format(n);
-  } catch {
-    return `$${n.toFixed(2)}`;
-  }
-}
-
-export default function DashboardStorePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkUserAndLoadProducts = async () => {
-      try {
-        // Check if user is signed in
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !user) {
-          router.replace('/auth/sign-in');
-          return;
-        }
-
-        // Load user's products
-        const { data, error: productsError } = await supabase
-          .from('products')
-          .select('id, title, price, images')
-          .eq('owner', user.id)
-          .order('title', { ascending: true });
-
-        if (productsError) {
-          setError(`Failed to load products: ${productsError.message}`);
-        } else {
-          setProducts((data || []) as Product[]);
-        }
-      } catch (err) {
-        setError('An unexpected error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkUserAndLoadProducts();
-  }, [router]);
-
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">My Products</h1>
-        <p className="text-sm text-gray-500">Loading...</p>
-      </div>
-    );
+export default async function DashboardStorePage() {
+  // Auth (server-side)
+  const supabase = createServerSupabase();
+  const {
+    data: { session },
+    error: sessErr,
+  } = await supabase.auth.getSession();
+  if (!session || sessErr) {
+    redirect("/auth/sign-in");
   }
 
+  // Fetch only this user's products
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,title,price,images")
+    .eq("owner", session.user.id)
+    .order("title", { ascending: true });
+
+  const products = (data ?? []) as Product[];
+
+  // Currency preference + FX rates
+  const userCurrency =
+    cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
+  const rates = await getFxRates(BASE_CURRENCY);
+
+  // Error state
   if (error) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-2">My Products</h1>
-        <p className="text-sm text-red-600">{error}</p>
-      </div>
-    );
-  }
-
-  if (products.length === 0) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">My Products</h1>
           <div className="flex items-center gap-4">
+            <CurrencyPicker />
             <Link
               href="/dashboard/store/new"
               className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               New Product
             </Link>
+            <Link href="/auth/sign-out" className="text-sm underline">
+              Sign out
+            </Link>
+          </div>
+        </div>
+        <p className="text-sm text-red-600">Failed to load: {error.message}</p>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (products.length === 0) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">My Products</h1>
+          <div className="flex items-center gap-4">
+            <CurrencyPicker />
             <Link
-              href="/auth/sign-out"
-              className="text-sm text-gray-600 hover:text-gray-800"
+              href="/dashboard/store/new"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
+              New Product
+            </Link>
+            <Link href="/auth/sign-out" className="text-sm underline">
               Sign out
             </Link>
           </div>
@@ -106,21 +92,20 @@ export default function DashboardStorePage() {
     );
   }
 
+  // Table view
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Products</h1>
         <div className="flex items-center gap-4">
+          <CurrencyPicker />
           <Link
             href="/dashboard/store/new"
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             New Product
           </Link>
-          <Link
-            href="/auth/sign-out"
-            className="text-sm text-gray-600 hover:text-gray-800"
-          >
+          <Link href="/auth/sign-out" className="text-sm underline">
             Sign out
           </Link>
         </div>
@@ -145,48 +130,55 @@ export default function DashboardStorePage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {products.map((product) => {
-              const img = Array.isArray(product.images) && product.images[0]
-                ? product.images[0]
-                : '/placeholder.png';
-              
+            {products.map((p) => {
+              const img =
+                Array.isArray(p.images) && p.images[0]
+                  ? p.images[0]
+                  : "/placeholder.png";
+
+              const displayAmount = convertFromBase(
+                Number(p.price ?? 0),
+                userCurrency,
+                rates,
+              );
+
               return (
-                <tr key={product.id}>
+                <tr key={p.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex-shrink-0 h-16 w-16">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         className="h-16 w-16 rounded-lg object-cover"
                         src={img}
-                        alt={product.title ?? 'Product'}
+                        alt={p.title ?? "Product"}
                       />
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {product.title ?? 'Untitled product'}
+                      {p.title ?? "Untitled product"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {formatPrice(product.price)}
+                    <div className="text-sm">
+                      {formatPrice(displayAmount, userCurrency)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <Link
-                      href={`/store/${product.id}`}
+                      href={`/store/${p.id}`}
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       View
                     </Link>
                     <Link
-                      href={`/dashboard/store/${product.id}/edit`}
+                      href={`/dashboard/store/${p.id}/edit`}
                       className="text-blue-600 hover:text-blue-900"
                     >
                       Edit
                     </Link>
                     <Link
-                      href={`/internal/upload-product-image?pid=${product.id}`}
+                      href={`/internal/upload-product-image?pid=${p.id}`}
                       className="text-green-600 hover:text-green-900"
                     >
                       Upload image

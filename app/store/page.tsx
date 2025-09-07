@@ -1,28 +1,26 @@
 // app/store/page.tsx
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import CurrencyPicker from "@/components/CurrencyPicker";
+import { formatPrice } from "@/lib/format";
+import {
+  getFxRates,
+  convertFromBase,
+  BASE_CURRENCY,
+  DEFAULT_CURRENCY,
+} from "@/lib/currency";
 
 type Product = {
   id: string;
   title: string | null;
   description: string | null;
-  price: number | null;
+  price: number | null; // stored in BASE_CURRENCY
   images: string[] | null;
 };
 
-function formatPrice(n?: number | null) {
-  if (n == null) return "—";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: "USD",
-    }).format(n);
-  } catch {
-    return `$${n.toFixed(2)}`;
-  }
-}
-
 export default async function StorePage() {
+  // 1) Supabase fetch
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -33,10 +31,18 @@ export default async function StorePage() {
     .select("id, title, description, price, images")
     .order("title", { ascending: true });
 
+  // 2) Currency: read user preference from cookie + fetch FX rates (base -> target)
+  const userCurrency =
+    cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
+  const rates = await getFxRates(BASE_CURRENCY);
+
   if (error) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-2">Store</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Store</h1>
+          <CurrencyPicker />
+        </div>
         <p className="text-sm text-red-600">
           Failed to load products: {error.message}
         </p>
@@ -49,7 +55,10 @@ export default async function StorePage() {
   if (products.length === 0) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">Store</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Store</h1>
+          <CurrencyPicker />
+        </div>
         <p className="text-sm text-gray-500">No products yet.</p>
       </div>
     );
@@ -59,6 +68,7 @@ export default async function StorePage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Store</h1>
+        <CurrencyPicker />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -67,10 +77,18 @@ export default async function StorePage() {
             Array.isArray(p.images) && p.images[0]
               ? p.images[0]
               : "/placeholder.png";
+
+          // Convert from BASE_CURRENCY (stored) to user's currency for display
+          const displayAmount = convertFromBase(
+            Number(p.price ?? 0),
+            userCurrency,
+            rates,
+          );
+
           return (
             <Link
               key={p.id}
-              href={`/store/${p.id}`} // <- **THIS forces link by row id**
+              href={`/store/${p.id}`}
               className="block rounded-xl border hover:shadow-md transition"
             >
               <div className="w-full aspect-video overflow-hidden rounded-t-xl">
@@ -88,7 +106,11 @@ export default async function StorePage() {
                 <p className="text-sm text-gray-500 line-clamp-1">
                   {p.description ?? "No description."}
                 </p>
-                <div className="mt-2 font-medium">{formatPrice(p.price)}</div>
+
+                {/* Price in user's selected currency */}
+                <p className="mt-2 text-sm font-semibold">
+                  {formatPrice(displayAmount, userCurrency)}
+                </p>
               </div>
             </Link>
           );

@@ -1,0 +1,210 @@
+You are my senior Next.js + Supabase engineer. Follow these instructions exactly.
+
+Hard rules (do NOT break):
+
+✅ Do NOT disable RLS.
+
+✅ Do NOT alter existing RLS policies or auth logic.
+
+✅ If an RLS error appears, show me the exact error and propose a minimal additive policy fix in SQL as a code block, but do not apply it unless I approve.
+
+✅ Keep all monetary amounts stored/validated in USD (BASE). FX is display-only.
+
+✅ Use TypeScript, Next.js App Router, and match current project style.
+
+✅ Keep existing files, routes, and schemas intact.
+
+Project
+
+Name: EntizNet (Next.js App Router + Supabase)
+
+State: Auth + dashboard + product CRUD done. Prices stored in USD (BASE). Currency cookie + picker + FX utils in lib/currency.ts are working. Pages: /store, /store/[id], /dashboard/store/*.
+
+Goal
+Add a minimal cart + checkout that is currency-aware for display only, while storing/validating totals in USD server-side. No payment integration yet—just a clean skeleton.
+
+What to build
+1) Cart utilities (client)
+
+Create lib/cart.ts (client-only; uses localStorage, key cart:v1).
+
+Types:
+
+export type CartItem = {
+  id: string;
+  title: string;
+  priceBase: number; // always USD
+  image?: string;
+  qty: number;
+};
+
+
+Functions:
+
+getCart(): CartItem[]
+setCart(items: CartItem[]): void
+addItem(item: CartItem): void
+removeItem(id: string): void
+setQty(id: string, qty: number): void // clamp to >=1
+clearCart(): void
+countItems(): number
+subtotalBase(): number // sum of (priceBase * qty) in USD
+
+
+Implementation notes:
+
+Guard for SSR (typeof window !== 'undefined').
+
+Persist to localStorage key cart:v1.
+
+Clamp qty to a minimum of 1.
+
+2) Enable “Add to Cart” on product page
+
+File: app/store/[id]/page.tsx
+
+Keep server fetch of product (price in USD).
+
+Render a client child component AddToCartButton in the details column.
+
+New file: app/store/[id]/AddToCartButton.tsx (client)
+Props:
+
+{ product: { id: string; title: string; price: number | string | null; images?: string[] } }
+
+
+On click:
+
+addItem({
+  id: product.id,
+  title: product.title,
+  priceBase: Number(product.price ?? 0),
+  image: product.images?.[0],
+  qty: 1
+})
+
+
+Show a small success notice/toast and reveal a “View cart” link to /checkout.
+
+3) Checkout page (client UI + currency display)
+
+Files:
+
+app/checkout/page.tsx (server wrapper that renders the client component)
+
+app/checkout/CheckoutClient.tsx (client)
+
+Behavior:
+
+Reads cart via lib/cart.ts.
+
+Reads user currency from cookie (document.cookie).
+
+Fetch /api/fx once to get rates; use existing convertFromBase + formatPrice utilities from lib/currency.ts.
+
+Render line items with qty +/- controls that update totals live (in display currency).
+
+“Place order” button:
+
+POST /api/store/orders with payload:
+
+{ "items": [{ "id": "<productId>", "qty": <number> }], "subtotalBase": <number> }
+
+
+On success, show “Order placed” toast and clear cart.
+
+UX notes:
+
+If cart is empty, show an empty state with a link back to /store.
+
+Disable “Place order” when cart empty or qty invalid.
+
+4) Orders API route (server, stub with validation)
+
+File: app/api/store/orders/route.ts
+
+POST accepts:
+
+{ items: Array<{ id: string; qty: number }> }
+
+
+Server must re-fetch product prices by ids from DB and compute subtotalBase authoritatively in USD (never trust any client totals).
+
+Return 201 with:
+
+{ id: "<fake-id>", subtotalBase: number }
+
+
+(No DB insert yet; this is a stub you can later wire to real tables.)
+
+If any product id is invalid or qty < 1, return 400.
+
+5) Header: show Cart link
+
+In main nav (where “Home / Store” lives), add a right-side Cart link to /checkout.
+
+Optional (preferred): Live count pill
+
+Create components/CartLink.tsx (client) that uses countItems() and updates live.
+
+Include <CartLink /> in the nav; fall back to a plain /checkout link if needed.
+
+6) Currency everywhere
+
+/checkout prices display in the selected currency (pull rates from /api/fx).
+
+All numbers sent to server remain USD.
+
+Existing create/edit product forms that store in USD: leave as-is.
+
+Files to create/update
+
+lib/cart.ts ✅ create
+
+app/store/[id]/AddToCartButton.tsx (client) ✅ create
+
+app/store/[id]/page.tsx ✏️ mount the button
+
+app/checkout/page.tsx (server wrapper) ✅ create
+
+app/checkout/CheckoutClient.tsx (client) ✅ create
+
+app/api/store/orders/route.ts (server stub) ✅ create
+
+components/CartLink.tsx (optional; client) ✅ create
+
+Update nav layout to include <CartLink /> or a simple /checkout link ✏️
+
+Acceptance criteria
+
+From /store/[id], clicking Add to Cart increases the cart count; user can go to /checkout.
+
+/checkout shows line items; prices convert to the selected currency; totals update when qty changes.
+
+Place order returns success and clears the cart.
+
+Switching the CurrencyPicker re-renders prices using /api/fx (fetched once per visit).
+
+All authoritative totals are validated in USD server-side.
+
+RLS remains enabled; no policies are removed or relaxed.
+
+Notes / Constraints
+
+Client reads user currency via cookie; server pages should use cookies() only when needed.
+
+If Replit Preview has auth issues, open the Dev URL in a new tab (don’t change auth or RLS to “make it work”).
+
+If any step would require schema/policy changes, stop and propose options first—do not apply changes.
+
+Quick test plan
+
+Set currency to EUR → open a product page /store/[id] → Add to Cart.
+
+Go to /checkout → see EUR prices and totals (not equal to raw USD).
+
+Change qty → totals update live.
+
+Switch currency to NGN → prices re-render using fallback+live rates.
+
+Click Place order → success toast, cart is cleared.
