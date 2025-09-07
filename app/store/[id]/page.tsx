@@ -9,6 +9,7 @@ import {
 } from "@/lib/currency";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import AddToCartButton from "./AddToCartButton";
 
 type Product = {
   id: string;
@@ -121,15 +122,14 @@ export default async function ProductDetailPage({
             </p>
           </div>
 
-          <div className="pt-4">
-            <button
-              className="px-4 py-2 rounded-lg bg-black text-white hover:opacity-90"
-              disabled
-              title="Coming soon"
-            >
-              Add to Cart (soon)
-            </button>
-          </div>
+          <AddToCartButton 
+            product={{
+              id: product.id,
+              title: product.title ?? "Untitled product",
+              price: product.price,
+              images: product.images || undefined
+            }}
+          />
         </div>
       </div>
     </div>
