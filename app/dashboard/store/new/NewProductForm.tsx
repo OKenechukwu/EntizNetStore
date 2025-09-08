@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 
 type FxRates = Record<string, number>;
@@ -18,37 +18,35 @@ function readCurrencyCookie(): string {
   return (c ?? DEFAULT_CURRENCY).toUpperCase();
 }
 
-/** Convert a display amount in user currency to USD (our base). */
-function toUSD(
-  amountInDisplay: number,
-  currency: string,
-  rates: FxRates,
-): number {
-  if (!amountInDisplay || !Number.isFinite(amountInDisplay)) return 0;
+// Convert an amount in user's currency to USD (our base)
+function toUSD(amount: number, currency: string, rates: FxRates): number {
+  if (!amount || !Number.isFinite(amount)) return 0;
   const rate = rates?.[currency.toUpperCase()];
-  if (!rate || rate <= 0) return amountInDisplay; // fallback: assume already USD
-  // rates are 1 USD -> rate[currency]; invert to get USD
-  const usd = amountInDisplay / rate;
-  // keep cents stable
-  return Math.round(usd * 100) / 100;
+  if (!rate || rate <= 0) return amount; // fallback: assume already USD
+  return Math.round((amount / rate) * 100) / 100;
 }
 
 export default function NewProductForm() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+
+  // Build a Supabase client directly (avoids local helper export mismatch)
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    return createSupabaseClient(url, anon);
+  }, []);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priceDisplay, setPriceDisplay] = useState<string>(""); // user-entered number in selected currency
+  const [priceDisplay, setPriceDisplay] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
   const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
   const [rates, setRates] = useState<FxRates>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load currency & FX on mount
   useEffect(() => {
     setCurrency(readCurrencyCookie());
-
     (async () => {
       try {
         const res = await fetch("/api/fx");
@@ -79,10 +77,9 @@ export default function NewProductForm() {
     setSubmitting(true);
 
     try {
-      // ensure we have a user id for RLS policy (provider_id)
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const { data: au, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw authErr;
-      const userId = authData.user?.id;
+      const userId = au.user?.id;
       if (!userId) {
         setError("You must be signed in to create a product.");
         setSubmitting(false);
@@ -92,9 +89,9 @@ export default function NewProductForm() {
       const payload = {
         title: title.trim(),
         description: description.trim() || null,
-        price: priceUSD, // store USD in 'price'
-        images: imageUrl ? [imageUrl.trim()] : [], // text[]
-        provider_id: userId, // satisfy RLS: (auth.uid() = provider_id)
+        price: priceUSD, // USD in DB
+        images: imageUrl ? [imageUrl.trim()] : [],
+        provider_id: userId, // RLS
       };
 
       const { error: insertErr } = await supabase
@@ -155,7 +152,7 @@ export default function NewProductForm() {
             className="w-full rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
             value={priceDisplay}
             onChange={(e) => setPriceDisplay(e.target.value)}
-            placeholder={`e.g. 19.99`}
+            placeholder="e.g. 19.99"
             required
           />
           <p className="text-xs text-gray-500">
