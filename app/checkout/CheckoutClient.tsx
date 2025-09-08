@@ -4,13 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
 import { getFxRates, convertFromBase, DEFAULT_CURRENCY } from "@/lib/currency";
-import { 
-  getCart, 
-  setQty, 
-  removeItem, 
-  clearCart, 
+import {
+  getCart,
+  setQty,
+  removeItem,
+  clearCart,
   subtotalBase,
-  type CartItem 
+  type CartItem,
 } from "@/lib/cart";
 
 export default function CheckoutClient() {
@@ -23,13 +23,13 @@ export default function CheckoutClient() {
   // Load cart and currency on mount
   useEffect(() => {
     setCart(getCart());
-    
+
     // Read currency from cookie
     const cookieValue = document.cookie
       .split("; ")
-      .find(row => row.startsWith("currency="))
+      .find((row) => row.startsWith("currency="))
       ?.split("=")[1];
-    
+
     if (cookieValue) {
       setUserCurrency(cookieValue.toUpperCase());
     }
@@ -67,14 +67,14 @@ export default function CheckoutClient() {
     if (cart.length === 0) return;
 
     setIsLoading(true);
-    
+
     try {
       const orderPayload = {
-        items: cart.map(item => ({
+        items: cart.map((item) => ({
           id: item.id,
-          qty: item.qty
+          qty: item.qty,
         })),
-        subtotalBase: subtotalBase()
+        subtotalBase: subtotalBase(),
       };
 
       const response = await fetch("/api/store/orders", {
@@ -113,7 +113,7 @@ export default function CheckoutClient() {
       <div className="max-w-4xl mx-auto px-4 py-10 text-center">
         <h1 className="text-2xl font-semibold mb-4">Your Cart is Empty</h1>
         <p className="text-gray-600 mb-6">
-          Browse our store to find products you'd like to purchase.
+          Browse our store to find products you&apos;d like to purchase.
         </p>
         <Link
           href="/store"
@@ -159,7 +159,7 @@ export default function CheckoutClient() {
                 />
               </div>
             )}
-            
+
             <div className="flex-1">
               <h3 className="font-medium">{item.title}</h3>
               <p className="text-sm text-gray-600">
@@ -186,7 +186,10 @@ export default function CheckoutClient() {
 
             <div className="text-right">
               <p className="font-medium">
-                {formatPrice(convertPrice(item.priceBase * item.qty), userCurrency)}
+                {formatPrice(
+                  convertPrice(item.priceBase * item.qty),
+                  userCurrency,
+                )}
               </p>
               <button
                 onClick={() => handleRemoveItem(item.id)}
