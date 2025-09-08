@@ -1,0 +1,26 @@
+snapshot_at,schemaname,tablename,policyname,permissive,roles,cmd,using_expr,check_expr
+2025-09-07 15:47:16.162833+00,public,entizer_profiles,entizer_profiles_insert_own,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+2025-09-07 15:47:16.162833+00,public,entizer_profiles,entizer_profiles_select_own,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+2025-09-07 15:47:16.162833+00,public,entizer_profiles,entizer_profiles_update_own,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
+2025-09-07 15:47:16.162833+00,public,escrow,update_escrow,PERMISSIVE,{public},UPDATE,(auth.role() = 'admin'::text),null
+2025-09-07 15:47:16.162833+00,public,orders,modify_own_orders,PERMISSIVE,{public},ALL,(auth.uid() = buyer_id),null
+2025-09-07 15:47:16.162833+00,public,orders,select_orders,PERMISSIVE,{public},SELECT,(auth.uid() = buyer_id),null
+2025-09-07 15:47:16.162833+00,public,products,modify_own_products,PERMISSIVE,{public},ALL,(auth.uid() = provider_id),null
+2025-09-07 15:47:16.162833+00,public,products,products_delete_own,PERMISSIVE,{authenticated},DELETE,(owner = auth.uid()),null
+2025-09-07 15:47:16.162833+00,public,products,products_insert_own,PERMISSIVE,{authenticated},INSERT,null,(owner = auth.uid())
+2025-09-07 15:47:16.162833+00,public,products,products_public_read,PERMISSIVE,{public},SELECT,true,null
+2025-09-07 15:47:16.162833+00,public,products,products_update_own,PERMISSIVE,{authenticated},UPDATE,(owner = auth.uid()),(owner = auth.uid())
+2025-09-07 15:47:16.162833+00,public,products,public read products,PERMISSIVE,{public},SELECT,true,null
+2025-09-07 15:47:16.162833+00,public,products,select_products,PERMISSIVE,{public},SELECT,(auth.uid() = provider_id),null
+2025-09-07 15:47:16.162833+00,public,provider_profiles,Allow providers to insert their profile,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+2025-09-07 15:47:16.162833+00,public,provider_verifications,Allow verified users to insert,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+2025-09-07 15:47:16.162833+00,public,user_roles,Allow authenticated users to insert their own role,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+2025-09-07 15:47:16.162833+00,public,user_roles,Enable users to view their own data only,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+2025-09-07 15:47:16.162833+00,public,user_roles,user can read own role,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+2025-09-07 15:47:16.162833+00,storage,objects,Allow Authenticated insert to ID Docs,PERMISSIVE,{authenticated},INSERT,null,(bucket_id = 'id-verification-docs'::text)
+2025-09-07 15:47:16.162833+00,storage,objects,Allow authenticated users to upload to id-verification-docs,PERMISSIVE,{authenticated},INSERT,null,(bucket_id = 'id-verification-docs'::text)
+2025-09-07 15:47:16.162833+00,storage,objects,Auth users read from id-verification-docs 11gh0u3_0,PERMISSIVE,{authenticated},SELECT,(bucket_id = 'id-verification-docs'::text),null
+2025-09-07 15:47:16.162833+00,storage,objects,Users can manage their own verification files knrfy9_0,PERMISSIVE,{public},SELECT,"((bucket_id = 'provider-verification-photos'::text) AND ((auth.uid())::text = split_part(name, '/'::text, 1)))",null
+2025-09-07 15:47:16.162833+00,storage,objects,allow uploads to store-products (images only),PERMISSIVE,{authenticated},INSERT,null,"((bucket_id = 'store-products'::text) AND ((metadata ->> 'mimetype'::text) = ANY (ARRAY['image/webp'::text, 'image/jpeg'::text, 'image/png'::text])))"
+2025-09-07 15:47:16.162833+00,storage,objects,delete own store-products files,PERMISSIVE,{authenticated},DELETE,((bucket_id = 'store-products'::text) AND (owner = auth.uid())),null
+2025-09-07 15:47:16.162833+00,storage,objects,update own store-products files,PERMISSIVE,{authenticated},UPDATE,((bucket_id = 'store-products'::text) AND (owner = auth.uid())),((bucket_id = 'store-products'::text) AND (owner = auth.uid()))
