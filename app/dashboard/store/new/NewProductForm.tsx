@@ -1,121 +1,195 @@
-// app/dashboard/store/new/NewProductForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { convertToBase } from "@/lib/currency";
+import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
 
-function readCookie(name: string) {
-  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return m ? decodeURIComponent(m[1]) : null;
+type FxRates = Record<string, number>;
+
+function readCurrencyCookie(): string {
+  const c =
+    typeof document !== "undefined"
+      ? document.cookie
+          .split("; ")
+          .find((r) => r.startsWith("currency="))
+          ?.split("=")[1]
+      : undefined;
+  return (c ?? DEFAULT_CURRENCY).toUpperCase();
 }
 
-export function NewProductForm() {
-  const router = useRouter();
+/** Convert a display amount in user currency to USD (our base). */
+function toUSD(
+  amountInDisplay: number,
+  currency: string,
+  rates: FxRates,
+): number {
+  if (!amountInDisplay || !Number.isFinite(amountInDisplay)) return 0;
+  const rate = rates?.[currency.toUpperCase()];
+  if (!rate || rate <= 0) return amountInDisplay; // fallback: assume already USD
+  // rates are 1 USD -> rate[currency]; invert to get USD
+  const usd = amountInDisplay / rate;
+  // keep cents stable
+  return Math.round(usd * 100) / 100;
+}
 
+export default function NewProductForm() {
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  // price typed IN user's selected currency
-  const [price, setPrice] = useState<string>("");
-  const [userCurrency, setUserCurrency] = useState<string>("USD");
+  const [priceDisplay, setPriceDisplay] = useState<string>(""); // user-entered number in selected currency
+  const [imageUrl, setImageUrl] = useState("");
+  const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
+  const [rates, setRates] = useState<FxRates>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-
+  // Load currency & FX on mount
   useEffect(() => {
-    const pref = (readCookie("currency") || "USD").toUpperCase();
-    setUserCurrency(pref);
+    setCurrency(readCurrencyCookie());
+
+    (async () => {
+      try {
+        const res = await fetch("/api/fx");
+        if (res.ok) {
+          const data = await res.json();
+          setRates(data.rates ?? {});
+        }
+      } catch (e) {
+        console.error("FX load failed:", e);
+      }
+    })();
   }, []);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr("");
+  const priceUSD = useMemo(() => {
+    const val = Number(priceDisplay);
+    if (!Number.isFinite(val)) return 0;
+    return toUSD(val, currency, rates);
+  }, [priceDisplay, currency, rates]);
 
-    const typed = Number(price);
-    if (!title.trim()) return setErr("Title is required.");
-    if (!Number.isFinite(typed) || typed <= 0) {
-      return setErr("Price must be a positive number.");
-    }
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const val = Number(priceDisplay);
+    if (!title.trim()) return setError("Title is required.");
+    if (!Number.isFinite(val) || val <= 0)
+      return setError("Enter a valid price.");
+    setSubmitting(true);
 
     try {
-      setLoading(true);
-
-      // Ensure signed in
-      const { data: u, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !u.user) {
-        return router.replace("/auth/sign-in");
+      // ensure we have a user id for RLS policy (provider_id)
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const userId = authData.user?.id;
+      if (!userId) {
+        setError("You must be signed in to create a product.");
+        setSubmitting(false);
+        return;
       }
-      const owner = u.user.id;
 
-      // Get FX (base -> target) and convert typed (user currency) -> base for storage
-      const fx = await fetch("/api/fx")
-        .then((r) => r.json())
-        .catch(() => ({ rates: {} }));
-      const rates: Record<string, number> = fx.rates || {};
-      const priceBase = convertToBase(typed, userCurrency, rates);
-
-      // Insert row in BASE currency
-      const { error } = await supabase.from("products").insert({
+      const payload = {
         title: title.trim(),
-        description: description.trim(),
-        price: priceBase,
-        images: [],
-        owner,
-      });
+        description: description.trim() || null,
+        price: priceUSD, // store USD in 'price'
+        images: imageUrl ? [imageUrl.trim()] : [], // text[]
+        provider_id: userId, // satisfy RLS: (auth.uid() = provider_id)
+      };
 
-      if (error) throw error;
+      const { error: insertErr } = await supabase
+        .from("products")
+        .insert(payload);
+      if (insertErr) throw insertErr;
 
-      router.replace("/dashboard/store");
+      router.push("/dashboard/store");
+      router.refresh();
     } catch (e: any) {
-      setErr(e.message ?? "Failed to create product");
+      console.error(e);
+      setError(e?.message ?? "Failed to create product.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold mb-6">New Product</h1>
-      <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Title</label>
         <input
-          className="w-full border rounded px-3 py-2"
-          placeholder="Title"
+          type="text"
+          className="w-full rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Aroma Candle"
+          required
         />
+      </div>
 
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Description</label>
         <textarea
-          className="w-full border rounded px-3 py-2"
-          placeholder="Description (optional)"
-          rows={4}
+          className="w-full rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          placeholder="Write a short description…"
+          rows={4}
         />
+      </div>
 
-        <div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            Price ({currency})
+          </label>
           <input
-            className="w-full border rounded px-3 py-2"
             type="number"
-            min="0"
             step="0.01"
-            placeholder={`Price in ${userCurrency}`}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            min="0"
+            className="w-full rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
+            value={priceDisplay}
+            onChange={(e) => setPriceDisplay(e.target.value)}
+            placeholder={`e.g. 19.99`}
+            required
           />
-          <p className="text-xs text-gray-500 mt-1">Price in {userCurrency}</p>
+          <p className="text-xs text-gray-500">
+            Will be saved as <span className="font-medium">USD</span>: $
+            {priceUSD.toFixed(2)}
+          </p>
         </div>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            Image URL (optional)
+          </label>
+          <input
+            type="url"
+            className="w-full rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://…/image.jpg"
+          />
+          <p className="text-xs text-gray-500">
+            Stored as the first item in <code>images[]</code>.
+          </p>
+        </div>
+      </div>
 
+      <div className="pt-2">
         <button
-          className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
-          disabled={loading}
           type="submit"
+          disabled={submitting}
+          className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-white disabled:opacity-60"
         >
-          {loading ? "Creating…" : "Create"}
+          {submitting ? "Saving…" : "Create Product"}
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }

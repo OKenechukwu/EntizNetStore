@@ -1,8 +1,8 @@
 // app/dashboard/store/new/page.tsx
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "../../../../lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server";
 import NewProductForm from "./NewProductForm";
-import CurrencyPicker from "@/components/CurrencyPicker"; // ← add this
+import CurrencyPicker from "@/components/CurrencyPicker";
 
 export default async function NewProductPage() {
   const supabase = createServerSupabase();
@@ -17,7 +17,7 @@ export default async function NewProductPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Create New Product</h1>
@@ -27,6 +27,6 @@ export default async function NewProductPage() {
       </div>
 
       <NewProductForm />
-    </div>
+    </main>
   );
 }
