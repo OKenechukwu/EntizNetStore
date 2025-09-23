@@ -11,7 +11,7 @@ export default function AgeGate({ children }: { children: React.ReactNode }) {
     const verified = localStorage.getItem("entiznet-age-verified") === "true";
     setIsVerified(verified);
     setMounted(true);
-  }, []);
+  }, []); // Empty dependency array is correct here
 
   const handleVerifyAge = (isAdult: boolean) => {
     if (isAdult) {
