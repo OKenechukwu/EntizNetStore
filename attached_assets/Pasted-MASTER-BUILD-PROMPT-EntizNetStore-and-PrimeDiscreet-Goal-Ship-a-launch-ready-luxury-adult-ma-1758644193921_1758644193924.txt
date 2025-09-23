@@ -1,0 +1,378 @@
+MASTER BUILD PROMPT — EntizNetStore (and PrimeDiscreet)
+
+Goal: Ship a launch-ready, luxury, adult marketplace (physical + digital) with dual brand fronts (EntizNetStore & PrimeDiscreet) on one backend. Include Google AdSense, seller-run ads, feature banners, recommendations, short product videos, uncensored media (within law), advanced buyer profiles, enterprise-grade seller dashboard, address reconfirmation, messaging, regional payments, dark/light modes, award-worthy UX in gold & black aligned with EntizNet.
+
+0) Tech Stack & Principles
+
+Next.js (App Router) + TypeScript, Tailwind CSS, Supabase (Auth, DB, Storage, RLS).
+
+PWA (installable, offline shells for catalog, add-to-home-screen).
+
+CDN & asset pipelines: Next Image for images, HLS/mp4 for videos via storage + signed URLs; lazy-load + skeletons.
+
+Search: Typesense/Algolia ready (start with Supabase full-text; abstraction layer to swap).
+
+i18n & multi-currency (base USD; FX util; display in user locale).
+
+Performance: route-level caching, ISR where safe, client hints, prefetch on hover, code-split.
+
+Accessibility: WCAG 2.1 AA (focus rings, landmarks, ARIA for carousels/video controls).
+
+1) Branding & Visual Design (Luxury, Modern, Addictive)
+
+Palette:
+
+Primary: Black #0B0B0D
+
+Accent/Brand Metal: Gold #D4AF37
+
+Contrast: Ivory #F7F6F3, Charcoal #1A1A1D
+
+Typography: High-contrast luxury serif for headings (e.g., “Fraunces” or “Cormorant Garamond”), geometric sans for UI (e.g., “Inter”).
+
+Components: glassy cards, soft shadows, micro-interactions (hover scale, shimmer on product tiles, gentle parallax on hero).
+
+Dark/Light Mode: toggle in header; persisted in local storage; gold accent remains consistent.
+
+Homepage hero: premium editorial look; feature sliders (see 3.2).
+
+2) Roles & Auth Flow
+
+Age Gate 18+ → must confirm to proceed.
+
+Sign up/sign in (email, password, email verification).
+
+Role select: Buyer (EntizNate) or Seller (Vendor/Creator/Brand).
+
+Profile setup:
+
+Buyer: name, gender (optional), country, default address(es), comms preferences, theme mode, interests (for recs).
+
+Seller: storefront name, bio, logo, banner, ID/verification, payout method, shipping profiles, return policy.
+
+3) Storefront & Navigation
+
+Top tabs (sticky): Store (Home), Shop All, On Sale, Popular, Favorites, Categories, Brands/Creators, Help.
+
+3.1 Google AdSense: integrate ad blocks in home, category listing, product page, blog/help layouts; responsive ad units; safe placements (non-intrusive, content-aligned).
+
+3.2 In-house Seller Ads (“Promote with us”):
+
+Self-serve portal in Seller Dashboard: create banner, carousel tile, search-sponsored, product card badge.
+
+Targeting: by category, geo, keywords; budget CPC/CPM; flight dates; creative uploads; review queue by admin.
+
+Reporting: impressions, clicks, CTR, spend; wallet for ad credits.
+
+3.3 Feature slide banners:
+
+CMS-managed hero slider (multiple slides, schedule, CTA links).
+
+Secondary carousels: “Editor’s Picks”, “New Arrivals”, “Best Rated”.
+
+3.4 Recommendations (personalized):
+
+Inputs: views, carts, purchases, wishlists, interests; cold-start via category/popularity.
+
+Surfaces: homepage, product page (“you may also like”), cart cross-sells, post-purchase.
+
+3.5 Search & Filters:
+
+Filters: price, rating, material, brand, category, “Ships from”, “Digital/Physical”, availability.
+
+Save filters; recently viewed; quick-add to wishlist/cart.
+
+4) Catalog – Product Types, Categories, Media
+
+Physical: Sex Clothing (fantasy/roleplay outfits), Lingerie, Toys, Accessories, Merch.
+
+Digital: E-books, Custom videos/photos, Fan packs, Training guides, NFTs (future).
+
+Categories (with subcats):
+
+Vibrators: Clitoral, G-Spot, Rabbit, Wand, Bullet, Remote-Controlled, Couples’.
+
+Dildos: Realistic, Non-realistic, Double-ended, Suction-cup, Strap-on, Glass/Metal.
+
+Men’s Toys: Masturbators/Fleshlights, Pumps, Prostate toys, Cock rings, Delay trainers, Sex dolls.
+
+Anal Toys: Butt plugs, Beads, Prostate massagers, Anal vibrators, Training kits.
+
+Couples’ Toys: Wearable, Remote-controlled, Bondage kits, Sensual massage kits.
+
+BDSM & Fetish: Restraints, Blindfolds/Masks, Gags, Whips/Floggers, Harnesses/Chokers.
+
+Lubes & Essentials: Water-based, Silicone-based, Organic, Warming/Cooling, Condoms.
+
+Lingerie & Apparel: Babydolls, Bodysuits, Corsets, Men’s erotic wear, Roleplay costumes.
+
+Gift Sets & Bundles: Date Night, Beginner, Couple bundles, Luxury editions.
+
+Digital & Virtual: E-books/Guides, Custom Photos/Videos, Fan Packs, NFTs (future).
+
+Media:
+
+Images & video won’t be auto-censored (no blurring by default).
+
+Lawful guardrails enforced: no minors/CSAM, no bestiality, explicit consent claims where applicable, IP respect, regional legality. Hard blocks + reporting pipeline.
+
+Short product videos: 6–60s, vertical/1:1/16:9; autoplay muted on hover (desktop) / tap to play (mobile); multiple clips supported.
+
+360°/gallery with pinch-zoom, swipe, video-in-gallery.
+
+5) Product & Inventory (Seller “Cal-level” advanced)
+
+Attributes & variants: size, color, material, voltage/plug, digital license types.
+
+SKUs, barcodes, batch import (CSV), bulk edit, draft/publish.
+
+Stock: multi-warehouse locations, safety stock, low-stock alerts.
+
+Pricing: base, compare-at, regional price rules, coupons, bundles, volume discounts.
+
+Shipping profiles: domestic/international, carrier rules, free-delivery conditions.
+
+Digital fulfillment: secure file/video links, watermark option, download limits, expiry.
+
+Returns/RMA: rules, window (e.g., 14/30 days), RMA statuses, restock logic.
+
+Ad tools (section 3.2) + Analytics: sales by SKU/category, cohorts, geography, UTM.
+
+6) Buyer Experience & Profile (Advanced)
+
+Checkout & Address
+
+Buyer default address pre-filled; must reconfirm before payment.
+
+Can edit/replace address on the final review step.
+
+Address book (multiple addresses), nicknames, default flags.
+
+Order lifecycle in profile:
+
+Statuses: Ordered, On Transit, Delivered, Cancelled, Returned.
+
+Reviews: “To be reviewed” queue + history; anonymous review option.
+
+Saved: Favorites/Wishlists, Recently Viewed.
+
+Policies: easy access (returns, discreet packaging, buyer protection).
+
+Themes: Dark/Bright mode toggle & persist.
+
+Messages:
+
+Order Chats (buyer↔seller per order thread).
+
+Promos Inbox (platform & followed stores; opt-in categories).
+
+Account & Payments: emails/phones, password, 2FA (optional), region/currency, saved methods (tokenized), receipts/invoices.
+
+Personalized suggestions:
+
+Based on your reviews + purchases + views; cold-start by selected interests.
+
+Explicit “Improve my recommendations” preferences page.
+
+7) Payments & Escrow (Regional)
+
+Gateways (abstracted adapter; select by user geo & seller region):
+
+Asia: GCash, Maya/PayMaya, Alipay.
+
+Americas: Stripe, PayPal, Apple Pay.
+
+Europe: Stripe, PayPal, Klarna, SEPA.
+
+Africa: Flutterwave, Paystack, M-Pesa.
+
+Escrow logic:
+
+Funds captured → held by platform.
+
+Physical: release on buyer “Delivered & OK” or auto-release after X days post-carrier delivered if no dispute.
+
+Digital: release on first successful download/view confirmation + short dispute window.
+
+Payouts to sellers: bank or e-wallet; KYC required; rolling reserve configurable.
+
+8) Ads & Monetization Summary
+
+Google AdSense: page placements ready + consent CMP; safe layout.
+
+Seller Ads: banner/carousel/search-sponsored/tile badge; CPC/CPM; category & geo targeting; spend caps; admin approval workflow.
+
+Spin-to-Win / promos: promo widgets on home and cart; limited by seller budgets; platform-wide coupons.
+
+9) Compliance, Safety, Moderation
+
+Age gate, ID verification for sellers & payout.
+
+“Uncensored” means no automatic blurring, but strict legal filters; reporting & takedown SLA.
+
+Auto-hash/AI checks against prohibited content lists (no minors/CSAM); 3-strike policy; audit trail.
+
+10) Messaging, Notifications, Comms
+
+Order chat threads; attachments limited to order context.
+
+Promo inbox; unsubscribe per store/category.
+
+Notifications: email + push (webpush) for order updates, delivery, promos (opt-in).
+
+System queue for email jobs (Supabase functions/Edge + external mailer).
+
+11) Admin & CMS
+
+CMS: hero sliders, home sections, feature tiles, categories, landing copy, policies.
+
+Review queue: products, media, ads, disputes.
+
+Disputes: case view, evidence, timeline, resolution (refund/partial/deny).
+
+Reports: sales, GMV, ad revenue, payouts, abuse reports.
+
+12) Deployment, Env, Telemetry
+
+Domains: EntizNetStore.com & PrimeDiscreet.com → same backend project; brand flag.
+
+ENV (examples):
+
+NEXT_PUBLIC_SITE_BRAND=entiznetstore|primediscreet
+NEXT_PUBLIC_DEFAULT_CURRENCY=USD
+NEXT_PUBLIC_TYPESENSE_URL=...
+NEXT_PUBLIC_TYPESENSE_KEY=...
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SERVICE_ROLE_KEY=...
+STRIPE_KEY=...
+PAYPAL_CLIENT_ID=...
+FLUTTERWAVE_KEY=...
+PAYSTACK_KEY=...
+MPESA_KEY=...
+GCASH_KEY=...
+MAYA_KEY=...
+ADSENSE_CLIENT=ca-pub-xxxxxxxx
+
+
+Analytics: page/product views, add-to-cart, checkout steps, purchase, rec clicks, ad clicks, video plays; privacy-aware.
+
+13) Database (high-level tables)
+
+users, profiles_buyer, profiles_seller (KYC fields), addresses.
+
+products, product_media, product_variants, categories, brands.
+
+inventory_stocks, warehouses, shipping_profiles.
+
+orders, order_items, transactions, escrow_ledgers, payouts.
+
+digital_assets (signed URLs, expiry), downloads.
+
+reviews, wishlists, recently_viewed.
+
+messages (order_chat), promo_messages, subscriptions.
+
+ads_campaigns, ads_creatives, ads_spend, ads_impressions_clicks.
+
+cms_banners, cms_sections, policies.
+
+RLS: sellers can only CRUD their own; buyers only their orders/msgs; admin full.
+
+14) Pages & Key Components (MVP)
+
+Public: Home (sliders, recs, AdSense, sections), Categories, Product detail (images+short-videos), Brands/Creators, Help/Policies.
+
+Auth: Sign in/up, 18+ check, Forgot password.
+
+Buyer: Profile dashboard, Orders (tabs: Ordered/Transit/Delivered/Cancelled/Returned), Reviews (pending/history), Addresses, Messages, Payment settings, Theme.
+
+Seller: Storefront preview, Product manager, Inventory, Orders & fulfillment, Digital delivery, Ads manager, Analytics, Payouts, Settings/KYC.
+
+Checkout: Cart → Address confirm/edit → Shipping method → Payment → Review (final reconfirm) → Success.
+
+Admin: moderation, CMS, disputes, ads approvals.
+
+📦 COPY-PASTE FOR AGENT 3
+
+Build EntizNetStore (and PrimeDiscreet) with the following exact scope:
+
+Stack: Next.js (App Router, TS) + Supabase (Auth/DB/Storage/RLS) + Tailwind + PWA.
+
+Branding: Luxury, modern, addictive. Gold (#D4AF37) on black (#0B0B0D), premium serif headings + clean sans UI, glassy cards, micro-motions. Dark/Light mode toggle persisted.
+
+Storefront:
+- Tabs: Store(Home), Shop All, On Sale, Popular, Favorites, Categories, Brands/Creators, Help.
+- Google AdSense: responsive ad units on home/category/product/help.
+- In-house Seller Ads: self-serve campaigns (banner/carousel/search-sponsored/tile badge), CPC/CPM, geo/category targeting, budgets, dates, admin approval, reporting.
+- CMS-managed hero sliders + feature carousels; scheduled banners with CTAs.
+- Recommendations on home/product/cart using views/carts/purchases/interests (fallback to trending).
+
+Catalog & Media:
+- Physical: Sex Clothing (fantasy/roleplay), Lingerie, Toys, Accessories, Merch.
+- Digital: E-books, Custom videos/photos, Fan packs, Training guides, NFTs (future).
+- Categories include Vibrators, Dildos, Men’s Toys, Anal Toys, Couples’ Toys, BDSM & Fetish, Lubes, Lingerie & Apparel, Gift Sets, Digital & Virtual (with listed subcategories).
+- Product detail supports galleries + short product videos (6–60s), autoplay muted on hover (desktop), tap to play (mobile). No automatic censoring of images/videos; enforce legal guardrails and content policy.
+
+Auth & Roles:
+- Age gate 18+; email/password + email verification.
+- Role select: Buyer or Seller; guided profile setup for each.
+
+Buyer Experience:
+- Address book; default address auto-filled; user must reconfirm on final review step and can edit/replace before payment.
+- Profile dashboard: Orders (Ordered/On Transit/Delivered/Cancelled/Returned), Reviews (to-review/history), Favorites/Wishlist, Recently Viewed, Policies, Messages (Order Chats + Promos inbox), Account info, Payment settings, Theme (dark/bright).
+- Personalized suggestions based on reviews + purchases + views; preferences page to tune recs.
+
+Seller Dashboard (advanced product & inventory):
+- Products with attributes/variants/SKUs; bulk import/edit; draft/publish.
+- Inventory (multi-warehouse), low-stock alerts.
+- Pricing (regional rules), coupons, bundles, volume discounts.
+- Shipping profiles; returns/RMA configuration.
+- Digital delivery: secure files/streams with signed URLs, download limits/expiry, watermark option.
+- Ads manager (create/manage campaigns) and Analytics (sales, cohorts, geography, UTMs).
+- KYC/verification required for payouts.
+
+Payments & Escrow:
+- Gateways by region: US/EU → Stripe, PayPal, Apple Pay, Klarna/SEPA; Asia → GCash, Maya/PayMaya, Alipay; Africa → Flutterwave, Paystack, M-Pesa.
+- Escrow: capture funds to platform; release to seller on buyer confirmation (physical) or on digital fulfillment + short dispute window; auto-release fallback after X days if no dispute.
+- Payouts to seller accounts; rolling reserve configurable.
+
+Messaging & Notifications:
+- Per-order chat threads; promo inbox with opt-outs.
+- Email + web push notifications for order status, delivery, promos (consent).
+
+Admin & CMS:
+- Manage CMS sliders/sections, categories, brands, policies.
+- Approve products, media, ads; disputes console with evidence & resolutions.
+- Abuse reporting and takedown workflow.
+- Analytics dashboard: GMV, ad revenue, payouts, reports.
+
+Infra & Quality:
+- PWA installable; ISR where applicable; lazy load, skeletons, code-split.
+- SEO: meta, OG, sitemap, structured data for products.
+- Accessibility WCAG AA; keyboard nav; ARIA for carousels/video controls.
+- ENV variables for Supabase, payments, search, AdSense.
+- RLS: strict row-level policies for buyers/sellers/admin.
+- Unit + e2e test skeletons for auth, checkout, escrow release, media access.
+
+Deliver a production-ready MVP that matches the above, with dual brand fronts (EntizNetStore.com, PrimeDiscreet.com) controlled by a brand flag but sharing the same backend.
+
+✅ Quick Acceptance Checklist (what we’ll verify)
+
+Age gate → Auth → Role setup works.
+
+Home shows hero banners, AdSense, seller ads, recs.
+
+Product page supports short videos + gallery; no auto-censoring but upload blocks illegal content.
+
+Buyer checkout forces address reconfirmation; address can be edited at final step.
+
+Buyer dashboard shows all statuses, reviews queues, messages, policies, theme toggle, payment settings.
+
+Seller dashboard: SKU/variants, stock, shipping profiles, digital files, ads manager, analytics, payouts.
+
+Payments route by region; escrow + payout works in sandbox.
+
+Admin can approve ads/products, manage CMS sliders, resolve disputes.
+
+Dark/light luxury UI with gold+black across both brands.
