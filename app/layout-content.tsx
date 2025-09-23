@@ -3,6 +3,7 @@
 import Link from "next/link";
 import CartLink from "@/components/CartLink";
 import ThemeToggle from "@/components/ThemeToggle";
+import LanguageCurrencySwitcher from "@/components/LanguageCurrencySwitcher";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BrandProvider, useBrand } from "@/components/BrandProvider";
 import { AuthProvider, useAuth } from "@/components/AuthProvider";
@@ -71,6 +72,7 @@ function Navigation() {
         </div>
         
         <div className="flex items-center gap-4">
+          <LanguageCurrencySwitcher />
           <BrandSwitcher />
           <ThemeToggle />
           <CartLink />

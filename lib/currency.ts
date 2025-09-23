@@ -8,49 +8,53 @@ export const DEFAULT_CURRENCY = "USD";
  * to STATIC_RATES_BY_BASE so the app still works.
  */
 export const SUPPORTED_CURRENCIES: string[] = [
-  // Europe
-  "EUR",
-  "GBP",
-  "CHF",
-  "DKK",
-  "NOK",
-  "SEK",
-  "PLN",
-  "CZK",
-  "HUF",
-  "RON",
-  // Americas
-  "USD",
-  "CAD",
-  "MXN",
-  "BRL",
-  "ARS",
-  "CLP",
-  "COP",
-  // Asia-Pacific
-  "JPY",
-  "CNY",
-  "HKD",
-  "TWD",
-  "KRW",
-  "SGD",
-  "AUD",
-  "NZD",
-  "INR",
-  "IDR",
-  "MYR",
-  "PHP",
-  "THB",
-  "VND",
-  // Middle East / Africa
-  "AED",
-  "SAR",
-  "TRY",
-  "ZAR",
-  "NGN",
-  "EGP",
-  "KES",
+  "USD", // US Dollar - World's primary reserve currency
+  "EUR", // Euro - European Union
+  "GBP", // British Pound
+  "JPY", // Japanese Yen
+  "CNY", // Chinese Yuan
+  "AUD", // Australian Dollar
+  "CAD", // Canadian Dollar
+  "CHF", // Swiss Franc
+  "HKD", // Hong Kong Dollar
+  "SGD", // Singapore Dollar
+  "INR", // Indian Rupee
+  "KRW", // South Korean Won
+  "MXN", // Mexican Peso
+  "BRL", // Brazilian Real
+  "ZAR", // South African Rand
+  "TRY", // Turkish Lira
+  "RUB", // Russian Ruble
+  "PHP", // Philippine Peso
+  "NGN", // Nigerian Naira
+  "THB", // Thai Baht
 ];
+
+/**
+ * Currency display names with symbols
+ */
+export const CURRENCY_NAMES: Record<string, { name: string; symbol: string }> = {
+  USD: { name: "US Dollar", symbol: "$" },
+  EUR: { name: "Euro", symbol: "€" },
+  GBP: { name: "British Pound", symbol: "£" },
+  JPY: { name: "Japanese Yen", symbol: "¥" },
+  CNY: { name: "Chinese Yuan", symbol: "¥" },
+  AUD: { name: "Australian Dollar", symbol: "A$" },
+  CAD: { name: "Canadian Dollar", symbol: "C$" },
+  CHF: { name: "Swiss Franc", symbol: "Fr" },
+  HKD: { name: "Hong Kong Dollar", symbol: "HK$" },
+  SGD: { name: "Singapore Dollar", symbol: "S$" },
+  INR: { name: "Indian Rupee", symbol: "₹" },
+  KRW: { name: "South Korean Won", symbol: "₩" },
+  MXN: { name: "Mexican Peso", symbol: "MX$" },
+  BRL: { name: "Brazilian Real", symbol: "R$" },
+  ZAR: { name: "South African Rand", symbol: "R" },
+  TRY: { name: "Turkish Lira", symbol: "₺" },
+  RUB: { name: "Russian Ruble", symbol: "₽" },
+  PHP: { name: "Philippine Peso", symbol: "₱" },
+  NGN: { name: "Nigerian Naira", symbol: "₦" },
+  THB: { name: "Thai Baht", symbol: "฿" },
+};
 
 /**
  * Fallback static rates (rough dev values) used when the live API
@@ -62,50 +66,26 @@ const STATIC_RATES_BY_BASE: Record<string, Record<string, number>> = {
     // self
     USD: 1,
 
-    // Europe
+    // Top 20 currencies
     EUR: 0.92,
     GBP: 0.78,
-    CHF: 0.86,
-    DKK: 6.87,
-    NOK: 10.5,
-    SEK: 10.6,
-    PLN: 3.95,
-    CZK: 23.2,
-    HUF: 360,
-    RON: 4.6,
-
-    // Americas
-    CAD: 1.36,
-    MXN: 19.0,
-    BRL: 5.2,
-    ARS: 950,
-    CLP: 950,
-    COP: 4000,
-
-    // Asia-Pacific
     JPY: 157,
     CNY: 7.3,
-    HKD: 7.8,
-    TWD: 32,
-    KRW: 1380,
-    SGD: 1.35,
     AUD: 1.49,
-    NZD: 1.65,
+    CAD: 1.36,
+    CHF: 0.86,
+    HKD: 7.8,
+    SGD: 1.35,
     INR: 84,
-    IDR: 16000,
-    MYR: 4.7,
-    PHP: 58,
-    THB: 36,
-    VND: 25500,
-
-    // Middle East / Africa
-    AED: 3.67,
-    SAR: 3.75,
-    TRY: 34,
+    KRW: 1380,
+    MXN: 19.0,
+    BRL: 5.2,
     ZAR: 18.5,
+    TRY: 34,
+    RUB: 92,
+    PHP: 58,
     NGN: 1600,
-    EGP: 50,
-    KES: 130,
+    THB: 36,
   },
 };
 
