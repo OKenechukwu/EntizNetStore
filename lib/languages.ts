@@ -26,6 +26,8 @@ export const SUPPORTED_LANGUAGES = [
   { code: "ko", name: "Korean", nativeName: "한국어" },
   { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt" },
   { code: "it", name: "Italian", nativeName: "Italiano" },
+  { code: "th", name: "Thai", nativeName: "ไทย" },
+  { code: "fil", name: "Filipino", nativeName: "Filipino" },
 ];
 
 /**
