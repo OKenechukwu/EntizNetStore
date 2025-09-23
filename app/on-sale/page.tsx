@@ -1,9 +1,31 @@
 // app/on-sale/page.tsx
 import Link from "next/link";
+import { getSaleProducts } from "@/lib/database";
 
-export default function OnSalePage() {
-  // Mock sale products data
-  const saleProducts = [
+export default async function OnSalePage() {
+  const saleProducts = await getSaleProducts(12);
+  
+  // Transform data to match component expectations
+  const transformedProducts = saleProducts.map(product => {
+    const discount = product.compare_at_price ? 
+      Math.round(((product.compare_at_price - product.base_price) / product.compare_at_price) * 100) : 0;
+    
+    return {
+      id: product.id,
+      title: product.title,
+      price: product.base_price,
+      originalPrice: product.compare_at_price || product.base_price * 1.3,
+      discount,
+      rating: 4.7, // Will come from reviews later
+      reviews: 0, // Will come from reviews later
+      category: "Premium",
+      image: "/placeholder-product.jpg",
+      saleEnd: "2025-10-01"
+    };
+  });
+  
+  // If no products, show sample data for demo
+  const displayProducts = transformedProducts.length > 0 ? transformedProducts : [
     {
       id: "1",
       title: "Deluxe Couples Collection",
@@ -103,7 +125,7 @@ export default function OnSalePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {saleProducts.map((product) => (
+        {displayProducts.map((product) => (
           <div key={product.id} className="product-card p-0 overflow-hidden relative">
             {/* Discount Badge */}
             <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold z-10">

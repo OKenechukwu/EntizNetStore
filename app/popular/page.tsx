@@ -1,9 +1,25 @@
 // app/popular/page.tsx
 import Link from "next/link";
+import { getPopularProducts } from "@/lib/database";
 
-export default function PopularPage() {
-  // Mock popular products data
-  const popularProducts = [
+export default async function PopularPage() {
+  const popularProducts = await getPopularProducts(12);
+  
+  // Transform data to match component expectations
+  const transformedProducts = popularProducts.map(product => ({
+    id: product.id,
+    title: product.title,
+    price: product.base_price,
+    originalPrice: product.compare_at_price,
+    rating: 4.8, // Will come from reviews later
+    reviews: 0, // Will come from reviews later
+    category: "Premium",
+    image: "/placeholder-product.jpg",
+    badge: "Featured"
+  }));
+  
+  // If no products, show sample data for demo
+  const displayProducts = transformedProducts.length > 0 ? transformedProducts : [
     {
       id: "1",
       title: "Luxury Silk Collection Set",
@@ -84,7 +100,7 @@ export default function PopularPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {popularProducts.map((product) => (
+        {displayProducts.map((product) => (
           <div key={product.id} className="product-card p-0 overflow-hidden">
             {/* Product Image */}
             <div className="aspect-square bg-gradient-to-br from-charcoal to-primary-black relative">

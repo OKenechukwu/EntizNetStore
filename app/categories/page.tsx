@@ -1,57 +1,22 @@
 // app/categories/page.tsx
 import Link from "next/link";
+import { getCategories, getSubcategories } from "@/lib/database";
 
-export default function CategoriesPage() {
-  const categories = [
-    {
-      name: "Vibrators",
-      slug: "vibrators",
-      description: "Vibrating pleasure devices",
-      subcategories: ["Clitoral", "G-Spot", "Rabbit", "Wand", "Bullet", "Remote Control"]
-    },
-    {
-      name: "Dildos & Toys", 
-      slug: "dildos-toys",
-      description: "Non-vibrating intimate toys",
-      subcategories: ["Realistic", "Non-realistic", "Double-ended", "Suction-cup", "Glass/Metal"]
-    },
-    {
-      name: "Men's Toys",
-      slug: "mens-toys", 
-      description: "Pleasure products for men",
-      subcategories: ["Masturbators", "Pumps", "Prostate", "Cock Rings", "Training"]
-    },
-    {
-      name: "Anal Toys",
-      slug: "anal-toys",
-      description: "Anal pleasure products", 
-      subcategories: ["Plugs", "Beads", "Prostate", "Training Kits"]
-    },
-    {
-      name: "Couples' Toys",
-      slug: "couples-toys",
-      description: "Products for couples",
-      subcategories: ["Wearable", "Remote Control", "Bondage Kits", "Massage"]
-    },
-    {
-      name: "BDSM & Fetish",
-      slug: "bdsm-fetish", 
-      description: "Bondage and fetish items",
-      subcategories: ["Restraints", "Masks", "Gags", "Whips", "Harnesses"]
-    },
-    {
-      name: "Lubes & Essentials",
-      slug: "lubes-essentials",
-      description: "Lubricants and care products",
-      subcategories: ["Water-based", "Silicone-based", "Organic", "Warming", "Condoms"]
-    },
-    {
-      name: "Lingerie & Apparel", 
-      slug: "lingerie-apparel",
-      description: "Intimate clothing and costumes",
-      subcategories: ["Babydolls", "Corsets", "Roleplay", "Men's Wear"]
-    }
-  ];
+export default async function CategoriesPage() {
+  // Get all main categories (no parent)
+  const allCategories = await getCategories();
+  const mainCategories = allCategories.filter(cat => !cat.parent_id);
+  
+  // Get subcategories for each main category
+  const categoriesWithSubs = await Promise.all(
+    mainCategories.map(async (category) => {
+      const subcategories = await getSubcategories(category.id);
+      return {
+        ...category,
+        subcategories
+      };
+    })
+  );
 
   return (
     <div className="animate-fade-in">
@@ -65,7 +30,7 @@ export default function CategoriesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category) => (
+        {categoriesWithSubs.map((category) => (
           <div key={category.slug} className="product-card p-6">
             <h2 className="font-serif text-xl font-semibold text-accent-gold mb-3">
               {category.name}
@@ -76,11 +41,11 @@ export default function CategoriesPage() {
             <div className="space-y-2 mb-6">
               {category.subcategories.map((sub) => (
                 <Link 
-                  key={sub}
-                  href={`/categories/${category.slug}/${sub.toLowerCase().replace(/\s+/g, '-')}`}
+                  key={sub.id}
+                  href={`/categories/${sub.slug}`}
                   className="block text-sm hover:text-accent-gold transition-colors"
                 >
-                  → {sub}
+                  → {sub.name}
                 </Link>
               ))}
             </div>
