@@ -63,7 +63,9 @@ export default function CheckoutClient() {
   };
 
   const handlePlaceOrder = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 && !orderSuccess) {
+      return (/* Your Cart is Empty UI */);
+    }
 
     setIsLoading(true);
     try {
