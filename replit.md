@@ -2,7 +2,18 @@
 
 ## Overview
 
-EntizNet is a Next.js 14 marketplace application built with TypeScript and App Router. The project serves as an e-commerce platform where users can browse products, manage their own inventory, and handle orders through an escrow system. The application features a clean, modern interface using Tailwind CSS and integrates with Supabase for backend services including authentication, database, and file storage.
+EntizNet is a Next.js 14 marketplace application built with TypeScript and App Router featuring a sophisticated dual brand architecture. The platform serves as a comprehensive luxury adult marketplace with two distinct brand experiences: EntizNetStore (warm luxury gold/ivory theme) and PrimeDiscreet (sophisticated champagne/charcoal theme). Users can browse products, manage inventory, handle orders through an escrow system, and enjoy brand-specific experiences with dedicated seller dashboards, KYC verification, and premium theming.
+
+## Recent Changes
+
+### December 2024 - Dual Brand Architecture Implementation
+- **Dual Brand System**: Implemented sophisticated dual brand architecture with EntizNetStore (luxury gold/ivory theme) and PrimeDiscreet (premium champagne/charcoal theme)
+- **Dynamic Theming**: Advanced theming system with real-time CSS variable switching, brand-specific color schemes, and responsive design transitions
+- **Brand-Specific Routing**: Added `/entiznet` and `/primediscreet` routes with automatic brand context switching and localStorage persistence
+- **Database Enhancement**: Added `marketplace_brand` field to products table for brand-specific filtering and categorization
+- **Product Filtering**: Comprehensive brand-aware filtering system with distinct categories, pricing tiers, and featured tags per brand
+- **Brand Provider System**: React context-based brand management with theme application and state persistence
+- **Seller Customization**: Brand-aware components allowing sellers to choose their marketplace brand and customize storefront experiences
 
 ## User Preferences
 
