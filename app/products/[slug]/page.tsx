@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
 import { addItem, type CartItem } from '@/lib/cart'
+import { getFxRates, convertFromBase, DEFAULT_CURRENCY, BASE_CURRENCY } from '@/lib/currency'
+import { formatPrice } from '@/lib/format'
+
+function readCookie(name: string): string | null {
+  if (typeof window === 'undefined') return null
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+  return match ? decodeURIComponent(match[1]) : null
+}
 
 interface Product {
   id: string
@@ -34,10 +42,36 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
+  const [userCurrency, setUserCurrency] = useState(DEFAULT_CURRENCY)
+  const [fxRates, setFxRates] = useState<Record<string, number>>({})
+  const [currencyLoading, setCurrencyLoading] = useState(true)
 
   useEffect(() => {
     loadProduct()
+    loadCurrency()
   }, [params.slug, brand])
+
+  const loadCurrency = async () => {
+    setCurrencyLoading(true)
+    
+    // Get currency from cookie
+    const savedCurrency = readCookie('currency') || DEFAULT_CURRENCY
+    setUserCurrency(savedCurrency.toUpperCase())
+    
+    // Fetch FX rates
+    try {
+      const response = await fetch('/api/fx')
+      if (response.ok) {
+        const data = await response.json()
+        setFxRates(data.rates || {})
+      }
+    } catch (error) {
+      console.error('Failed to fetch FX rates:', error)
+      setFxRates({ [DEFAULT_CURRENCY]: 1 })
+    } finally {
+      setCurrencyLoading(false)
+    }
+  }
 
   const loadProduct = async () => {
     setLoading(true)
@@ -286,19 +320,28 @@ Ideal for beginners or as a thoughtful gift for someone special in your life.`,
 
             {/* Price */}
             <div className="mb-6">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-3xl font-bold" style={{ color: theme.colors.accent }}>
-                  ${product.price}
-                </span>
-                {product.originalPrice && (
-                  <span className="text-xl line-through" style={{ color: theme.colors.text.secondary }}>
-                    ${product.originalPrice}
+              {currencyLoading ? (
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-24 h-8 bg-gray-200 animate-pulse rounded"></div>
+                  {product.originalPrice && (
+                    <div className="w-20 h-6 bg-gray-200 animate-pulse rounded"></div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-3xl font-bold" style={{ color: theme.colors.accent }}>
+                    {formatPrice(convertFromBase(product.price, userCurrency, fxRates), userCurrency)}
                   </span>
-                )}
-              </div>
-              {product.originalPrice && (
+                  {product.originalPrice && (
+                    <span className="text-xl line-through" style={{ color: theme.colors.text.secondary }}>
+                      {formatPrice(convertFromBase(product.originalPrice, userCurrency, fxRates), userCurrency)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {product.originalPrice && !currencyLoading && (
                 <p className="text-sm font-medium text-green-600">
-                  You save ${(product.originalPrice - product.price).toFixed(2)}!
+                  You save {formatPrice(convertFromBase(product.originalPrice - product.price, userCurrency, fxRates), userCurrency)}!
                 </p>
               )}
             </div>
@@ -347,8 +390,10 @@ Ideal for beginners or as a thoughtful gift for someone special in your life.`,
               >
                 {addedToCart ? (
                   <>✓ Added to Cart!</>
+                ) : currencyLoading ? (
+                  <>🛒 Add to Cart - ...</>
                 ) : (
-                  <>🛒 Add to Cart - ${(product.price * quantity).toFixed(2)}</>
+                  <>🛒 Add to Cart - {formatPrice(convertFromBase(product.price * quantity, userCurrency, fxRates), userCurrency)}</>
                 )}
               </button>
             </div>
