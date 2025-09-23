@@ -235,6 +235,31 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  // Generate secure presigned URL for document viewing (admin access)
+  async getDocumentDownloadURL(
+    filePath: string,
+    accessType: 'admin_view' | 'seller_view' = 'admin_view',
+    expirationSeconds: number = 300
+  ): Promise<string> {
+    try {
+      // Parse the file path to get bucket and object name
+      const { bucketName, objectName } = parseObjectPath(filePath);
+      
+      // Use the existing signObjectURL function for generating secure URLs
+      const signedUrl = await signObjectURL({
+        bucketName,
+        objectName,
+        method: 'GET',
+        ttlSec: expirationSeconds
+      });
+
+      return signedUrl;
+    } catch (error) {
+      console.error('Error generating document download URL:', error);
+      throw error;
+    }
+  }
 }
 
 function parseObjectPath(path: string): {
