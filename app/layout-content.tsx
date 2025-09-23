@@ -5,6 +5,7 @@ import CartLink from "@/components/CartLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BrandProvider, useBrand } from "@/components/BrandProvider";
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import AgeGate from "@/components/AgeGate";
 
 function BrandSwitcher() {
@@ -38,6 +39,7 @@ function BrandSwitcher() {
 
 function Navigation() {
   const { config } = useBrand();
+  const { user, signOut } = useAuth();
   
   return (
     <header className="glass-card sticky top-0 z-40 border-b border-opacity-20">
@@ -72,12 +74,29 @@ function Navigation() {
           <BrandSwitcher />
           <ThemeToggle />
           <CartLink />
-          <Link 
-            href="/auth/sign-in" 
-            className="luxury-button-outline text-sm px-4 py-2"
-          >
-            Sign In
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <Link 
+                href="/dashboard"
+                className="text-sm hover:text-accent-gold transition-colors"
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={signOut}
+                className="luxury-button-outline text-sm px-4 py-2"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <Link 
+              href="/auth/sign-in" 
+              className="luxury-button-outline text-sm px-4 py-2"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </nav>
     </header>
@@ -142,15 +161,17 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <BrandProvider>
-        <AgeGate>
-          <div className="min-h-screen transition-colors duration-300">
-            <Navigation />
-            <main className="mx-auto max-w-7xl px-6 py-8">
-              {children}
-            </main>
-            <Footer />
-          </div>
-        </AgeGate>
+        <AuthProvider>
+          <AgeGate>
+            <div className="min-h-screen transition-colors duration-300">
+              <Navigation />
+              <main className="mx-auto max-w-7xl px-6 py-8">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </AgeGate>
+        </AuthProvider>
       </BrandProvider>
     </ThemeProvider>
   );

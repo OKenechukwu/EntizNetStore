@@ -169,7 +169,19 @@ export async function getProducts(filters?: {
     .eq('status', 'active')
   
   if (filters?.category) {
-    query = query.contains('categories', [filters.category])
+    // Join with product_categories to filter by category slug
+    query = supabase
+      .from('products')
+      .select(`
+        *,
+        brands(name, slug, is_verified),
+        product_media(url, alt_text, type, position),
+        product_categories!inner(
+          categories!inner(slug, name)
+        )
+      `)
+      .eq('status', 'active')
+      .eq('categories.slug', filters.category)
   }
   
   if (filters?.brand) {

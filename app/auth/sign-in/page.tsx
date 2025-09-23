@@ -1,115 +1,121 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { supabase } from '../../../lib/supabase/client';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { signIn } from '@/lib/auth'
+import { useAuth } from '@/components/AuthProvider'
 
 export default function SignInPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const router = useRouter();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
+  const { refreshProfile } = useAuth()
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-      } else {
-        router.replace('/dashboard/store');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
+      await signIn(email, password)
+      await refreshProfile()
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during sign in')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
+    <div className="min-h-[80vh] flex items-center justify-center">
+      <div className="glass-card p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
+            Welcome Back
+          </h1>
+          <p className="opacity-80">
+            Sign in to your EntizNet account
+          </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSignIn}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-2">
+              Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none transition-colors"
+              placeholder="your@email.com"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium mb-2">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none transition-colors"
+              placeholder="Your password"
+            />
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm text-center">{error}</div>
+            <div className="p-3 rounded-lg bg-red-600/20 border border-red-600/30 text-red-400 text-sm">
+              {error}
+            </div>
           )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="luxury-button w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Signing In...' : 'Sign In'}
+          </button>
+        </form>
 
-          <div className="text-center space-y-2">
-            <Link
-              href="#"
-              className="text-indigo-600 hover:text-indigo-500 text-sm"
-            >
-              Create account (coming soon)
-            </Link>
-            <div>
-              <Link
-                href="/store"
-                className="text-gray-600 hover:text-gray-500 text-sm"
+        <div className="mt-6 text-center space-y-4">
+          <Link 
+            href="/auth/forgot-password"
+            className="text-sm text-accent-gold hover:opacity-80 transition-opacity"
+          >
+            Forgot your password?
+          </Link>
+          
+          <div className="border-t border-accent-gold/20 pt-4">
+            <p className="text-sm opacity-80 mb-3">
+              Don't have an account?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link 
+                href="/auth/sign-up?role=buyer"
+                className="luxury-button-outline flex-1 text-center py-2"
               >
-                Continue as guest
+                Join as Buyer
+              </Link>
+              <Link 
+                href="/auth/sign-up?role=seller"
+                className="luxury-button-outline flex-1 text-center py-2"
+              >
+                Become a Seller
               </Link>
             </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
