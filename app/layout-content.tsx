@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { BrandProvider, useBrand } from "@/components/BrandProvider";
 import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import AgeGate from "@/components/AgeGate";
+import { useTranslation } from "@/hooks/useTranslation";
 
 function BrandSwitcher() {
   const { brand, setBrand } = useBrand();
@@ -41,6 +42,7 @@ function BrandSwitcher() {
 function Navigation() {
   const { config } = useBrand();
   const { user, signOut } = useAuth();
+  const { t } = useTranslation();
   
   return (
     <header className="glass-card sticky top-0 z-40 border-b border-opacity-20">
@@ -54,22 +56,22 @@ function Navigation() {
           </Link>
           <div className="flex items-center gap-6 text-sm font-medium">
             <Link href="/store" className="hover:text-accent-gold transition-colors">
-              Store
+              {t('store')}
             </Link>
             <Link href="/categories" className="hover:text-accent-gold transition-colors">
-              Categories
+              {t('categories')}
             </Link>
             <Link href="/brands" className="hover:text-accent-gold transition-colors">
-              Brands
+              {t('brands')}
             </Link>
             <Link href="/popular" className="hover:text-accent-gold transition-colors">
-              Popular
+              {t('popular')}
             </Link>
             <Link href="/on-sale" className="hover:text-accent-gold transition-colors">
-              On Sale
+              {t('onSale')}
             </Link>
             <Link href="/platform" className="hover:text-accent-gold transition-colors">
-              Experience
+              {t('experience')}
             </Link>
           </div>
         </div>
@@ -85,13 +87,13 @@ function Navigation() {
                 href="/dashboard"
                 className="text-sm hover:text-accent-gold transition-colors"
               >
-                Dashboard
+                {t('dashboard')}
               </Link>
               <button
                 onClick={signOut}
                 className="luxury-button-outline text-sm px-4 py-2"
               >
-                Sign Out
+                {t('signOut')}
               </button>
             </div>
           ) : (
@@ -99,7 +101,7 @@ function Navigation() {
               href="/auth/sign-in" 
               className="luxury-button-outline text-sm px-4 py-2"
             >
-              Sign In
+              {t('signIn')}
             </Link>
           )}
         </div>
