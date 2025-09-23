@@ -24,22 +24,22 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
     description: "Premium adult products and experiences. Discrete, luxury, authentic.",
     domain: "entiznetstore.com",
     colors: {
-      primary: "#0B0B0D",
-      accent: "#D4AF37",
-      background: "#F7F6F3",
+      primary: "#0B0B0D",      // Deep black
+      accent: "#D4AF37",       // Luxury gold
+      background: "#F7F6F3",   // Warm ivory
     },
     logo: "/logos/entiznet-logo.svg",
     favicon: "/favicons/entiznet.ico",
   },
   primediscreet: {
     name: "Prime Discreet",
-    tagline: "Elite Intimate Collection",
+    tagline: "Elite Intimate Collection", 
     description: "Ultra-premium intimate products for discerning adults. Exclusively curated.",
     domain: "primediscreet.com",
     colors: {
-      primary: "#0B0B0D",
-      accent: "#D4AF37", // Same luxury gold
-      background: "#F7F6F3",
+      primary: "#0A0A0A",      // Deeper black for more discrete feel
+      accent: "#C9A876",       // Muted champagne gold
+      background: "#1A1A1D",   // Dark charcoal for sophisticated discrete theme
     },
     logo: "/logos/primediscreet-logo.svg",
     favicon: "/favicons/primediscreet.ico",
