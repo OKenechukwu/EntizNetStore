@@ -1,20 +1,19 @@
-entrypoint = "package.json"
-run = "bash -lc 'npm ci || npm i; HOST=0.0.0.0 PORT=${PORT:-3000} npm run dev'"
+run = "npm run dev"
+entrypoint = "index.js"
+modules = ["nodejs-20:v9-20231020-a3526c9"]
+hidden = [".config", "package-lock.json", ".next", ".swc"]
 
 [nix]
-channel = "stable-25_05"
+channel = "stable-23_05"
 
-[agent]
-expertMode = true
+[env]
+NEXT_TELEMETRY_DISABLED = "1"
 
-[workflows]
-runButton = "Project"
+[deployment]
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
+deploymentTarget = "cloudrun"
 
-[[workflows.workflow]]
-name = "Project"
-author = "agent"
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash -lc 'HOST=0.0.0.0 PORT=${PORT:-3000} npm run dev'"
+[[ports]]
+localPort = 3000
+externalPort = 80
