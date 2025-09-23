@@ -68,6 +68,9 @@ function Navigation() {
             <Link href="/on-sale" className="hover:text-accent-gold transition-colors">
               On Sale
             </Link>
+            <Link href="/platform" className="hover:text-accent-gold transition-colors">
+              Experience
+            </Link>
           </div>
         </div>
         
