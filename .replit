@@ -1,14 +1,5 @@
 entrypoint = "package.json"
-run = "npm run dev"
-modules = ["nodejs-20"]
-
-[[ports]]
-localPort = 3000
-externalPort = 80
-
-[[ports]]
-localPort = 5000
-externalPort = 80
+run = "bash -lc 'npm ci || npm i; HOST=0.0.0.0 PORT=${PORT:-3000} npm run dev'"
 
 [nix]
 channel = "stable-25_05"
@@ -21,21 +12,9 @@ runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
+author = "agent"
 mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Next.js App"
-
-[[workflows.workflow]]
-name = "Next.js App"
-author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
+args = "bash -lc 'HOST=0.0.0.0 PORT=${PORT:-3000} npm run dev'"
