@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ObjectStorageService } from '@/server/objectStorage'
 import { getCurrentUser } from '@/lib/auth'
+import { ObjectStorageService } from '@/server/objectStorage'
+
+// Valid KYC document types for EntizNetStore
+const VALID_DOCUMENT_TYPES = [
+  'identity', 
+  'business_license', 
+  'tax_document', 
+  'address_proof', 
+  'bank_statement'
+] as const
+
+type DocumentType = typeof VALID_DOCUMENT_TYPES[number]
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,8 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate document type
-    const validTypes = ['identity', 'business_license', 'tax_document', 'address_proof', 'bank_statement']
-    if (!validTypes.includes(documentType)) {
+    if (!VALID_DOCUMENT_TYPES.includes(documentType as DocumentType)) {
       return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
     }
 

@@ -118,62 +118,108 @@ export default function VerificationPage() {
     }
   }
 
-  const handleFileUpload = async (documentType: DocumentType, file: File) => {
+  const handleFileUpload = async (documentType: DocumentType) => {
     setUploadingType(documentType)
     
     try {
-      // Validate file size (10MB max)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB')
-        return
+      // Get presigned upload URL from secure API
+      const getUploadParameters = async () => {
+        const response = await fetch('/api/kyc/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ documentType })
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to get upload URL')
+        }
+        
+        const { uploadURL } = await response.json()
+        return { method: 'PUT' as const, url: uploadURL }
       }
 
-      // Convert file to base64 for now (in production, use proper file storage)
-      const fileBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(file)
-      })
-      
-      // Create document record
-      const { data } = await supabase
-        .from('kyc_documents')
-        .insert({
-          seller_id: user!.id,
-          document_type: documentType,
-          file_path: fileBase64, // Store base64 for now
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type
-        })
-        .select()
-        .single()
-
-      if (data) {
-        setDocuments(prev => [data, ...prev])
-        
-        // Update verification request with submitted document
-        if (verificationRequest && !verificationRequest.submitted_documents.includes(documentType)) {
-          const updatedSubmitted = [...verificationRequest.submitted_documents, documentType]
-          const isComplete = verificationRequest.required_documents.every(doc => 
-            updatedSubmitted.includes(doc)
-          )
+      // Handle upload completion
+      const handleUploadComplete = async (result: any) => {
+        if (result.successful && result.successful.length > 0) {
+          const uploadedFile = result.successful[0]
           
-          await supabase
-            .from('kyc_verification_requests')
-            .update({
-              submitted_documents: updatedSubmitted,
-              verification_status: isComplete ? 'under_review' : 'incomplete'
+          // Save document record with secure object storage path
+          const response = await fetch('/api/kyc/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              documentType,
+              uploadURL: uploadedFile.uploadURL,
+              fileName: uploadedFile.name,
+              fileSize: uploadedFile.size,
+              mimeType: uploadedFile.type
             })
-            .eq('id', verificationRequest.id)
+          })
           
-          await loadVerificationData()
+          if (response.ok) {
+            const { document } = await response.json()
+            setDocuments(prev => [document, ...prev])
+            await loadVerificationData()
+          } else {
+            throw new Error('Failed to save document record')
+          }
         }
       }
+
+      // For now, show file input until ObjectUploader is properly integrated
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.pdf,.jpg,.jpeg,.png,.webp'
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+
+        // Validate file
+        if (file.size > 10 * 1024 * 1024) {
+          alert('File size must be less than 10MB')
+          return
+        }
+
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        if (!allowedTypes.includes(file.type)) {
+          alert('Only PDF and image files are allowed')
+          return
+        }
+
+        try {
+          const { url } = await getUploadParameters()
+          
+          // Upload file directly to object storage
+          const uploadResponse = await fetch(url, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type }
+          })
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Upload failed')
+          }
+          
+          // Simulate Uppy result format for handleUploadComplete
+          await handleUploadComplete({
+            successful: [{
+              uploadURL: url,
+              name: file.name,
+              size: file.size,
+              type: file.type
+            }]
+          })
+        } catch (error) {
+          console.error('Upload error:', error)
+          alert('Failed to upload document. Please try again.')
+        } finally {
+          setUploadingType(null)
+        }
+      }
+      input.click()
     } catch (error) {
       console.error('Error uploading document:', error)
       alert('Failed to upload document. Please try again.')
-    } finally {
       setUploadingType(null)
     }
   }
@@ -367,20 +413,13 @@ export default function VerificationPage() {
                         Uploading...
                       </div>
                     ) : (
-                      <label className="luxury-button-outline px-4 py-2 cursor-pointer">
+                      <button 
+                        className="luxury-button-outline px-4 py-2"
+                        onClick={() => handleFileUpload(docType)}
+                        disabled={isUploading}
+                      >
                         {isUploaded ? 'Replace' : 'Upload'}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              handleFileUpload(docType, file)
-                            }
-                          }}
-                        />
-                      </label>
+                      </button>
                     )}
                   </div>
                 </div>
