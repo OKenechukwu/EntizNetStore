@@ -1,6 +1,6 @@
 entrypoint = "package.json"
 run = "bash -lc 'npm ci || npm i; HOST=0.0.0.0 PORT=${PORT:-3000} npm run dev'"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
@@ -39,7 +39,3 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 38409
-externalPort = 3000
