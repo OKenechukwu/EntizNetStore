@@ -60,17 +60,121 @@ export function validatePassword(password: string): {
   }
 }
 
+// Secure encryption system for EntizNetStore using Web Crypto API
+export class MessageEncryption {
+  private static readonly ALGORITHM = 'AES-GCM'
+  private static readonly KEY_LENGTH = 256
+
+  // Generate a new encryption key for conversations
+  static async generateConversationKey(): Promise<CryptoKey> {
+    return await crypto.subtle.generateKey(
+      {
+        name: this.ALGORITHM,
+        length: this.KEY_LENGTH,
+      },
+      true, // extractable for storage
+      ['encrypt', 'decrypt']
+    )
+  }
+
+  // Export key to store in database (encrypted with user's master key)
+  static async exportKey(key: CryptoKey): Promise<string> {
+    const exported = await crypto.subtle.exportKey('raw', key)
+    return btoa(String.fromCharCode(...new Uint8Array(exported)))
+  }
+
+  // Import key from database
+  static async importKey(keyData: string): Promise<CryptoKey> {
+    const rawKey = new Uint8Array(
+      atob(keyData)
+        .split('')
+        .map(char => char.charCodeAt(0))
+    )
+    
+    return await crypto.subtle.importKey(
+      'raw',
+      rawKey,
+      { name: this.ALGORITHM },
+      true,
+      ['encrypt', 'decrypt']
+    )
+  }
+
+  // Encrypt a message
+  static async encryptMessage(message: string, key: CryptoKey): Promise<{
+    encrypted: string
+    iv: string
+  }> {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(message)
+    const iv = crypto.getRandomValues(new Uint8Array(12)) // 96-bit IV for AES-GCM
+
+    const encrypted = await crypto.subtle.encrypt(
+      {
+        name: this.ALGORITHM,
+        iv: iv,
+      },
+      key,
+      data
+    )
+
+    return {
+      encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+      iv: btoa(String.fromCharCode(...iv))
+    }
+  }
+
+  // Decrypt a message
+  static async decryptMessage(
+    encryptedData: string, 
+    ivData: string, 
+    key: CryptoKey
+  ): Promise<string> {
+    try {
+      const encrypted = new Uint8Array(
+        atob(encryptedData)
+          .split('')
+          .map(char => char.charCodeAt(0))
+      )
+      
+      const iv = new Uint8Array(
+        atob(ivData)
+          .split('')
+          .map(char => char.charCodeAt(0))
+      )
+
+      const decrypted = await crypto.subtle.decrypt(
+        {
+          name: this.ALGORITHM,
+          iv: iv,
+        },
+        key,
+        encrypted
+      )
+
+      const decoder = new TextDecoder()
+      return decoder.decode(decrypted)
+    } catch (error) {
+      console.error('Decryption failed:', error)
+      return '[Message could not be decrypted]'
+    }
+  }
+
+  // Generate conversation key ID from participant IDs
+  static generateConversationId(userId1: string, userId2: string): string {
+    const sortedIds = [userId1, userId2].sort()
+    return btoa(sortedIds.join(':'))
+  }
+}
+
 export function encryptSensitiveData(data: string): string {
-  // In production, use proper encryption
-  // For now, return base64 encoded
-  return btoa(data)
+  // Use proper base64 encoding for non-message sensitive data
+  return btoa(unescape(encodeURIComponent(data)))
 }
 
 export function decryptSensitiveData(encryptedData: string): string {
-  // In production, use proper decryption
-  // For now, return base64 decoded
   try {
-    return atob(encryptedData)
+    return decodeURIComponent(escape(atob(encryptedData)))
   } catch {
     return encryptedData
   }

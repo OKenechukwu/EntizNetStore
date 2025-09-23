@@ -4,28 +4,10 @@ import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { RealTimeMessaging, type DecryptedMessage } from '@/lib/messaging'
 import Link from 'next/link'
 
-interface Message {
-  id: string
-  sender_id: string
-  recipient_id: string
-  content: string
-  message_type: 'text' | 'image' | 'order_inquiry' | 'system'
-  order_id?: string
-  read_at?: string
-  created_at: string
-  sender?: {
-    id: string
-    email: string
-    profile?: any
-  }
-  recipient?: {
-    id: string
-    email: string
-    profile?: any
-  }
-}
+// Using DecryptedMessage interface from messaging lib
 
 interface Conversation {
   other_user: {
@@ -33,7 +15,7 @@ interface Conversation {
     email: string
     profile?: any
   }
-  last_message: Message
+  last_message: DecryptedMessage
   unread_count: number
 }
 
@@ -42,10 +24,11 @@ export default function MessagesPage() {
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<DecryptedMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,6 +38,24 @@ export default function MessagesPage() {
 
     if (user?.id) {
       loadConversations()
+      
+      // Set up real-time subscription for new conversations
+      const subscription = RealTimeMessaging.subscribeToNewConversations(
+        user.id,
+        (newMessage) => {
+          // Refresh conversations when a new message arrives
+          loadConversations()
+        }
+      )
+      setRealtimeSubscription(subscription)
+    }
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe()
+      }
+      RealTimeMessaging.clearKeyCache()
     }
   }, [user, loading, router])
 
@@ -107,30 +108,33 @@ export default function MessagesPage() {
 
   const loadMessages = async (otherUserId: string) => {
     try {
-      const { data: messagesData } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:sender_id(id, email),
-          recipient:recipient_id(id, email)
-        `)
-        .or(`and(sender_id.eq.${user!.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user!.id})`)
-        .order('created_at', { ascending: true })
-
-      if (messagesData) {
-        setMessages(messagesData)
-        
-        // Mark messages as read
-        await supabase
-          .from('messages')
-          .update({ read_at: new Date().toISOString() })
-          .eq('sender_id', otherUserId)
-          .eq('recipient_id', user!.id)
-          .is('read_at', null)
-        
-        // Refresh conversations to update unread count
-        loadConversations()
+      // Use encrypted messaging API
+      const response = await fetch(`/api/messages/conversation/${otherUserId}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to load messages')
       }
+      
+      const { messages: decryptedMessages } = await response.json()
+      setMessages(decryptedMessages || [])
+      
+      // Refresh conversations to update unread count
+      loadConversations()
+      
+      // Set up real-time subscription for this conversation
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe()
+      }
+      
+      const conversationSubscription = RealTimeMessaging.subscribeToConversation(
+        user!.id,
+        otherUserId,
+        (newMessage) => {
+          setMessages(prev => [...prev, newMessage])
+          loadConversations() // Update conversation list
+        }
+      )
+      setRealtimeSubscription(conversationSubscription)
     } catch (error) {
       console.error('Error loading messages:', error)
     }
@@ -141,24 +145,32 @@ export default function MessagesPage() {
     
     setIsSending(true)
     try {
-      const { data } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user!.id,
-          recipient_id: selectedConversation,
+      // Use encrypted messaging API
+      const response = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipientId: selectedConversation,
           content: newMessage,
-          message_type: 'text'
+          messageType: 'text'
         })
-        .select()
-        .single()
+      })
 
-      if (data) {
-        setMessages(prev => [...prev, data])
-        setNewMessage('')
-        loadConversations() // Refresh conversations list
+      if (!response.ok) {
+        throw new Error('Failed to send message')
       }
+
+      const { message } = await response.json()
+      
+      // Add message to local state (real-time will also update it)
+      setMessages(prev => [...prev, message])
+      setNewMessage('')
+      loadConversations() // Refresh conversations list
     } catch (error) {
       console.error('Error sending message:', error)
+      alert('Failed to send message. Please try again.')
     } finally {
       setIsSending(false)
     }
