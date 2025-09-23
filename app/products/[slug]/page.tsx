@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
+import { addItem, type CartItem } from '@/lib/cart'
 
 interface Product {
   id: string
@@ -32,6 +33,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [loading, setLoading] = useState(true)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
+  const [addedToCart, setAddedToCart] = useState(false)
 
   useEffect(() => {
     loadProduct()
@@ -126,6 +128,25 @@ Ideal for beginners or as a thoughtful gift for someone special in your life.`,
       setProduct(demoProduct)
       setLoading(false)
     }, 500)
+  }
+
+  const handleAddToCart = () => {
+    if (!product) return
+    
+    const cartItem: CartItem = {
+      id: product.id,
+      title: product.title,
+      priceBase: product.price,
+      qty: quantity
+    }
+    
+    addItem(cartItem)
+    setAddedToCart(true)
+    
+    // Reset the added state after 2 seconds
+    setTimeout(() => {
+      setAddedToCart(false)
+    }, 2000)
   }
 
   if (loading) {
@@ -288,35 +309,47 @@ Ideal for beginners or as a thoughtful gift for someone special in your life.`,
             </p>
 
             {/* Quantity and Add to Cart */}
-            <div className="flex items-center gap-4 mb-8">
-              <div className="flex items-center gap-2">
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center gap-4">
                 <label className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
                   Quantity:
                 </label>
-                <select
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
-                  className="px-3 py-2 border rounded-lg"
-                  style={{
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
-                  }}
-                >
-                  {[1, 2, 3, 4, 5].map(num => (
-                    <option key={num} value={num}>{num}</option>
-                  ))}
-                </select>
+                <div className="flex items-center border rounded-lg"
+                     style={{ borderColor: theme.colors.glass.border }}>
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 flex items-center justify-center hover:bg-opacity-10 transition-colors"
+                    style={{ backgroundColor: theme.colors.surface }}
+                    disabled={quantity <= 1}
+                  >
+                    −
+                  </button>
+                  <span className="w-16 text-center font-medium" style={{ color: theme.colors.text.primary }}>
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-10 h-10 flex items-center justify-center hover:bg-opacity-10 transition-colors"
+                    style={{ backgroundColor: theme.colors.surface }}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               
               <button
-                className="flex-1 py-3 px-6 rounded-lg font-medium transition-all hover:opacity-90"
+                onClick={handleAddToCart}
+                className="w-full py-3 px-6 rounded-lg font-medium transition-all hover:opacity-90 flex items-center justify-center gap-2"
                 style={{
-                  backgroundColor: theme.colors.accent,
-                  color: brand === 'primediscreet' ? theme.colors.background : 'white'
+                  backgroundColor: addedToCart ? '#10B981' : theme.colors.accent,
+                  color: 'white'
                 }}
               >
-                Add to Cart - ${(product.price * quantity).toFixed(2)}
+                {addedToCart ? (
+                  <>✓ Added to Cart!</>
+                ) : (
+                  <>🛒 Add to Cart - ${(product.price * quantity).toFixed(2)}</>
+                )}
               </button>
             </div>
 
