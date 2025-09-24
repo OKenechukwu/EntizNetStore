@@ -76,13 +76,19 @@ function SearchResults() {
       // Get products from similar categories or with related keywords
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, base_price, status, marketplace_brand, created_at, updated_at')
         .ilike('name', `%${searchQuery.split(' ')[0]}%`)
         .eq('marketplace_brand', brand)
+        .eq('status', 'active')
         .limit(6)
 
       if (!error && data) {
-        setRelatedProducts(data.filter(p => !searchResults.some(sr => sr.id === p.id)))
+        const processedData = data.map(product => ({
+          ...product,
+          price: product.base_price,
+          slug: product.id
+        }))
+        setRelatedProducts(processedData.filter(p => !searchResults.some(sr => sr.id === p.id)))
       }
     } catch (error) {
       console.error('Error loading related products:', error)
@@ -94,13 +100,19 @@ function SearchResults() {
       // Get top-rated or popular products
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, base_price, status, marketplace_brand, created_at, updated_at')
         .eq('marketplace_brand', brand)
+        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(6)
 
       if (!error && data) {
-        setRecommendedProducts(data.filter(p => !searchResults.some(sr => sr.id === p.id)))
+        const processedData = data.map(product => ({
+          ...product,
+          price: product.base_price,
+          slug: product.id
+        }))
+        setRecommendedProducts(processedData.filter(p => !searchResults.some(sr => sr.id === p.id)))
       }
     } catch (error) {
       console.error('Error loading recommended products:', error)
