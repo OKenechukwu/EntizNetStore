@@ -13,10 +13,19 @@ export async function POST(request: NextRequest) {
     let searchQuery = supabase
       .from('products')
       .select(`
-        *,
-        seller:profiles_seller!seller_id(storefront_name),
-        variants:product_variants(id, title, price),
-        media:product_media(url, alt_text)
+        id,
+        name,
+        description,
+        base_price,
+        compare_at_price,
+        status,
+        marketplace_brand,
+        tags,
+        search_keywords,
+        average_rating,
+        review_count,
+        created_at,
+        updated_at
       `)
 
     // Add marketplace brand filter
@@ -117,11 +126,12 @@ export async function POST(request: NextRequest) {
     // Process results to add computed fields
     const processedProducts = (products || []).map(product => ({
       ...product,
-      image_url: product.media?.[0]?.url || null,
-      price_range: getProductPriceRange(product),
+      image_url: null, // No media relationship for now
+      price: product.base_price,
       on_sale: product.compare_at_price && product.compare_at_price > product.base_price,
       rating: product.average_rating || 0,
-      review_count: product.review_count || 0
+      reviews_count: product.review_count || 0,
+      slug: product.id
     }))
 
     // Add search analytics (optional)

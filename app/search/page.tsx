@@ -58,14 +58,19 @@ function SearchResults() {
 
       setSearchResults(data.products || [])
       
-      // Load related and recommended products
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchResults([])
+    }
+
+    // Always load related and recommended products, regardless of search results
+    try {
       await Promise.all([
         loadRelatedProducts(searchQuery),
         loadRecommendedProducts()
       ])
     } catch (error) {
-      console.error('Search error:', error)
-      setSearchResults([])
+      console.error('Error loading related/recommended products:', error)
     } finally {
       setLoading(false)
     }
@@ -74,13 +79,17 @@ function SearchResults() {
   const loadRelatedProducts = async (searchQuery: string) => {
     try {
       // Get products from similar categories or with related keywords
+      // Use broader search terms to find related items
+      const searchTerms = searchQuery.toLowerCase().split(' ')
+      const searchTerm = searchTerms[0] // Use first word for broader matching
+      
       const { data, error } = await supabase
         .from('products')
         .select('id, name, description, base_price, status, marketplace_brand, created_at, updated_at')
-        .ilike('name', `%${searchQuery.split(' ')[0]}%`)
+        .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,tags.ilike.%${searchTerm}%`)
         .eq('marketplace_brand', brand)
         .eq('status', 'active')
-        .limit(6)
+        .limit(8)
 
       if (!error && data) {
         const processedData = data.map(product => ({
@@ -88,6 +97,7 @@ function SearchResults() {
           price: product.base_price,
           slug: product.id
         }))
+        // Filter out items that are already in search results (if any)
         setRelatedProducts(processedData.filter(p => !searchResults.some(sr => sr.id === p.id)))
       }
     } catch (error) {
@@ -192,24 +202,14 @@ function SearchResults() {
 
         {/* No Results Message */}
         {hasSearched && searchResults.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🔍</div>
+          <div className="text-center py-8 mb-8">
+            <div className="text-4xl mb-3">🔍</div>
             <h2 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
               Cannot find this product
             </h2>
-            <p className="text-lg mb-6" style={{ color: theme.colors.text.secondary }}>
-              We couldn't find any products matching "{query}". Try a different search term or browse our categories.
+            <p className="text-lg mb-4" style={{ color: theme.colors.text.secondary }}>
+              We couldn't find any products matching "{query}". Check out related items below.
             </p>
-            <Link 
-              href="/categories"
-              className="inline-block px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-              style={{
-                backgroundColor: theme.colors.accent,
-                color: brand === 'primediscreet' ? theme.colors.background : 'white'
-              }}
-            >
-              Browse Categories
-            </Link>
           </div>
         )}
 
@@ -244,14 +244,14 @@ function SearchResults() {
           </div>
         )}
 
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
+        {/* Related Products - Show even when no search results */}
+        {relatedProducts.length > 0 && hasSearched && (
           <div className="mb-12">
             <h2 className="text-xl font-semibold mb-6" style={{ color: theme.colors.text.primary }}>
-              Related Products
+              {searchResults.length === 0 ? 'Related Products' : 'You Might Also Like'}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {relatedProducts.slice(0, 4).map((product) => (
+              {relatedProducts.slice(0, 8).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
@@ -259,16 +259,32 @@ function SearchResults() {
         )}
 
         {/* Recommended Products */}
-        {recommendedProducts.length > 0 && (
+        {recommendedProducts.length > 0 && hasSearched && (
           <div className="mb-12">
             <h2 className="text-xl font-semibold mb-6" style={{ color: theme.colors.text.primary }}>
-              Recommended Products
+              {searchResults.length === 0 ? 'Popular Products' : 'Recommended Products'}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {recommendedProducts.slice(0, 4).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Fallback when no results and no related products */}
+        {hasSearched && searchResults.length === 0 && relatedProducts.length === 0 && !loading && (
+          <div className="text-center py-8">
+            <Link 
+              href="/categories"
+              className="inline-block px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+              style={{
+                backgroundColor: theme.colors.accent,
+                color: brand === 'primediscreet' ? theme.colors.background : 'white'
+              }}
+            >
+              Browse Categories
+            </Link>
           </div>
         )}
 
