@@ -1,0 +1,23 @@
+{
+  "leftSideAd": {
+    "src": "https://example.com/placeholder-ad-video.mp4",
+    "type": "video",
+    "poster": "https://example.com/placeholder-ad-poster.jpg",
+    "title": "Premium Collection",
+    "caption": "Discover our exclusive luxury wellness products",
+    "ctaLabel": "Shop Now",
+    "href": "/collections/premium",
+    "autoplay": true,
+    "duration": 15
+  },
+  "alternativeAds": [
+    {
+      "src": "/images/luxury-banner.jpg",
+      "type": "image",
+      "title": "Elite Wellness",
+      "caption": "Elevate your intimate experiences",
+      "ctaLabel": "Explore",
+      "href": "/categories/premium"
+    }
+  ]
+}

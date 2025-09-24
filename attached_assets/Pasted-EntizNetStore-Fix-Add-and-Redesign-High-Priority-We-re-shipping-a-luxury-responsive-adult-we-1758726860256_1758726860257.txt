@@ -1,0 +1,273 @@
+EntizNetStore – Fix, Add, and Redesign (High Priority)
+
+We’re shipping a luxury, responsive adult-wellness storefront. Please implement the following changes. Use Next.js (App Router) + TypeScript + Tailwind, keep code modular, and add light comments. Maintain our white + rich luxury pink + purple palette.
+
+0) Tech notes
+
+If needed, install:
+
+react-select (for searchable country select)
+
+framer-motion (hero slider animations)
+
+next-intl or i18next (for i18n)
+
+Use Tailwind variables for brandPink and brandPurple.
+
+1) Searchable Country Select (Profile/Edit forms)
+
+Goal: Dropdown with search, full country list (A–Z). Typing “P” filters to P…; typing “Phil” shows “Philippines”.
+
+Where: whichever form component renders “Country” (e.g., components/forms/CountrySelect.tsx or inside profile page).
+
+Do:
+
+Create components/forms/CountrySelect.tsx using react-select with:
+
+isSearchable enabled
+
+list of all countries in A–Z order
+
+keyboard navigation
+
+Export onChange(countryCode) + value support
+
+Style to our theme.
+
+Acceptance:
+
+Users can type to filter (e.g., “Phil”) and select Philippines quickly.
+
+Works on desktop + mobile.
+
+2) Dashboard Cards Layout & Opacity
+
+Issue: “Edit Profile” is stacked above “Today” and both “Start Shopping” and “Edit Profile” look faded.
+
+Where: app/dashboard/page.tsx (or the card component used there).
+
+Do:
+
+Make a 2-column responsive grid:
+
+Left: “Recent Orders” card with “No orders yet” + “Start Shopping” button.
+
+Right: “Account” card with “Member Since: Today” and an “Edit Profile” button aligned top-right, on the same row as “Account”.
+
+Increase button opacity to 100%; keep disabled state styles distinct.
+
+Place “Start Shopping” below “No orders yet” with proper spacing.
+
+Acceptance:
+
+“Edit Profile” appears top-right within Account card, not overlapping text.
+
+Buttons are fully opaque and readable.
+
+3) Top Bar & Hero Slider (Luxury theme + overlay CTAs)
+
+Goal: See Screenshot #3 behavior.
+
+Where: components/layout/Header.tsx, components/hero/HeroSlider.tsx, app/(store)/page.tsx.
+
+Do:
+
+Header bar: set background to brandPink with luxury feel (no gradients unless super subtle). Ensure text/buttons contrast and hover states.
+
+Create/replace HeroSlider that supports both images and 15–20s videos. Use a 3-slide carousel.
+
+Keep the headline/description/CTAs overlaid on top of the media (absolute positioning, centered). CTAs (“Explore Collection”, “Browse Categories”) must remain clickable across slides.
+
+Category pill buttons (“Wellness”, “Massage”, etc.) use brandPink style consistent with header.
+
+Acceptance:
+
+3-slide media carousel (images or videos), autoplay, with pause on hover.
+
+Overlaid text + CTAs remain clickable and accessible.
+
+Visual theme = white base + rich luxury pink + purple accents.
+
+4) Left-Side Video Ad Slot (15–20s)
+
+Goal: Like Screenshot #4, a persistent left-column ad area with video/gif or image, optional caption, and clickable link.
+
+Where: components/ads/SideVideoAd.tsx + include on catalog/product listing/home as per layout (left middle; not top/bottom).
+
+Do:
+
+Props: src (video or image), title, ctaLabel, href, caption.
+
+Video: autoplay muted loop; fallback to poster if needed.
+
+Entire card (and CTA button) should be clickable to href.
+
+Admin config from a simple JSON for now (e.g., data/ads.json).
+
+Acceptance:
+
+Renders on the left side (on large screens); stacks below content on mobile.
+
+Clicking goes to the configured link. Caption overlays nicely.
+
+5) Fully Responsive (phone/tablet/laptop)
+
+Issue: Layout breaks on smaller screens; “EntizNet Store” and “On Sale” split into two lines each.
+
+Where: Global layout + header nav components.
+
+Do:
+
+Make header nav flex-wrap:nowrap and shrink/condense at smaller breakpoints.
+
+Use a mobile hamburger menu.
+
+Ensure all hero, cards, grids, and ad slot stack gracefully on small screens.
+
+Acceptance:
+
+No label splits (e.g., “EntizNet\nStore”).
+
+Pages look clean on iPhone/Android/tablets and desktop.
+
+6) Dropdown “Mega Menu” with Grid & Images
+
+Goal: On hover (or tap on mobile), show a grid mega-menu with images + short descriptions (see Screenshot #5 style).
+
+Where: components/nav/MegaMenu.tsx and integrate into Header for tabs: Store, Categories, Brands, Popular, On Sale.
+
+Do:
+
+Build a reusable MegaMenu that accepts sections (title, image, short blurb, link).
+
+Desktop: open on hover/focus; Mobile: open on tap via hamburger.
+
+Include small thumbnails and 2–3 line descriptions.
+
+Acceptance:
+
+Smooth open/close, keyboard accessible, and visually rich grid.
+
+7) Language & Currency Switchers (live on all pages)
+
+Issue: Language/currency select doesn’t affect storefront pages (only cart reflects currency).
+
+Where: providers/I18nProvider.tsx, providers/CurrencyProvider.tsx, utils.
+
+Do:
+
+Implement SSR-aware i18n (e.g., next-intl or i18next) with language switch persisting via cookie or localStorage. Translate visible strings on Store pages (at least EN + FR demo).
+
+Implement currency context + formatter so product cards, list pages, and PDP reflect the selected currency immediately (€, $, £ etc.). Use a simple FX table for now (config JSON).
+
+Ensure both switchers update UI without reload (hydrate state on client).
+
+Acceptance:
+
+Switching language updates visible strings across Store pages.
+
+Switching currency updates all visible prices, not just cart.
+
+8) Categories: add/expand taxonomy
+
+Goal: Add these categories & subcategories under our Categories page + mega-menu.
+
+Masturbator: Automatic Masturbators; Masturbator Cup; Pocket Pussy; Penis Pumps; Blowjob Toys.
+
+Vibrators: Rose Vibrators; Tongue Vibrators; Rabbit Vibrators; Clitoral Vibrators; Butterfly Vibrators; Bullet Vibrators; Wearable Vibrators; G-Spot Vibrators; Wand Massagers; Quiet Vibrators.
+
+Dildos: Strap-On Dildos; Anal Dildos; Double Dildos; Huge Dildos; Realistic Dildos; Thrusting Dildos; Squirting Dildos; Silicone Dildos.
+
+Sex Dolls: White Female Sex Doll; Black Female Sex Doll; Asian Female Sex Doll; White Male Sex Doll; Black Male Sex Doll; Asian Male Sex Doll; Realistic Sex Butts; Sex Torso.
+
+Couple Toys: Cock Rings; Penis Sleeves; Penis Trainer; BDSM.
+
+Anal Toys: Prostate Massagers; Butt Plugs; Anal Beads; Anal Douches; Anal Hooks; Tails.
+
+Where: data/taxonomy.ts (or CMS seed), app/categories/page.tsx, mega-menu data.
+
+Do:
+
+Add to taxonomy with slugs, display names, and short 1-sentence blurbs.
+
+Ensure each appears in Categories page cards and mega-menu grid.
+
+Acceptance:
+
+All new categories + subs are visible, linked, and searchable.
+
+9) “Find What You’re Looking For” – move up
+
+Goal: On the Categories page, place the search panel directly under “Product Categories” heading, above category cards.
+
+Where: app/categories/page.tsx.
+
+Do:
+
+Move the section (“Browse All Products | Advanced Search”) above the grid.
+
+Acceptance:
+
+The search panel shows immediately below the page title.
+
+10) Home Page Product Search (below hero)
+
+Goal: Global product search bar directly below the hero slider.
+
+Where: app/(store)/page.tsx + components/search/ProductSearchBar.tsx.
+
+Do:
+
+Add a full-width search input with suggestions (optional) and submit button.
+
+Hook to our existing search route; show results page.
+
+Acceptance:
+
+Search bar is visible under the slider and functional.
+
+11) QA & Accessibility
+
+Keyboard navigable menus, selects, and carousels.
+
+Alt text for all images; titles for video ads.
+
+Lighthouse pass ≥ 90 for Accessibility on home + categories.
+
+Deliverables
+
+Updated components:
+
+components/forms/CountrySelect.tsx
+
+components/layout/Header.tsx
+
+components/hero/HeroSlider.tsx
+
+components/ads/SideVideoAd.tsx
+
+components/nav/MegaMenu.tsx
+
+components/search/ProductSearchBar.tsx
+
+Updated pages:
+
+app/dashboard/page.tsx
+
+app/(store)/page.tsx
+
+app/categories/page.tsx
+
+Data/config:
+
+data/countries.ts (A–Z list)
+
+data/ads.json (left-ad config)
+
+data/taxonomy.ts (new categories/subs)
+
+utils/currency.ts (format, FX)
+
+i18n message files: messages/en.json, messages/fr.json
+
+Please implement now and confirm

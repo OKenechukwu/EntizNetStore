@@ -1,0 +1,73 @@
+{
+  "nav": {
+    "store": "Boutique",
+    "categories": "Catégories",
+    "brands": "Marques",
+    "popular": "Populaire",
+    "onSale": "En Promotion",
+    "search": "Rechercher des produits...",
+    "cart": "Panier",
+    "account": "Compte",
+    "login": "Connexion",
+    "signup": "S'inscrire"
+  },
+  "hero": {
+    "title": "Bien-être Intime de Luxe",
+    "subtitle": "Découvrez des produits intimes haut de gamme conçus pour votre plaisir et bien-être",
+    "exploreCollection": "Explorer la Collection",
+    "browseCategories": "Parcourir les Catégories"
+  },
+  "categories": {
+    "title": "Catégories de Produits",
+    "subtitle": "Explorez notre sélection complète de produits de bien-être de luxe",
+    "findWhatYouLookingFor": "Trouvez Ce Que Vous Cherchez",
+    "browseAllProducts": "Parcourir Tous les Produits",
+    "advancedSearch": "Recherche Avancée",
+    "searchPlaceholder": "Rechercher des produits, catégories ou marques..."
+  },
+  "dashboard": {
+    "title": "Tableau de Bord",
+    "recentOrders": "Commandes Récentes",
+    "account": "Compte",
+    "noOrders": "Aucune commande encore",
+    "startShopping": "Commencer les Achats",
+    "editProfile": "Modifier le Profil",
+    "memberSince": "Membre Depuis"
+  },
+  "search": {
+    "placeholder": "Que recherchez-vous aujourd'hui?",
+    "searchButton": "Rechercher",
+    "suggestions": "Recherches populaires",
+    "noResults": "Aucun résultat trouvé",
+    "showingResults": "Affichage des résultats pour"
+  },
+  "product": {
+    "addToCart": "Ajouter au Panier",
+    "buyNow": "Acheter Maintenant",
+    "outOfStock": "Rupture de Stock",
+    "price": "Prix",
+    "description": "Description",
+    "features": "Caractéristiques",
+    "reviews": "Avis",
+    "specifications": "Spécifications"
+  },
+  "footer": {
+    "about": "À Propos",
+    "contact": "Contact",
+    "privacy": "Politique de Confidentialité",
+    "terms": "Conditions d'Utilisation",
+    "shipping": "Informations de Livraison",
+    "returns": "Retours et Échanges"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Quelque chose s'est mal passé",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer"
+  }
+}

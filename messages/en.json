@@ -1,0 +1,73 @@
+{
+  "nav": {
+    "store": "Store",
+    "categories": "Categories",
+    "brands": "Brands",
+    "popular": "Popular",
+    "onSale": "On Sale",
+    "search": "Search products...",
+    "cart": "Cart",
+    "account": "Account",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
+  "hero": {
+    "title": "Luxury Adult Wellness",
+    "subtitle": "Discover premium intimate products designed for your pleasure and wellbeing",
+    "exploreCollection": "Explore Collection",
+    "browseCategories": "Browse Categories"
+  },
+  "categories": {
+    "title": "Product Categories",
+    "subtitle": "Explore our comprehensive selection of luxury wellness products",
+    "findWhatYouLookingFor": "Find What You're Looking For",
+    "browseAllProducts": "Browse All Products",
+    "advancedSearch": "Advanced Search",
+    "searchPlaceholder": "Search for products, categories, or brands..."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "recentOrders": "Recent Orders",
+    "account": "Account",
+    "noOrders": "No orders yet",
+    "startShopping": "Start Shopping",
+    "editProfile": "Edit Profile",
+    "memberSince": "Member Since"
+  },
+  "search": {
+    "placeholder": "What are you looking for today?",
+    "searchButton": "Search",
+    "suggestions": "Popular searches",
+    "noResults": "No results found",
+    "showingResults": "Showing results for"
+  },
+  "product": {
+    "addToCart": "Add to Cart",
+    "buyNow": "Buy Now",
+    "outOfStock": "Out of Stock",
+    "price": "Price",
+    "description": "Description",
+    "features": "Features",
+    "reviews": "Reviews",
+    "specifications": "Specifications"
+  },
+  "footer": {
+    "about": "About Us",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "shipping": "Shipping Info",
+    "returns": "Returns & Exchanges"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Try Again",
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  }
+}
