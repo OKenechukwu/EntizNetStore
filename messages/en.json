@@ -9,7 +9,9 @@
     "cart": "Cart",
     "account": "Account",
     "login": "Login",
-    "signup": "Sign Up"
+    "signup": "Sign Up",
+    "language": "Language",
+    "currency": "Currency"
   },
   "hero": {
     "title": "Luxury Adult Wellness",
@@ -69,5 +71,15 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm"
+  },
+  "language": {
+    "select": "Select Language",
+    "more_coming_soon": "More languages coming soon"
+  },
+  "currency": {
+    "select": "Select Currency",
+    "refresh_rates": "Refresh Rates",
+    "updating": "Updating",
+    "powered_by": "Rates updated in real-time • Powered by live exchange data"
   }
 }
