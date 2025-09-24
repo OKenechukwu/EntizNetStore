@@ -211,23 +211,26 @@ export default function CategoriesPage() {
 
         {/* Filter Options */}
         <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            <span className="text-xs sm:text-sm font-medium mb-2 sm:mb-0 w-full sm:w-auto text-center sm:text-left" 
+                  style={{ color: theme.colors.text.secondary }}>
               Quick filters:
             </span>
-            {['New Arrivals', 'Best Sellers', 'On Sale', 'Premium', 'Beginner Friendly'].map((filter) => (
-              <button
-                key={filter}
-                className="px-4 py-2 rounded-full text-sm border transition-all duration-300 hover:scale-105 hover:shadow-md"
-                style={{
-                  borderColor: theme.colors.glass.border,
-                  backgroundColor: theme.colors.surface,
-                  color: theme.colors.text.primary
-                }}
-              >
-                {filter}
-              </button>
-            ))}
+            <div className="flex flex-wrap justify-center gap-2">
+              {['New Arrivals', 'Best Sellers', 'On Sale', 'Premium', 'Beginner Friendly'].map((filter) => (
+                <button
+                  key={filter}
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm border transition-all duration-300 hover:scale-105 hover:shadow-md whitespace-nowrap"
+                  style={{
+                    borderColor: theme.colors.glass.border,
+                    backgroundColor: theme.colors.surface,
+                    color: theme.colors.text.primary
+                  }}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
