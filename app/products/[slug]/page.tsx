@@ -48,8 +48,28 @@ export default function ProductPage({ params }: ProductPageProps) {
 
   useEffect(() => {
     loadProduct()
-    loadCurrency()
   }, [params.slug, brand])
+
+  useEffect(() => {
+    loadCurrency()
+  }, [])
+
+  // Listen for currency changes via storage events
+  useEffect(() => {
+    const handleCurrencyChange = () => {
+      loadCurrency()
+    }
+
+    // Listen for cookie changes (when currency is switched)
+    const interval = setInterval(() => {
+      const currentCurrency = readCookie('currency')?.toUpperCase() || DEFAULT_CURRENCY
+      if (currentCurrency !== userCurrency) {
+        loadCurrency()
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [userCurrency])
 
   const loadCurrency = async () => {
     setCurrencyLoading(true)
@@ -64,6 +84,8 @@ export default function ProductPage({ params }: ProductPageProps) {
       if (response.ok) {
         const data = await response.json()
         setFxRates(data.rates || {})
+      } else {
+        setFxRates({ [DEFAULT_CURRENCY]: 1 })
       }
     } catch (error) {
       console.error('Failed to fetch FX rates:', error)
