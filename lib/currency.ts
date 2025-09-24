@@ -174,3 +174,97 @@ export function convertToBase(
 function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/**
+ * Mapping of common locales to currencies
+ */
+const LOCALE_TO_CURRENCY: Record<string, string> = {
+  // Americas
+  'en-US': 'USD', 'en-CA': 'CAD', 'fr-CA': 'CAD',
+  'es-MX': 'MXN', 'pt-BR': 'BRL', 'es-AR': 'USD', // Argentina often uses USD
+  
+  // Europe
+  'en-GB': 'GBP', 'de-DE': 'EUR', 'fr-FR': 'EUR', 'es-ES': 'EUR',
+  'it-IT': 'EUR', 'nl-NL': 'EUR', 'pt-PT': 'EUR', 'de-CH': 'CHF',
+  'fr-CH': 'CHF', 'it-CH': 'CHF', 'tr-TR': 'TRY', 'ru-RU': 'RUB',
+  
+  // Asia Pacific
+  'ja-JP': 'JPY', 'ko-KR': 'KRW', 'zh-CN': 'CNY', 'zh-TW': 'USD', // Taiwan often uses USD
+  'en-AU': 'AUD', 'en-HK': 'HKD', 'en-SG': 'SGD', 'zh-SG': 'SGD',
+  'hi-IN': 'INR', 'en-IN': 'INR', 'th-TH': 'THB', 'en-PH': 'PHP',
+  'tl-PH': 'PHP', 'fil-PH': 'PHP', 'en-NG': 'NGN', 'ha-NG': 'NGN',
+  'yo-NG': 'NGN', 'en-ZA': 'ZAR'
+}
+
+/**
+ * Mapping of common timezones to currencies
+ */
+const TIMEZONE_TO_CURRENCY: Record<string, string> = {
+  // Americas
+  'America/New_York': 'USD', 'America/Chicago': 'USD', 'America/Denver': 'USD',
+  'America/Los_Angeles': 'USD', 'America/Toronto': 'CAD', 'America/Vancouver': 'CAD',
+  'America/Mexico_City': 'MXN', 'America/Sao_Paulo': 'BRL', 'America/Buenos_Aires': 'USD',
+  
+  // Europe
+  'Europe/London': 'GBP', 'Europe/Berlin': 'EUR', 'Europe/Paris': 'EUR',
+  'Europe/Madrid': 'EUR', 'Europe/Rome': 'EUR', 'Europe/Amsterdam': 'EUR',
+  'Europe/Zurich': 'CHF', 'Europe/Istanbul': 'TRY', 'Europe/Moscow': 'RUB',
+  
+  // Asia Pacific
+  'Asia/Tokyo': 'JPY', 'Asia/Seoul': 'KRW', 'Asia/Shanghai': 'CNY',
+  'Asia/Hong_Kong': 'HKD', 'Asia/Singapore': 'SGD', 'Asia/Kolkata': 'INR',
+  'Asia/Bangkok': 'THB', 'Asia/Manila': 'PHP', 'Australia/Sydney': 'AUD',
+  'Australia/Melbourne': 'AUD', 'Africa/Lagos': 'NGN', 'Africa/Johannesburg': 'ZAR'
+}
+
+/**
+ * Detect user's likely currency based on browser locale and timezone
+ */
+export function detectUserCurrency(): string {
+  if (typeof window === 'undefined') return DEFAULT_CURRENCY
+  
+  try {
+    // Try locale first (more specific)
+    const locale = navigator.language || navigator.languages?.[0]
+    if (locale && LOCALE_TO_CURRENCY[locale]) {
+      const currency = LOCALE_TO_CURRENCY[locale]
+      if (SUPPORTED_CURRENCIES.includes(currency)) {
+        return currency
+      }
+    }
+    
+    // Try broader locale (e.g., 'en-US' -> 'en')
+    if (locale) {
+      const baseLocale = locale.split('-')[0]
+      for (const [key, currency] of Object.entries(LOCALE_TO_CURRENCY)) {
+        if (key.startsWith(baseLocale + '-') && SUPPORTED_CURRENCIES.includes(currency)) {
+          return currency
+        }
+      }
+    }
+    
+    // Fall back to timezone
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (timezone && TIMEZONE_TO_CURRENCY[timezone]) {
+      const currency = TIMEZONE_TO_CURRENCY[timezone]
+      if (SUPPORTED_CURRENCIES.includes(currency)) {
+        return currency
+      }
+    }
+    
+    // Try to match timezone region
+    if (timezone) {
+      const region = timezone.split('/')[0]
+      if (region === 'America') return 'USD'
+      if (region === 'Europe') return 'EUR'
+      if (region === 'Asia') return 'CNY'
+      if (region === 'Australia') return 'AUD'
+      if (region === 'Africa') return 'ZAR'
+    }
+    
+  } catch (error) {
+    console.warn('Currency detection failed:', error)
+  }
+  
+  return DEFAULT_CURRENCY
+}

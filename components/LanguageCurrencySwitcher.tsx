@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBrand } from '@/components/BrandProvider'
-import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY, CURRENCY_NAMES } from '@/lib/currency'
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY, CURRENCY_NAMES, detectUserCurrency } from '@/lib/currency'
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, getLanguageName } from '@/lib/languages'
 
 function readCookie(name: string) {
@@ -21,19 +21,37 @@ export default function LanguageCurrencySwitcher() {
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    const savedCurrency = (readCookie('currency') || DEFAULT_CURRENCY).toUpperCase()
+    const savedCurrency = readCookie('currency')
     const savedLanguage = readCookie('language') || DEFAULT_LANGUAGE
-    setCurrency(savedCurrency)
+    
+    // If no currency is saved, automatically detect from user's locale/timezone
+    if (!savedCurrency) {
+      const detectedCurrency = detectUserCurrency()
+      setCurrency(detectedCurrency)
+      // Save the detected currency automatically
+      fetch('/api/prefs/currency', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ currency: detectedCurrency }),
+      }).catch(error => console.warn('Failed to save detected currency:', error))
+    } else {
+      setCurrency(savedCurrency.toUpperCase())
+    }
+    
     setLanguage(savedLanguage)
   }, [])
 
   const handleCurrencyChange = async (newCurrency: string) => {
     setCurrency(newCurrency)
-    await fetch('/api/prefs/currency', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ currency: newCurrency }),
-    }).catch(() => {})
+    try {
+      await fetch('/api/prefs/currency', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ currency: newCurrency }),
+      })
+    } catch (error) {
+      console.warn('Failed to save currency preference:', error)
+    }
     
     startTransition(() => router.refresh())
     setIsDropdownOpen(false)
@@ -41,11 +59,15 @@ export default function LanguageCurrencySwitcher() {
 
   const handleLanguageChange = async (newLanguage: string) => {
     setLanguage(newLanguage)
-    await fetch('/api/prefs/language', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ language: newLanguage }),
-    }).catch(() => {})
+    try {
+      await fetch('/api/prefs/language', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ language: newLanguage }),
+      })
+    } catch (error) {
+      console.warn('Failed to save language preference:', error)
+    }
     
     startTransition(() => router.refresh())
     setIsDropdownOpen(false)
