@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { useAuth } from '@/components/AuthProvider'
+import HeroSlider from '@/components/hero/HeroSlider'
+import ProductSearchBar from '@/components/search/ProductSearchBar'
+import SideVideoAd from '@/components/ads/SideVideoAd'
 import Link from 'next/link'
 
 interface DemoProduct {
@@ -150,21 +153,23 @@ export default function Home() {
   ]
 
   const ProductCard = ({ product }: { product: DemoProduct }) => (
-    <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300"
-         style={{ borderColor: theme.colors.glass.border }}>
+    <div className="border rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]"
+         style={{ 
+           borderColor: theme.colors.glass.border,
+           backgroundColor: theme.colors.surface
+         }}>
       
       {/* Product Image */}
-      <div className="aspect-square relative overflow-hidden"
-           style={{ backgroundColor: theme.colors.background }}>
+      <div className="aspect-square relative overflow-hidden">
         {product.on_sale && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold z-10">
+          <div className="absolute top-3 left-3 bg-brandPink text-white px-3 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
             SALE
           </div>
         )}
         
         <div className="absolute inset-0 flex items-center justify-center"
-             style={{ backgroundColor: theme.colors.surface }}>
-          <div className="text-center p-4">
+             style={{ backgroundColor: theme.colors.background }}>
+          <div className="text-center p-4 group-hover:scale-110 transition-transform duration-300">
             <div className="text-4xl mb-2" style={{ color: theme.colors.accent }}>
               {brand === 'primediscreet' ? '💎' : '✨'}
             </div>
@@ -173,11 +178,15 @@ export default function Home() {
             </p>
           </div>
         </div>
+        
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       </div>
 
       {/* Product Info */}
-      <div className="p-4">
-        <h3 className="font-semibold mb-1 line-clamp-2" style={{ color: theme.colors.text.primary }}>
+      <div className="p-4 lg:p-5">
+        <h3 className="font-semibold mb-1 line-clamp-2 group-hover:text-brandPink transition-colors" 
+            style={{ color: theme.colors.text.primary }}>
           {product.title}
         </h3>
         
@@ -192,7 +201,7 @@ export default function Home() {
               <span 
                 key={star}
                 className="text-sm"
-                style={{ color: star <= product.rating ? theme.colors.accent : theme.colors.text.secondary }}
+                style={{ color: star <= product.rating ? '#FFD700' : theme.colors.text.secondary }}
               >
                 ★
               </span>
@@ -218,11 +227,7 @@ export default function Home() {
         {/* View Button */}
         <Link
           href={`/products/${product.slug}`}
-          className="w-full py-2 rounded-lg font-medium text-center block transition-all hover:opacity-90"
-          style={{
-            backgroundColor: theme.colors.accent,
-            color: brand === 'primediscreet' ? theme.colors.background : 'white'
-          }}
+          className="w-full py-3 bg-brandPink hover:bg-brandPink-600 text-white rounded-lg font-medium text-center block transition-all duration-300 hover:shadow-lg transform hover:scale-105"
         >
           View Details
         </Link>
@@ -233,128 +238,134 @@ export default function Home() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
       
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 text-center overflow-hidden">
-        <div className="absolute inset-0 opacity-5"
-             style={{ 
-               background: `radial-gradient(circle at 30% 70%, ${theme.colors.accent} 0%, transparent 50%),
-                           radial-gradient(circle at 70% 30%, ${theme.colors.accent} 0%, transparent 50%)`
-             }}>
-        </div>
-        
-        <div className="relative max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6"
-              style={{ color: theme.colors.text.primary }}>
-            {brand === 'primediscreet' ? (
-              <>Elite <span style={{ color: theme.colors.accent }}>Intimate</span> Collection</>
-            ) : (
-              <>Premium <span style={{ color: theme.colors.accent }}>Adult</span> Marketplace</>
-            )}
-          </h1>
-          
-          <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto"
-             style={{ color: theme.colors.text.secondary }}>
-            {brand === 'primediscreet' 
-              ? 'Discover our exclusive collection of luxury intimate products, curated for discerning individuals who value quality and discretion.'
-              : 'Your trusted destination for premium adult wellness products with discrete shipping and exceptional customer service.'
-            }
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/store"
-              className="px-8 py-3 rounded-lg font-semibold transition-all hover:opacity-90"
-              style={{
-                backgroundColor: theme.colors.accent,
-                color: brand === 'primediscreet' ? theme.colors.background : 'white'
-              }}
-            >
-              Explore Collection
-            </Link>
-            <Link
-              href="/categories"
-              className="px-8 py-3 rounded-lg font-semibold border transition-all hover:opacity-80"
-              style={{
-                borderColor: theme.colors.accent,
-                color: theme.colors.accent
-              }}
-            >
-              Browse Categories
-            </Link>
-          </div>
+      {/* Hero Slider Section */}
+      <section className="px-4 sm:px-6 lg:px-8 pt-4 pb-8">
+        <div className="max-w-7xl mx-auto">
+          <HeroSlider />
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 pb-20">
-        
-        {/* Categories Section */}
-        <section className="mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center"
-              style={{ color: theme.colors.text.primary }}>
-            Shop by Category
-          </h2>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((category) => (
-              <Link
-                key={category.slug}
-                href={`/categories/${category.slug}`}
-                className="p-6 border rounded-lg text-center hover:shadow-md transition-all group"
-                style={{ borderColor: theme.colors.glass.border }}
-              >
-                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
-                  {category.icon}
-                </div>
-                <h3 className="font-medium text-sm group-hover:opacity-80 transition-opacity"
-                    style={{ color: theme.colors.text.primary }}>
-                  {category.name}
-                </h3>
-              </Link>
-            ))}
-          </div>
-        </section>
+      {/* Product Search Section */}
+      <section className="px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="max-w-7xl mx-auto">
+          <ProductSearchBar 
+            placeholder={brand === 'primediscreet' 
+              ? "Discover exclusive luxury products..." 
+              : "What are you looking for today?"
+            }
+          />
+        </div>
+      </section>
 
-        {/* Featured Products */}
-        <section className="mb-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold"
-                style={{ color: theme.colors.text.primary }}>
-              Featured Products
-            </h2>
-            <Link
-              href="/store"
-              className="text-sm font-medium hover:opacity-80 transition-opacity"
-              style={{ color: theme.colors.accent }}
-            >
-              View All →
-            </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        
+        {/* Layout with Side Ad */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Main Content */}
+          <div className="lg:col-span-9 space-y-16">
+            {/* Categories Section */}
+            <section>
+              <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center lg:text-left"
+                  style={{ color: theme.colors.text.primary }}>
+                Shop by Category
+              </h2>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {categories.map((category) => (
+                  <Link
+                    key={category.slug}
+                    href={`/categories/${category.slug}`}
+                    className="p-4 lg:p-6 border rounded-xl text-center hover:shadow-lg transition-all duration-300 group hover:scale-105"
+                    style={{ 
+                      borderColor: theme.colors.glass.border,
+                      backgroundColor: theme.colors.surface
+                    }}
+                  >
+                    <div className="text-2xl lg:text-3xl mb-3 group-hover:scale-110 transition-transform">
+                      {category.icon}
+                    </div>
+                    <h3 className="font-medium text-xs lg:text-sm group-hover:text-brandPink transition-colors"
+                        style={{ color: theme.colors.text.primary }}>
+                      {category.name}
+                    </h3>
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            {/* Featured Products */}
+            <section>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+                <h2 className="text-2xl md:text-3xl font-bold"
+                    style={{ color: theme.colors.text.primary }}>
+                  Featured Products
+                </h2>
+                <Link
+                  href="/store"
+                  className="text-sm font-medium hover:opacity-80 transition-opacity inline-flex items-center gap-1"
+                  style={{ color: theme.colors.accent }}
+                >
+                  View All
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+              
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(3)].map((_, index) => (
+                    <div key={index} className="border rounded-xl overflow-hidden animate-pulse"
+                         style={{ borderColor: theme.colors.glass.border }}>
+                      <div className="aspect-square" style={{ backgroundColor: theme.colors.surface }}></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 rounded" style={{ backgroundColor: theme.colors.surface }}></div>
+                        <div className="h-3 rounded w-2/3" style={{ backgroundColor: theme.colors.surface }}></div>
+                        <div className="h-6 rounded w-1/3" style={{ backgroundColor: theme.colors.surface }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {featuredProducts.slice(0, 3).map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
           
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, index) => (
-                <div key={index} className="border rounded-lg overflow-hidden animate-pulse"
-                     style={{ borderColor: theme.colors.glass.border }}>
-                  <div className="aspect-square" style={{ backgroundColor: theme.colors.surface }}></div>
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 rounded" style={{ backgroundColor: theme.colors.surface }}></div>
-                    <div className="h-3 rounded w-2/3" style={{ backgroundColor: theme.colors.surface }}></div>
-                    <div className="h-6 rounded w-1/3" style={{ backgroundColor: theme.colors.surface }}></div>
-                  </div>
-                </div>
-              ))}
+          {/* Side Ad (Desktop Only) */}
+          <div className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-8">
+              <SideVideoAd
+                type="image"
+                src="/images/ads/luxury-wellness.jpg"
+                title="Luxury Wellness Experience"
+                caption="Discover our premium collection of wellness products designed for ultimate relaxation and pleasure."
+                ctaLabel="Explore Collection"
+                href="/collections/wellness"
+                className="mb-6"
+              />
+              
+              <SideVideoAd
+                type="video"
+                src="/videos/ads/premium-showcase.mp4"
+                poster="/images/ads/premium-poster.jpg"
+                title="Premium Adult Collection"
+                caption="Experience the finest in adult wellness with our curated selection of luxury products."
+                ctaLabel="Shop Premium"
+                href="/collections/premium"
+                duration={20}
+              />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          )}
-        </section>
+          </div>
+        </div>
 
         {/* Features Section */}
-        <section className="text-center">
+        <section className="text-center mt-20">
           <h2 className="text-2xl md:text-3xl font-bold mb-12"
               style={{ color: theme.colors.text.primary }}>
             Why Choose {brand === 'primediscreet' ? 'Elite Collection' : 'EntizNetStore'}?
@@ -380,7 +391,11 @@ export default function Home() {
                 description: 'Quick and reliable shipping with tracking information provided'
               }
             ].map((feature, index) => (
-              <div key={index} className="p-6">
+              <div key={index} className="p-6 rounded-xl border hover:shadow-lg transition-all duration-300"
+                   style={{ 
+                     borderColor: theme.colors.glass.border,
+                     backgroundColor: theme.colors.surface
+                   }}>
                 <div className="text-4xl mb-4">{feature.icon}</div>
                 <h3 className="text-xl font-semibold mb-3" style={{ color: theme.colors.text.primary }}>
                   {feature.title}
