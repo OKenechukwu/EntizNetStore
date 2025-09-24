@@ -234,8 +234,7 @@ export default function ProductSearchBar({
             style={{
               backgroundColor: theme.colors.surface,
               borderColor: isOpen ? theme.colors.accent : theme.colors.glass.border,
-              color: theme.colors.text.primary,
-              focusRing: `${theme.colors.accent}20`
+              color: theme.colors.text.primary
             }}
           />
           

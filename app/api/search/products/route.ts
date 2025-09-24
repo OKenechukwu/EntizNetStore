@@ -27,12 +27,7 @@ export async function POST(request: NextRequest) {
     // Add text search if query provided
     if (query && query.trim()) {
       // Search in title, description, and tags
-      searchQuery = searchQuery.or(`
-        title.ilike.%${query}%,
-        description.ilike.%${query}%,
-        tags.cs.{${query}},
-        search_keywords.cs.{${query}}
-      `)
+      searchQuery = searchQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,tags.cs.{${query}},search_keywords.cs.{${query}}`)
     }
 
     // Apply category filters
