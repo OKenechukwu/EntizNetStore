@@ -33,6 +33,7 @@ export default function MegaMenu({
   const [isHovered, setIsHovered] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -95,7 +96,52 @@ export default function MegaMenu({
     }
   }
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'Escape':
+        if (isMenuOpen) {
+          if (isMobile && onToggle) {
+            onToggle()
+          } else {
+            setIsHovered(false)
+          }
+          // Return focus to trigger
+          setTimeout(() => triggerRef.current?.focus(), 0)
+        }
+        break
+      case 'Enter':
+      case ' ':
+        event.preventDefault()
+        if (isMobile && onToggle) {
+          onToggle()
+        } else {
+          setIsHovered(!isHovered)
+        }
+        break
+    }
+  }
+
   const isMenuOpen = isMobile ? isOpen : isHovered
+
+  // Handle escape key when menu is open - global listener
+  useEffect(() => {
+    if (!isMenuOpen) return
+
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (isMobile && onToggle) {
+          onToggle()
+        } else {
+          setIsHovered(false)
+        }
+        // Return focus to trigger
+        setTimeout(() => triggerRef.current?.focus(), 0)
+      }
+    }
+
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [isMenuOpen, isMobile, onToggle])
 
   return (
     <div 
@@ -105,7 +151,17 @@ export default function MegaMenu({
       onMouseLeave={handleMouseLeave}
     >
       {/* Trigger */}
-      <div onClick={handleClick} className="cursor-pointer">
+      <div 
+        ref={triggerRef}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        className="cursor-pointer"
+        tabIndex={0}
+        role="button"
+        aria-haspopup="true"
+        aria-expanded={isMenuOpen}
+        aria-label={`${title} menu`}
+      >
         {trigger}
       </div>
 
@@ -124,6 +180,8 @@ export default function MegaMenu({
               backgroundColor: theme.colors.surface,
               borderColor: theme.colors.glass.border
             }}
+            role="menu"
+            aria-label={`${title} navigation menu`}
           >
             <div className="rounded-2xl border shadow-2xl overflow-hidden backdrop-blur-sm"
                  style={{
@@ -157,10 +215,14 @@ export default function MegaMenu({
 
               {/* Content Grid */}
               <div className="p-6">
-                <div className={`grid gap-6 ${
-                  sections.length <= 4 ? `grid-cols-1 sm:grid-cols-2 lg:grid-cols-${Math.min(4, sections.length)}` : 
-                  'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-                }`}>
+                <div 
+                  className={`grid gap-6 ${
+                    sections.length <= 4 ? `grid-cols-1 sm:grid-cols-2 lg:grid-cols-${Math.min(4, sections.length)}` : 
+                    'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+                  }`}
+                  role="group"
+                  aria-label="Menu items"
+                >
                   {sections.map((section, index) => (
                     <motion.div
                       key={section.name}
@@ -170,7 +232,7 @@ export default function MegaMenu({
                     >
                       <Link
                         href={section.link}
-                        className="group block p-4 rounded-xl transition-all duration-300 hover:scale-105"
+                        className="group block p-4 rounded-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brandPink focus:ring-offset-2"
                         style={{
                           backgroundColor: `${theme.colors.glass.bg}50`,
                           borderColor: theme.colors.glass.border
@@ -181,6 +243,8 @@ export default function MegaMenu({
                             clearTimeout(timeoutRef.current)
                           }
                         }}
+                        role="menuitem"
+                        aria-label={`Navigate to ${section.name}: ${section.description}`}
                       >
                         {/* Image */}
                         <div className="relative aspect-video rounded-lg overflow-hidden mb-3">
@@ -197,7 +261,7 @@ export default function MegaMenu({
                           {/* Overlay on hover */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             <div className="absolute bottom-2 right-2">
-                              <div className="w-8 h-8 rounded-full bg-brandPink flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-brandPink flex items-center justify-center" aria-hidden="true">
                                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
@@ -220,7 +284,8 @@ export default function MegaMenu({
                         
                         {/* Hover indicator */}
                         <div className="mt-3 flex items-center text-sm font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0"
-                             style={{ color: theme.colors.accent }}>
+                             style={{ color: theme.colors.accent }}
+                             aria-hidden="true">
                           <span>Explore</span>
                           <svg className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -235,10 +300,12 @@ export default function MegaMenu({
                 <div className="mt-8 text-center">
                   <Link
                     href="/categories"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-brandPink hover:bg-brandPink-600 text-white font-semibold rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-brandPink hover:bg-brandPink-600 text-white font-semibold rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-brandPink"
+                    role="menuitem"
+                    aria-label="View all product categories"
                   >
                     <span>View All Categories</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>

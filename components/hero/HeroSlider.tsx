@@ -132,6 +132,29 @@ export default function HeroSlider({
     setCurrentSlide(index)
   }
 
+  const announceSlideChange = (index: number) => {
+    const announcement = `Slide ${index + 1} of ${slides.length}: ${slides[index].title}`
+    // Create temporary element for screen reader announcement
+    const announcer = document.createElement('div')
+    announcer.setAttribute('aria-live', 'polite')
+    announcer.setAttribute('aria-atomic', 'true')
+    announcer.className = 'sr-only'
+    announcer.textContent = announcement
+    document.body.appendChild(announcer)
+    
+    // Remove after announcement
+    setTimeout(() => {
+      if (document.body.contains(announcer)) {
+        document.body.removeChild(announcer)
+      }
+    }, 1000)
+  }
+
+  // Announce slide changes whenever currentSlide changes
+  useEffect(() => {
+    announceSlideChange(currentSlide)
+  }, [currentSlide, slides])
+
   const handleMouseEnter = () => {
     setIsPaused(true)
   }
@@ -142,7 +165,28 @@ export default function HeroSlider({
 
   const handleVideoEnd = () => {
     // Move to next slide when video ends
-    setCurrentSlide((prev) => (prev + 1) % slides.length)
+    goToSlide((currentSlide + 1) % slides.length)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowLeft':
+        event.preventDefault()
+        goToSlide((currentSlide - 1 + slides.length) % slides.length)
+        break
+      case 'ArrowRight':
+        event.preventDefault()
+        goToSlide((currentSlide + 1) % slides.length)
+        break
+      case ' ':
+        event.preventDefault()
+        setIsPlaying(!isPlaying)
+        break
+      case 'Escape':
+        // Allow users to stop autoplay
+        setIsPlaying(false)
+        break
+    }
   }
 
   const currentSlideData = slides[currentSlide]
@@ -152,11 +196,20 @@ export default function HeroSlider({
       className={`relative w-full h-[70vh] min-h-[500px] overflow-hidden rounded-2xl ${className}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="region"
+      aria-label="Image carousel"
+      aria-live="polite"
+      aria-roledescription="carousel"
     >
       {/* Slides */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlideData.id}
+          id={`slide-${currentSlide}`}
+          role="tabpanel"
+          aria-label={`Slide ${currentSlide + 1}: ${currentSlideData.title}`}
           initial={{ opacity: 0, scale: 1.1 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
@@ -268,18 +321,21 @@ export default function HeroSlider({
       </motion.div>
 
       {/* Navigation Dots */}
-      <div className="absolute bottom-4 right-6">
+      <div className="absolute bottom-4 right-6" role="tablist" aria-label="Slide navigation">
         <div className="flex gap-2">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
+              role="tab"
+              aria-selected={index === currentSlide}
+              aria-controls={`slide-${index}`}
               className={`w-3 h-3 rounded-full transition-all duration-300 ${
                 index === currentSlide
                   ? 'bg-white shadow-lg scale-110'
                   : 'bg-white/50 hover:bg-white/70'
               }`}
-              aria-label={`Go to slide ${index + 1}`}
+              aria-label={`Go to slide ${index + 1}: ${slides[index].title}`}
             />
           ))}
         </div>
@@ -306,11 +362,17 @@ export default function HeroSlider({
       {currentSlideData.type === 'video' && (
         <div className="absolute top-4 left-4">
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-sm">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-            <span>LIVE</span>
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true"></div>
+            <span>VIDEO</span>
           </div>
         </div>
       )}
+      
+      {/* Screen reader instructions */}
+      <div className="sr-only">
+        Use arrow keys to navigate slides, spacebar to play/pause, escape to stop autoplay. 
+        Currently showing slide {currentSlide + 1} of {slides.length}.
+      </div>
     </div>
   )
 }

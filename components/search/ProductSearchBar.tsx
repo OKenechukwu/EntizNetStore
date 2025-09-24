@@ -223,6 +223,13 @@ export default function ProductSearchBar({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             autoFocus={autoFocus}
+            role="combobox"
+            aria-label="Search products and categories"
+            aria-expanded={isOpen && suggestions.length > 0}
+            aria-haspopup="listbox"
+            aria-autocomplete="list"
+            aria-activedescendant={selectedIndex >= 0 ? `search-suggestion-${selectedIndex}` : undefined}
+            aria-describedby="search-help"
             className="w-full h-14 pl-6 pr-16 rounded-2xl border-2 text-lg transition-all duration-300 focus:outline-none focus:ring-4"
             style={{
               backgroundColor: theme.colors.surface,
@@ -231,6 +238,11 @@ export default function ProductSearchBar({
               focusRing: `${theme.colors.accent}20`
             }}
           />
+          
+          {/* Screen reader helper text */}
+          <div id="search-help" className="sr-only">
+            Search through products, categories, and brands. Use arrow keys to navigate suggestions, Enter to select, Escape to close.
+          </div>
           
           {/* Search Icon / Loading */}
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
@@ -268,10 +280,17 @@ export default function ProductSearchBar({
             }}
           >
             {suggestions.length > 0 ? (
-              <div className="max-h-96 overflow-y-auto">
+              <div 
+                role="listbox"
+                aria-label="Search suggestions"
+                className="max-h-96 overflow-y-auto"
+              >
                 {suggestions.map((suggestion, index) => (
                   <motion.button
                     key={suggestion.id}
+                    id={`search-suggestion-${index}`}
+                    role="option"
+                    aria-selected={selectedIndex === index}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
@@ -279,6 +298,7 @@ export default function ProductSearchBar({
                     className={`w-full flex items-center gap-4 p-4 text-left transition-all duration-200 hover:bg-brandPink/10 ${
                       selectedIndex === index ? 'bg-brandPink/10' : ''
                     }`}
+                    aria-label={`${suggestion.type}: ${suggestion.title}${suggestion.category ? ` in ${suggestion.category}` : ''}${suggestion.price ? ` - $${suggestion.price}` : ''}`}
                   >
                     {/* Icon */}
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-brandPink/20 flex items-center justify-center"
@@ -310,7 +330,7 @@ export default function ProductSearchBar({
                     </div>
                     
                     {/* Arrow */}
-                    <div className="flex-shrink-0" style={{ color: theme.colors.text.secondary }}>
+                    <div className="flex-shrink-0" style={{ color: theme.colors.text.secondary }} aria-hidden="true">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
@@ -342,6 +362,7 @@ export default function ProductSearchBar({
                         performSearch(term)
                       }}
                       className="px-3 py-1 rounded-full text-sm bg-brandPink/10 text-brandPink hover:bg-brandPink/20 transition-colors"
+                      aria-label={`Search for ${term}`}
                     >
                       {term}
                     </button>
