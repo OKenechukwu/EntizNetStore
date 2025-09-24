@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import CategoryManager from './CategoryManager'
+import FeaturedProductsManager from './FeaturedProductsManager'
 
 interface DashboardStats {
   totalRevenue: number
@@ -142,6 +144,8 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'orders', label: 'Orders', icon: '🛒' },
     { id: 'products', label: 'Products', icon: '📦' },
+    { id: 'categories', label: 'Categories', icon: '🗂️' },
+    { id: 'featured', label: 'Featured', icon: '⭐' },
     { id: 'users', label: 'Users', icon: '👥' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
@@ -430,6 +434,12 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Categories Tab */}
+        {activeTab === 'categories' && <CategoryManager />}
+
+        {/* Featured Products Tab */}
+        {activeTab === 'featured' && <FeaturedProductsManager />}
 
         {/* Other tabs placeholder */}
         {['users', 'analytics', 'settings'].includes(activeTab) && (
