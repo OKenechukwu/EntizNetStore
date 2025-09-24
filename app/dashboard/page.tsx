@@ -148,51 +148,53 @@ function SellerDashboard() {
 
 function BuyerDashboard() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Recent Orders */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Recent Orders - Left Column */}
+      <div className="space-y-6">
         <div className="glass-card p-6">
-          <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">Recent Orders</h2>
-          <div className="text-center py-8 opacity-60">
-            <p>No orders yet</p>
+          <h2 className="font-serif text-xl font-bold text-accent-gold mb-6">Recent Orders</h2>
+          <div className="text-center py-8">
+            <div className="text-6xl mb-4 opacity-40">📦</div>
+            <p className="text-lg mb-6 opacity-80">No orders yet</p>
             <Link 
               href="/store"
-              className="luxury-button-outline mt-4 px-6 py-2"
+              className="inline-flex items-center justify-center px-8 py-3 bg-brandPink hover:bg-brandPink-600 text-white font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               Start Shopping
             </Link>
           </div>
         </div>
-
-        <div className="glass-card p-6">
-          <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">Recommended for You</h2>
-          <div className="text-center py-8 opacity-60">
-            <p>Browse our categories to discover products you might like</p>
-            <Link 
-              href="/categories"
-              className="luxury-button-outline mt-4 px-6 py-2"
-            >
-              Explore Categories
-            </Link>
-          </div>
-        </div>
       </div>
 
-      {/* Profile Sidebar */}
+      {/* Account - Right Column */}
       <div className="space-y-6">
         <div className="glass-card p-6">
-          <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">Account</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Member Since</label>
-              <p className="opacity-80">Today</p>
-            </div>
+          <div className="flex items-start justify-between mb-6">
+            <h2 className="font-serif text-xl font-bold text-accent-gold">Account</h2>
             <Link 
               href="/dashboard/profile"
-              className="luxury-button-outline w-full text-center py-3"
+              className="inline-flex items-center justify-center px-6 py-2 bg-brandPurple hover:bg-brandPurple-600 text-white font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
             >
               Edit Profile
             </Link>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-accent-gold">Member Since:</label>
+              <p className="font-medium">Today</p>
+            </div>
+            <div className="pt-4 border-t border-white/10">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="block text-accent-gold font-medium">Orders</span>
+                  <span className="text-2xl font-bold">0</span>
+                </div>
+                <div>
+                  <span className="block text-accent-gold font-medium">Saved Items</span>
+                  <span className="text-2xl font-bold">0</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -201,21 +203,24 @@ function BuyerDashboard() {
           <div className="space-y-3">
             <Link 
               href="/dashboard/orders"
-              className="block text-sm hover:text-accent-gold transition-colors"
+              className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
             >
-              Order History
+              <span className="text-sm font-medium">Order History</span>
+              <span className="text-accent-gold group-hover:translate-x-1 transition-transform">→</span>
             </Link>
             <Link 
               href="/dashboard/addresses"
-              className="block text-sm hover:text-accent-gold transition-colors"
+              className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
             >
-              Shipping Addresses
+              <span className="text-sm font-medium">Shipping Addresses</span>
+              <span className="text-accent-gold group-hover:translate-x-1 transition-transform">→</span>
             </Link>
             <Link 
               href="/dashboard/wishlist"
-              className="block text-sm hover:text-accent-gold transition-colors"
+              className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
             >
-              Wishlist
+              <span className="text-sm font-medium">Wishlist</span>
+              <span className="text-accent-gold group-hover:translate-x-1 transition-transform">→</span>
             </Link>
           </div>
         </div>
