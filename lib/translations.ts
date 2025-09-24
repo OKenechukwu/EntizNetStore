@@ -181,6 +181,42 @@ export const translations = {
     browseProducts: "เรียกดูสินค้า"
   },
 
+  ja: {
+    // Navigation
+    store: "ストア",
+    categories: "カテゴリー",
+    brands: "ブランド",
+    popular: "人気",
+    onSale: "セール中",
+    experience: "エクスペリエンス",
+    home: "ホーム",
+    dashboard: "ダッシュボード",
+    signIn: "サインイン",
+    signOut: "サインアウト",
+    
+    // Product page
+    addToCart: "カートに追加",
+    addedToCart: "カートに追加されました！",
+    quantity: "数量：",
+    description: "説明",
+    featuresSpecs: "機能・仕様",
+    keyFeatures: "主な機能：",
+    specifications: "仕様：",
+    continueShopping: "ショッピングを続ける",
+    youSave: "節約額",
+    
+    // Cart
+    cart: "カート",
+    removeFromCart: "カートから削除",
+    checkout: "レジへ進む",
+    total: "合計",
+    
+    // General
+    loading: "読み込み中",
+    productNotFound: "商品が見つかりません",
+    browseProducts: "商品を閲覧"
+  },
+
   fil: {
     // Navigation
     store: "Tindahan",
