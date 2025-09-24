@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
+import ProductSearchBar from '@/components/search/ProductSearchBar'
 import Link from 'next/link'
 
 interface DemoCategory {
@@ -177,7 +178,7 @@ export default function CategoriesPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-4" style={{ color: theme.colors.text.primary }}>
             {brand === 'primediscreet' ? 'Elite Categories' : 'Product Categories'}
           </h1>
@@ -187,6 +188,47 @@ export default function CategoriesPage() {
               : 'Explore our comprehensive collection of premium adult products, organized by category for easy browsing.'
             }
           </p>
+        </div>
+
+        {/* Search Panel */}
+        <div className="mb-12">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
+              Find What You're Looking For
+            </h2>
+            <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
+              Search across all categories or browse by category below
+            </p>
+          </div>
+          <ProductSearchBar 
+            placeholder={brand === 'primediscreet' 
+              ? "Search exclusive luxury products..." 
+              : "Search for products, categories, or brands..."
+            }
+            className="max-w-3xl"
+          />
+        </div>
+
+        {/* Filter Options */}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+              Quick filters:
+            </span>
+            {['New Arrivals', 'Best Sellers', 'On Sale', 'Premium', 'Beginner Friendly'].map((filter) => (
+              <button
+                key={filter}
+                className="px-4 py-2 rounded-full text-sm border transition-all duration-300 hover:scale-105 hover:shadow-md"
+                style={{
+                  borderColor: theme.colors.glass.border,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.primary
+                }}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Categories Grid */}
