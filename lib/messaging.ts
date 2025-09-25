@@ -7,7 +7,7 @@ export interface DecryptedMessage {
   sender_id: string
   recipient_id: string
   content: string
-  message_type: 'text' | 'image' | 'order_inquiry' | 'system'
+  message_type: 'text' | 'image' | 'order_inquiry' | 'system' | 'promo' | 'admin_chat'
   order_id?: string
   read_at?: string
   created_at: string
@@ -59,7 +59,7 @@ export class RealTimeMessaging {
           } catch (error) {
             console.error('Error processing real-time message:', error)
             onMessage({
-              ...payload.new,
+              ...payload.new as DecryptedMessage,
               content: '[Message could not be decrypted]'
             })
           }
@@ -107,7 +107,7 @@ export class RealTimeMessaging {
           } catch (error) {
             console.error('Error processing new conversation message:', error)
             onNewConversation({
-              ...payload.new,
+              ...payload.new as DecryptedMessage,
               content: '[Message could not be decrypted]'
             })
           }
