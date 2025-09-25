@@ -81,6 +81,7 @@ export default function Home() {
         slug: 'elite-platinum-collection',
         base_price: 299.99,
         compare_at_price: 399.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg',
         category: 'Premium Collections',
         brand: 'Platinum Elite',
         rating: 4.9,
@@ -92,6 +93,7 @@ export default function Home() {
         title: 'Artisan Crystal Massage Wand',
         slug: 'artisan-crystal-wand',
         base_price: 189.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_f6c14bc7.jpg',
         category: 'Luxury Wellness',
         brand: 'Crystal Artisans',
         rating: 4.8,
@@ -103,6 +105,7 @@ export default function Home() {
         slug: 'designer-silk-collection',
         base_price: 149.99,
         compare_at_price: 199.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_51dd235d.jpg',
         category: 'Luxury Lingerie',
         brand: 'Silk Dreams',
         rating: 4.7,
@@ -114,6 +117,7 @@ export default function Home() {
         title: 'Premium Couple\'s Experience Kit',
         slug: 'premium-couples-kit',
         base_price: 249.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_0363025f.jpg',
         category: 'Couples Collections',
         brand: 'Intimate Elite',
         rating: 4.9,
@@ -126,6 +130,7 @@ export default function Home() {
         slug: 'starter-wellness-kit',
         base_price: 79.99,
         compare_at_price: 99.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_68b78495.jpg',
         category: 'Wellness',
         brand: 'EntizCare',
         rating: 4.6,
@@ -137,6 +142,7 @@ export default function Home() {
         title: 'Comfort Massage Collection',
         slug: 'comfort-massage-collection',
         base_price: 129.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg',
         category: 'Massage & Wellness',
         brand: 'ComfortZone',
         rating: 4.5,
@@ -148,6 +154,7 @@ export default function Home() {
         slug: 'essential-care-bundle',
         base_price: 59.99,
         compare_at_price: 79.99,
+        image_url: '/attached_assets/stock_images/luxury_adult_product_f6c14bc7.jpg',
         category: 'Essentials',
         brand: 'EntizCare',
         rating: 4.4,
@@ -204,17 +211,25 @@ export default function Home() {
           </div>
         )}
         
-        <div className="absolute inset-0 flex items-center justify-center"
-             style={{ backgroundColor: theme.colors.background }}>
-          <div className="text-center p-4 group-hover:scale-110 transition-transform duration-300">
-            <div className="text-4xl mb-2" style={{ color: theme.colors.accent }}>
-              {brand === 'primediscreet' ? '💎' : '✨'}
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={product.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center"
+               style={{ backgroundColor: theme.colors.background }}>
+            <div className="text-center p-4 group-hover:scale-110 transition-transform duration-300">
+              <div className="text-4xl mb-2" style={{ color: theme.colors.accent }}>
+                {brand === 'primediscreet' ? '💎' : '✨'}
+              </div>
+              <p className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+                {product.title.split(' ').slice(0, 2).join(' ')}
+              </p>
             </div>
-            <p className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-              {product.title.split(' ').slice(0, 2).join(' ')}
-            </p>
           </div>
-        </div>
+        )}
         
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
