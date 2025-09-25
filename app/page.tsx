@@ -153,7 +153,7 @@ export default function Home() {
   ]
 
   const ProductCard = ({ product }: { product: DemoProduct }) => (
-    <div className="border rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]"
+    <div className="luxury-hover glass-morphism rounded-xl overflow-hidden border group luxury-border"
          style={{ 
            borderColor: theme.colors.glass.border,
            backgroundColor: theme.colors.surface
@@ -276,16 +276,16 @@ export default function Home() {
                   <Link
                     key={category.slug}
                     href={`/categories/${category.slug}`}
-                    className="p-4 lg:p-6 border rounded-xl text-center hover:shadow-lg transition-all duration-300 group hover:scale-105"
+                    className="luxury-hover glass-morphism p-4 lg:p-6 rounded-xl text-center group luxury-border luxury-gradient"
                     style={{ 
                       borderColor: theme.colors.glass.border,
                       backgroundColor: theme.colors.surface
                     }}
                   >
-                    <div className="text-2xl lg:text-3xl mb-3 group-hover:scale-110 transition-transform">
+                    <div className="text-2xl lg:text-3xl mb-3 group-hover:scale-110 transition-transform luxury-float">
                       {category.icon}
                     </div>
-                    <h3 className="font-medium text-xs lg:text-sm group-hover:text-brandPink transition-colors"
+                    <h3 className="font-medium text-xs lg:text-sm group-hover:text-brandPink transition-colors luxury-text-shadow"
                         style={{ color: theme.colors.text.primary }}>
                       {category.name}
                     </h3>
