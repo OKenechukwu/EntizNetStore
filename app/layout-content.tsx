@@ -7,6 +7,8 @@ import LanguageCurrencySwitcher from "@/components/LanguageCurrencySwitcher";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BrandProvider, useBrand } from "@/components/BrandProvider";
 import { AuthProvider, useAuth } from "@/components/AuthProvider";
+import { NotificationProvider } from "@/components/notifications/NotificationProvider";
+import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import AgeGate from "@/components/AgeGate";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -80,6 +82,7 @@ function Navigation() {
           <LanguageCurrencySwitcher />
           <BrandSwitcher />
           <ThemeToggle />
+          {user && <NotificationDropdown />}
           <CartLink />
           {user ? (
             <div className="flex items-center gap-4">
@@ -169,7 +172,8 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <BrandProvider>
         <AuthProvider>
-          <AgeGate>
+          <NotificationProvider>
+            <AgeGate>
             <div className="min-h-screen transition-colors duration-300">
               <Navigation />
               <main className="mx-auto max-w-7xl px-6 py-8">
@@ -177,7 +181,8 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
               </main>
               <Footer />
             </div>
-          </AgeGate>
+            </AgeGate>
+          </NotificationProvider>
         </AuthProvider>
       </BrandProvider>
     </ThemeProvider>

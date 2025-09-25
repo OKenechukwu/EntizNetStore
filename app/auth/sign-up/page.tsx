@@ -13,6 +13,7 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,6 +38,12 @@ export default function SignUpPage() {
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters')
+      setLoading(false)
+      return
+    }
+
+    if (!acceptedTerms) {
+      setError('You must accept the Terms of Service and Privacy Policy to create an account')
       setLoading(false)
       return
     }
@@ -189,9 +196,33 @@ export default function SignUpPage() {
             </div>
           )}
 
-          <div className="text-xs opacity-70 p-3 bg-accent-gold/10 rounded-lg">
-            By creating an account, you confirm you are 18+ and agree to our Terms of Service and Privacy Policy. 
-            All content is for adults only.
+          {/* Terms and Conditions */}
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <input
+                id="terms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 text-accent-gold border-accent-gold/30 rounded focus:ring-accent-gold focus:ring-offset-0"
+              />
+              <label htmlFor="terms" className="text-sm">
+                I confirm I am 18+ years old and agree to the{' '}
+                <Link href="/terms" className="text-accent-gold hover:underline" target="_blank">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="text-accent-gold hover:underline" target="_blank">
+                  Privacy Policy
+                </Link>
+                . I understand all content is for adults only.
+              </label>
+            </div>
+            
+            <div className="text-xs opacity-70 p-3 bg-accent-gold/10 rounded-lg">
+              <strong>Privacy Notice:</strong> We protect your data with enterprise-grade security. 
+              Your information is never shared with third parties. Discreet billing and shipping guaranteed.
+            </div>
           </div>
 
           <button

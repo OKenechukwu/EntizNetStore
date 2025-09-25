@@ -1,7 +1,7 @@
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import MessageCenter from '@/components/messaging/MessageCenter'
+import EnhancedMessageCenter from '@/components/messaging/EnhancedMessageCenter'
 
 export default async function MessagesPage() {
   const supabase = createServerComponentClient({ cookies })
@@ -30,7 +30,7 @@ export default async function MessagesPage() {
 
   return (
     <div className="h-screen">
-      <MessageCenter 
+      <EnhancedMessageCenter 
         currentUserId={session.user.id}
         userType={userType}
       />

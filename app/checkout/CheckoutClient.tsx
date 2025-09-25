@@ -22,7 +22,16 @@ export default function CheckoutClient() {
 
   // Load cart and currency on mount
   useEffect(() => {
-    setCart(getCart());
+    const updateCart = () => setCart(getCart());
+    
+    // Initial load
+    updateCart();
+
+    // Listen for cart changes via storage events
+    window.addEventListener("storage", updateCart);
+    
+    // Also update periodically in case cart changes from same tab
+    const interval = setInterval(updateCart, 1000);
 
     // Read currency from cookie
     const cookieValue = document.cookie
@@ -33,6 +42,11 @@ export default function CheckoutClient() {
     if (cookieValue) {
       setUserCurrency(cookieValue.toUpperCase());
     }
+
+    return () => {
+      window.removeEventListener("storage", updateCart);
+      clearInterval(interval);
+    };
   }, []);
 
   // Fetch FX rates when currency changes

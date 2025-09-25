@@ -26,12 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Try to get seller profile first, then buyer profile
-      const sellerProfile = await getSellerProfile(currentUser.id)
-      const buyerProfile = !sellerProfile ? await getBuyerProfile(currentUser.id) : null
+      // Get both profiles in parallel for better performance
+      const [sellerProfile, buyerProfile] = await Promise.allSettled([
+        getSellerProfile(currentUser.id),
+        getBuyerProfile(currentUser.id)
+      ])
 
-      const role: UserRole = sellerProfile ? 'seller' : 'buyer'
-      const profile = sellerProfile || buyerProfile
+      const seller = sellerProfile.status === 'fulfilled' ? sellerProfile.value : null
+      const buyer = buyerProfile.status === 'fulfilled' ? buyerProfile.value : null
+
+      const role: UserRole = seller ? 'seller' : 'buyer'
+      const profile = seller || buyer
 
       setUser({
         id: currentUser.id,
