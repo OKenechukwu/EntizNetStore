@@ -186,14 +186,14 @@ export default function CheckoutClient() {
                   <button
                     onClick={() => handleQtyChange(item.id, item.qty - 1)}
                     disabled={item.qty <= 1}
-                    className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50 disabled:opacity-50"
+                    className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 text-black border-black"
                   >
                     −
                   </button>
-                  <span className="w-8 text-center">{item.qty}</span>
+                  <span className="w-8 text-center text-black">{item.qty}</span>
                   <button
                     onClick={() => handleQtyChange(item.id, item.qty + 1)}
-                    className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50"
+                    className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50 text-black border-black"
                   >
                     +
                   </button>

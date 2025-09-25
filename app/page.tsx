@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { useAuth } from '@/components/AuthProvider'
+import { useTranslation } from '@/hooks/useTranslation'
 import HeroSlider from '@/components/hero/HeroSlider'
 import ProductSearchBar from '@/components/search/ProductSearchBar'
 import SideVideoAd from '@/components/ads/SideVideoAd'
+import { convertFromBase, formatPrice, getFxRates, DEFAULT_CURRENCY } from '@/lib/currency'
 import Link from 'next/link'
 
 interface DemoProduct {
@@ -25,13 +27,47 @@ interface DemoProduct {
 export default function Home() {
   const { theme, brand } = useBrand()
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [featuredProducts, setFeaturedProducts] = useState<DemoProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [userCurrency, setUserCurrency] = useState(DEFAULT_CURRENCY)
+  const [rates, setRates] = useState<Record<string, number>>({})
 
   useEffect(() => {
     // Load demo products for the home page
     loadDemoProducts()
+    
+    // Load currency preference
+    loadCurrencyPreference()
+    
+    // Load FX rates
+    loadFxRates()
   }, [brand])
+
+  const loadCurrencyPreference = () => {
+    if (typeof window !== 'undefined') {
+      const cookieValue = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('currency='))
+        ?.split('=')[1]
+      
+      if (cookieValue) {
+        setUserCurrency(cookieValue.toUpperCase())
+      }
+    }
+  }
+
+  const loadFxRates = async () => {
+    try {
+      const response = await fetch('/api/fx')
+      if (response.ok) {
+        const data = await response.json()
+        setRates(data.rates || {})
+      }
+    } catch (error) {
+      console.error('Failed to fetch FX rates:', error)
+    }
+  }
 
   const loadDemoProducts = async () => {
     setLoading(true)
@@ -215,11 +251,11 @@ export default function Home() {
         {/* Price */}
         <div className="flex items-center gap-2 mb-4">
           <span className="font-bold text-lg" style={{ color: theme.colors.accent }}>
-            ${product.base_price}
+            {formatPrice(convertFromBase(product.base_price, userCurrency, rates), userCurrency)}
           </span>
           {product.compare_at_price && (
             <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-              ${product.compare_at_price}
+              {formatPrice(convertFromBase(product.compare_at_price, userCurrency, rates), userCurrency)}
             </span>
           )}
         </div>
@@ -229,7 +265,7 @@ export default function Home() {
           href={`/products/${product.slug}`}
           className="w-full py-3 bg-brandPink hover:bg-brandPink-600 text-white rounded-lg font-medium text-center block transition-all duration-300 hover:shadow-lg transform hover:scale-105"
         >
-          View Details
+          {t('addToCart')}
         </Link>
       </div>
     </div>
@@ -268,7 +304,7 @@ export default function Home() {
             <section>
               <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center lg:text-left"
                   style={{ color: theme.colors.text.primary }}>
-                Shop by Category
+                {t('categories')}
               </h2>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
