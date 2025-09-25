@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/components/notifications/NotificationPro
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import AgeGate from "@/components/AgeGate";
 import { useTranslation } from "@/hooks/useTranslation";
+import { AdminChatWidget } from "@/components/messaging/AdminChatWidget";
 
 function BrandSwitcher() {
   const { brand, setBrand } = useBrand();
@@ -75,6 +76,11 @@ function Navigation() {
             <Link href="/platform" className="hover:text-accent-gold transition-colors">
               {t('experience')}
             </Link>
+            {user && (
+              <Link href="/messages" className="hover:text-accent-gold transition-colors">
+                {t('messages')}
+              </Link>
+            )}
           </div>
         </div>
         
@@ -180,6 +186,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
                 {children}
               </main>
               <Footer />
+              <AdminChatWidget />
             </div>
             </AgeGate>
           </NotificationProvider>

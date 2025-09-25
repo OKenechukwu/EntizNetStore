@@ -13,6 +13,7 @@ export const translations = {
     dashboard: "Dashboard",
     signIn: "Sign In",
     signOut: "Sign Out",
+    messages: "Messages",
     
     // Product page
     addToCart: "Add to Cart",
@@ -49,6 +50,7 @@ export const translations = {
     dashboard: "Panel",
     signIn: "Iniciar Sesión",
     signOut: "Cerrar Sesión",
+    messages: "Mensajes",
     
     // Product page
     addToCart: "Añadir al Carrito",
@@ -85,6 +87,7 @@ export const translations = {
     dashboard: "Tableau de Bord",
     signIn: "Se Connecter",
     signOut: "Se Déconnecter",
+    messages: "Messages",
     
     // Product page
     addToCart: "Ajouter au Panier",
@@ -121,6 +124,7 @@ export const translations = {
     dashboard: "Dashboard",
     signIn: "Anmelden",
     signOut: "Abmelden",
+    messages: "Nachrichten",
     
     // Product page
     addToCart: "In den Warenkorb",
@@ -157,6 +161,7 @@ export const translations = {
     dashboard: "แดชบอร์ด",
     signIn: "เข้าสู่ระบบ",
     signOut: "ออกจากระบบ",
+    messages: "ข้อความ",
     
     // Product page
     addToCart: "เพิ่มลงตะกร้า",
@@ -193,6 +198,7 @@ export const translations = {
     dashboard: "ダッシュボード",
     signIn: "サインイン",
     signOut: "サインアウト",
+    messages: "メッセージ",
     
     // Product page
     addToCart: "カートに追加",
@@ -229,6 +235,7 @@ export const translations = {
     dashboard: "Dashboard",
     signIn: "Mag-sign In",
     signOut: "Mag-sign Out",
+    messages: "Mga Mensahe",
     
     // Product page
     addToCart: "Ilagay sa Cart",

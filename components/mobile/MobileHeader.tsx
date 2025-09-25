@@ -20,7 +20,7 @@ export default function MobileHeader({
   onBackClick,
   className = '' 
 }: MobileHeaderProps) {
-  const { theme, brand, toggleBrand } = useBrand()
+  const { theme, brand, setBrand } = useBrand()
   const { user, signOut } = useAuth()
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
@@ -39,6 +39,7 @@ export default function MobileHeader({
     { label: 'Wishlist', href: '/wishlist', icon: '🤍' },
     { label: 'Orders', href: '/orders', icon: '🛒' },
     ...(user ? [
+      { label: 'Messages', href: '/messages', icon: '💬' },
       { label: 'Profile', href: '/profile', icon: '👤' },
       { label: 'Seller Dashboard', href: '/seller', icon: '🏪' }
     ] : [
@@ -98,7 +99,7 @@ export default function MobileHeader({
           <div className="flex items-center gap-2">
             {/* Brand Toggle */}
             <button
-              onClick={toggleBrand}
+              onClick={() => setBrand(brand === 'primediscreet' ? 'entiznetstore' : 'primediscreet')}
               className="p-2 rounded-lg transition-all active:scale-95"
               style={{ 
                 backgroundColor: theme.colors.background,
