@@ -227,7 +227,7 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !acceptedTerms}
             className="luxury-button w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating Account...' : `Create ${role === 'seller' ? 'Seller' : 'Buyer'} Account`}
