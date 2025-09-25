@@ -28,7 +28,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       accent: "#D4AF37",       // Luxury gold
       background: "#F7F6F3",   // Warm ivory
     },
-    logo: "/logos/entiznet-logo.svg",
+    logo: "/logos/entiznet-logo.jpg",
     favicon: "/favicons/entiznet.ico",
   },
   primediscreet: {
@@ -41,7 +41,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       accent: "#C9A876",       // Muted champagne gold
       background: "#1A1A1D",   // Dark charcoal for sophisticated discrete theme
     },
-    logo: "/logos/primediscreet-logo.svg",
+    logo: "/logos/primediscreet-logo.jpg",
     favicon: "/favicons/primediscreet.ico",
   },
 };
