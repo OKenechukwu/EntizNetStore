@@ -10,6 +10,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import AddToCartButton from "./AddToCartButton";
+import ProductDetailsTabs from "@/components/products/ProductDetailsTabs";
 
 type Product = {
   id: string;
@@ -116,12 +117,6 @@ export default async function ProductDetailPage({
             {formatPrice(displayAmount, userCurrency)}
           </p>
 
-          <div className="prose max-w-none">
-            <p className="whitespace-pre-wrap">
-              {product.description ?? "No description provided."}
-            </p>
-          </div>
-
           <AddToCartButton 
             product={{
               id: product.id,
@@ -132,6 +127,9 @@ export default async function ProductDetailPage({
           />
         </div>
       </div>
+
+      {/* Product Details Tabs */}
+      <ProductDetailsTabs product={product} />
     </div>
   );
 }
