@@ -6,6 +6,17 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
+### October 2025 - Royal Desire (Option A) Design Transformation
+- **Royal Desire Color Palette**: Transformed site with luxury purple (#7A00D1), gold (#D1B000), and velvet black (#0B0A0D) branding
+- **Two-Level Navigation**: Implemented TopBar (logo, primary links, search, language+currency, auth icons) + MainNav (category tabs) system
+- **Full-Width Layout**: Removed all max-width constraints for true edge-to-edge design with 70vh hero slider
+- **Categories Grid**: Exact 2-row × 8-column layout (16 total) with responsive breakpoints and fast hover effects
+- **Featured Sections**: Created 9 reusable product showcase sections with ratings, prices, and smooth animations
+- **Language & Currency**: Single dropdown component with localStorage persistence for user preferences
+- **New Routes**: Added /premium, /luxury, /collections, /smart-devices, /gift-sets pages
+- **Security**: Updated CSP in middleware.ts to allow Google Fonts (Cormorant Garamond serif + Inter sans)
+- **Documentation**: Created docs/ui-notes.md with comprehensive UI architecture guide
+
 ### December 2024 - Dual Brand Architecture Implementation
 - **Dual Brand System**: Implemented sophisticated dual brand architecture with EntizNetStore (luxury gold/ivory theme) and PrimeDiscreet (premium champagne/charcoal theme)
 - **Dynamic Theming**: Advanced theming system with real-time CSS variable switching, brand-specific color schemes, and responsive design transitions
