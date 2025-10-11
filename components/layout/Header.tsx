@@ -4,13 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   ShoppingCart,
-  User,
   Bell,
   Search,
   Menu,
   X,
 } from "lucide-react";
 import LanguageCurrencyMenu from "./LanguageCurrencyMenu";
+import ProfileIconClient from "./ProfileIconClient";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -92,13 +92,7 @@ export default function Header() {
               Sign in
             </Link>
             
-            <Link
-              href="/account"
-              className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
-              aria-label="Account"
-            >
-              <User className="h-5 w-5" />
-            </Link>
+            <ProfileIconClient />
             
             <Link
               href="/cart"
