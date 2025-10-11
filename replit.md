@@ -6,14 +6,20 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
-### October 2025 - Auth, BSM & Routing Fixes
-- **3-Role Auth System**: Auth page now supports Buyer/Seller/BSM tabs with helper text "BSM = Brands, Suppliers & Manufacturers"
-- **Role-Based Routing**: Profile icon routes to `/auth?mode=signin` when logged out, or correct dashboard by role when authenticated
-- **BSM Integration**: Added BSM footer section with links to /bsm/apply, /bsm/resources, /dashboard/bsm
-- **404 Fixes**: Created stub pages for /help, /terms, /contact, /seller/apply, /seller/resources
-- **Currency & i18n**: Language & currency pickers now persist via localStorage + cookies with router.refresh()
-- **formatMoney Utility**: Added currency formatter to lib/currency.ts for consistent price display
-- **Centralized Routing**: All role redirects use lib/auth/routeByRole.ts helper (buyer→/dashboard/buyer, seller→/dashboard/vendor, bsm→/dashboard/bsm)
+### October 2025 - Auth Sign-in Fix, BSM/Seller Links, i18n & Currency
+- **Sign-in Link Fixed**: Header "Sign in" now correctly routes to `/auth?mode=signin` instead of 404 `/auth/signin`
+- **Compatibility Route**: Created `/auth/signin` redirect for backward compatibility
+- **Footer BSM/Seller Links**: Updated footer to route "Become a Seller", "Sell as BSM", and "BSM Dashboard" to `/auth?mode=signin` with role parameters
+- **Auth Guards**: Added server-side auth checks to `/seller/apply` and `/bsm/apply` pages that redirect unauthenticated users
+- **Language & Currency Persistence**: Verified full cookie + localStorage persistence system working via LanguageCurrencySwitcher
+- **formatMoney Utility**: Currency formatter in lib/currency.ts for consistent price display across the app
+- **Auto-Detection**: Currency automatically detects from user locale/timezone on first visit
+
+### October 2025 - 3-Role Auth System & BSM Integration
+- **3-Role Auth System**: Auth page supports Buyer/Seller/BSM tabs with helper text
+- **Role-Based Routing**: Profile icon routes to `/auth?mode=signin` when logged out, or role-based dashboard when authenticated
+- **BSM Footer Section**: Added BSM links to footer with proper routing
+- **Centralized Routing**: All role redirects use lib/auth/routeByRole.ts helper
 
 ### October 2025 - Royal Desire (Option A) Design Transformation
 - **Royal Desire Color Palette**: Transformed site with luxury purple (#7A00D1), gold (#D1B000), and velvet black (#0B0A0D) branding
