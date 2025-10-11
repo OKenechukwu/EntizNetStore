@@ -231,7 +231,7 @@ function Footer() {
             <h4 className="font-semibold text-accent-gold">Sellers</h4>
             <div className="space-y-2 text-sm">
               <Link
-                href="/seller/apply"
+                href="/auth?mode=signin&role=seller"
                 className="block hover:text-accent-gold transition-colors"
               >
                 Become a Seller
@@ -255,13 +255,13 @@ function Footer() {
             <h4 className="font-semibold text-accent-gold">BSM</h4>
             <div className="space-y-2 text-sm">
               <Link
-                href="/bsm/apply"
+                href="/auth?mode=signin&role=bsm"
                 className="block hover:text-accent-gold transition-colors"
               >
                 Sell as a Brand, Supplier, Manufacturer (BSM)
               </Link>
               <Link
-                href="/dashboard/bsm"
+                href="/auth?mode=signin&role=bsm"
                 className="block hover:text-accent-gold transition-colors"
               >
                 BSM Dashboard
