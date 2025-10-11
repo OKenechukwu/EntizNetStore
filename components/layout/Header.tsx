@@ -86,7 +86,7 @@ export default function Header() {
             <LanguageCurrencyMenu />
             
             <Link
-              href="/auth/signin"
+              href="/auth?mode=signin"
               className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
             >
               Sign in
@@ -208,7 +208,7 @@ export default function Header() {
             <div className="flex items-center gap-2 pt-2">
               <LanguageCurrencyMenu />
               <Link
-                href="/auth/signin"
+                href="/auth?mode=signin"
                 className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"
                 onClick={() => setMobileOpen(false)}
               >

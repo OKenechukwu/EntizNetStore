@@ -1,0 +1,135 @@
+Agent Task: Fix Sign-in link (404), route BSM/Seller links to auth, and wire Language/Currency — no other changes
+
+Stack: Next.js App Router, Tailwind.
+Rule: Do not change any styling, layouts, copy, or components beyond the files/lines below.
+
+1) Top-nav “Sign in” → 404
+
+Problem: Header button points to /auth/signin (404). Working page is /auth.
+
+Do:
+
+In components/layout/Header.tsx (or the file that renders the top nav):
+
+Change the Sign-in link target to href="/auth?mode=signin".
+
+Add a compatibility route to prevent future regressions:
+
+Create app/auth/signin/page.tsx with:
+
+import { redirect } from "next/navigation";
+export default function Page() { redirect("/auth?mode=signin"); }
+
+
+No other header changes.
+
+2) Footer & BSM links should go to Sign-in (for now)
+
+Problem:
+
+“Become a Seller”, “Sell as a Brand, Supplier, Manufacturer (BSM)”, and “BSM Dashboard” show “Coming soon” or don’t auth-gate consistently.
+Goal: These three should open the Sign-in screen when the user isn’t authenticated (same as “Seller Dashboard” does now).
+
+Do (quick, minimal):
+
+In components/layout/Footer.tsx, update ONLY these hrefs:
+
+Become a Seller → "/auth?mode=signin&role=seller"
+
+Sell as a Brand, Supplier, Manufacturer (BSM) → "/auth?mode=signin&role=bsm"
+
+BSM Dashboard → "/auth?mode=signin&role=bsm"
+
+Leave the existing stub pages in place (no deletions), just stop linking to them for now.
+
+Optional (small hardening, still minimal):
+
+In app/seller/apply/page.tsx and app/bsm/apply/page.tsx, add server redirect if unauthenticated:
+
+import { redirect } from "next/navigation";
+import { getUser } from "@/lib/auth/server"; // use existing helper
+export default async function Page() {
+  const user = await getUser();
+  if (!user) redirect("/auth?mode=signin");
+  return <div>Coming soon</div>;
+}
+
+
+(Use existing auth helper; don’t introduce new libraries.)
+
+3) Language & Currency pickers don’t work
+
+Goal: Changing language/currency should persist and reflect immediately (no style changes).
+
+Do:
+
+In the picker component (e.g., components/LanguageCurrencyPicker.tsx or equivalent):
+
+On language change:
+
+document.cookie = `locale=${code}; path=/; max-age=31536000`;
+localStorage.setItem("locale", code);
+router.refresh();
+
+
+On currency change:
+
+localStorage.setItem("currency", code);
+dispatch({ type: "SET_CURRENCY", currency: code }); // via existing context/provider
+
+
+In the global settings/provider (e.g., components/BrandProvider.tsx or providers/SettingsProvider.tsx):
+
+On mount, hydrate from cookie.locale (server) or localStorage.locale (client) and localStorage.currency.
+
+Ensure all price displays import a single formatter (create if missing):
+
+lib/currency.ts
+
+export function formatMoney(amount: number, currency = "USD", locale = "en-US") {
+  try { return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount); }
+  catch { return `$${amount?.toFixed?.(2) ?? amount}`; }
+}
+
+
+Replace inline price formatting with formatMoney(price, currentCurrency, currentLocale) in product card, PDP, cart totals (imports only—no UI changes).
+
+Note: If i18n dictionaries aren’t set up yet, just persist the locale and reflect it in state (it’s okay if copy stays English for now). The visible confirmation is that the picker shows the saved choice after refresh and prices switch currency symbol.
+
+4) Acceptance checklist
+
+Top-nav Sign in opens /auth?mode=signin (no 404). /auth/signin also redirects correctly.
+
+Footer:
+
+Become a Seller, Sell as a BSM, BSM Dashboard → /auth?mode=signin (with role preselected via query).
+
+If you keep the apply pages accessible directly, they redirect to auth when logged out.
+
+Language selection persists across refresh (cookie + localStorage) and shows the saved choice.
+
+Currency selection updates price symbols site-wide and persists after refresh.
+
+No changes to colors, spacing, components, hero, categories, product cards, payment/cart logic, or file moves.
+
+5) Deliverables
+
+Minimal PR touching only:
+
+components/layout/Header.tsx
+
+components/layout/Footer.tsx
+
+app/auth/signin/page.tsx (new)
+
+(optional) app/seller/apply/page.tsx, app/bsm/apply/page.tsx auth-redirect
+
+components/LanguageCurrencyPicker.tsx (or equivalent)
+
+providers/* or components/BrandProvider.tsx (hydrate settings)
+
+lib/currency.ts (new) + import lines in price displays
+
+Add a short CHANGELOG-AUTH-I18N-CURRENCY.md summarizing the fixes.
+
+Do not modify anything else.
