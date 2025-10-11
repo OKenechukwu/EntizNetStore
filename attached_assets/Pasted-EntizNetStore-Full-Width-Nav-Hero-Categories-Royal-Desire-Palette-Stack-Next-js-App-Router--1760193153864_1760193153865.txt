@@ -1,0 +1,221 @@
+EntizNetStore Full-Width + Nav/ Hero/ Categories + Royal Desire Palette
+
+Stack: Next.js (App Router) + Tailwind
+Project: EntizNetStore (storefront)
+Goal: Implement full-width layout, 2-level navigation, hero placement, categories in exactly two rows (8 per row), featured sections below categories, Language+Currency in one dropdown, fix routes, and apply Royal Desire (Option A) palette across the entire site.
+
+0) Brand Palette — Royal Desire (Option A) APPLY GLOBALLY (all pages)
+
+Define CSS variables and wire Tailwind to semantic tokens. Use these names; apply everywhere.
+
+globals.css
+
+:root {
+  --brand-primary: #7A00D1;   /* Royal Purple */
+  --brand-secondary: #D1B000; /* Luxury Gold */
+  --background: #0B0A0D;      /* Velvet Black */
+  --foreground: #F4F3F6;      /* Off-white text */
+  --muted: #1A1720;
+  --card: #121017;
+  --border: rgba(255,255,255,0.12);
+}
+
+
+tailwind.config.ts
+
+theme: {
+  extend: {
+    colors: {
+      background: "var(--background)",
+      foreground: "var(--foreground)",
+      border: "var(--border)",
+      brand: {
+        primary: "var(--brand-primary)",
+        secondary: "var(--brand-secondary)",
+      },
+      card: "var(--card)",
+      muted: "var(--muted)",
+    },
+  },
+}
+
+
+Rule: Replace any hardcoded bg-white, text-black, border-gray-200 with these semantic tokens (bg-background text-foreground border etc.). Hover accents should use brand.secondary with low opacity.
+
+1) Two-Level Top Navigation (search sits on the same line as logo)
+
+TopBar (same line as logo):
+
+Left: EntizNetStore logo.
+
+Links: Stores, Brands, Live, On Sale, Learn.
+
+Right (same line): Search bar (compact), then Language dropdown that includes both Language + Currency (single dropdown).
+
+Icons cluster (right): Sign in, Profile, Cart, Notifications.
+
+MainNav (immediately under TopBar):
+
+Tabs: Home, Premium, Luxury, Collections, Smart Devices, Gift Sets.
+
+File targets
+
+components/layout/Header.tsx → split (or inline) into:
+
+TopBar and MainNav
+
+LanguageCurrencyMenu.tsx (single dropdown showing Language first, divider, then Currency; persist selection in localStorage)
+
+Routing
+
+Ensure Luxury routes correctly (no 404). Create stub pages if missing:
+
+/premium, /luxury, /collections, /smart-devices, /gift-sets
+
+2) Full-Width Site (remove side empty space)
+
+Make the entire site full-bleed: no left/right gaps like in the screenshots.
+
+app/layout.tsx → <body className="min-h-screen w-full bg-background text-foreground antialiased overflow-x-hidden">
+
+Replace page clamps:
+
+mx-auto max-w-screen-* → w-full
+
+container → w-full
+
+Any max-w-* wrappers on header/hero/home → max-w-none
+
+3) Hero Placement & Cleanup
+
+Remove the old white/purple long bar completely.
+
+Place Hero slider immediately under MainNav; no large gap; full width.
+
+The search bar must NOT appear below hero anymore (it lives on TopBar).
+
+File: components/home/HeroSlider.tsx should render full width with gentle gradient overlay and brand typography.
+
+4) Categories — exactly two rows, 8 per row (16 total on desktop)
+
+Position: Immediately below the Hero.
+
+Grid:
+
+Desktop: grid-cols-8 (→ 2 rows × 8 = 16 items)
+
+Tablet: grid-cols-6
+
+Mobile: grid-cols-3 or 4
+
+Cards: Smaller, subtle effects (faster):
+
+Icon 28–32px, label text-sm, card rounded-xl, border border-white/10, bg-white/5, hover scale-105 & bg-white/10.
+
+Remove duplicates: Only one Categories block on the page.
+
+File: components/home/CategoriesRow.tsx
+Wrapper: w-full px-4 md:px-6 py-6 md:py-8 bg-background text-foreground
+Grid: grid gap-3 md:gap-4 grid-cols-4 sm:grid-cols-6 md:grid-cols-8
+Slice to 16 items to force two rows.
+
+5) Featured Sections (below Categories) — use this exact list & order
+
+Create a reusable FeaturedSection component and render these sections (use demo data for now):
+
+Best Selling Products
+
+Top Sellers
+
+Top Sellers in Dildos for you
+
+Top categories in Vibrator
+
+International top sellers in Dolls
+
+Best Sellers in Beauty & Personal Care
+
+Popular products in Essentials internationally
+
+Local top sellers
+
+International top sellers
+
+Files
+
+components/home/FeaturedSection.tsx (props: title, items)
+
+Use on: app/store/page.tsx (or app/(store)/page.tsx) with demo arrays.
+
+6) Search Bar (TopBar, compact)
+
+Widths: desktop max-w-[520px], tablet ~420px, mobile full-width when TopBar stacks.
+
+Classes: rounded, subtle border, semantic colors, focus ring using brand.secondary.
+
+7) Language + Currency (single dropdown)
+
+Label the trigger Language.
+
+Dropdown content:
+
+Section A: Languages
+
+Divider
+
+Section B: Currencies
+
+Persist both selections to localStorage; later we’ll wire to user settings.
+
+8) Performance & Polish
+
+Transitions: transition-transform duration-150 ease-out only.
+
+Avoid heavy shadows/filters; keep it crisp.
+
+No console errors; keyboard tab order correct.
+
+9) Page Assembly (order)
+
+Header (TopBar + MainNav) → HeroSlider → CategoriesRow (2 rows) → Featured sections (the 9 blocks above).
+
+Acceptance Criteria (QA — VISIT/TEST THESE PAGES)
+
+Agent, please VISIT and verify:
+
+ Site is full-width; no empty left/right gutters on header, hero, categories, or featured grids.
+
+ TopBar: Stores, Brands, Live, On Sale, Learn + Search + Language (with Currency inside) + icons are on the same line (desktop).
+
+ MainNav under TopBar: Home, Premium, Luxury, Collections, Smart Devices, Gift Sets.
+
+ Click Luxury → loads without 404.
+
+ Hero sits directly under MainNav; old long bar removed.
+
+ Categories appear immediately under hero, exactly two rows, 8 per row on desktop (total 16 shown), smaller effects; no duplicate categories block.
+
+ Featured sections rendered in the exact order listed (9 sections), each with grid of cards.
+
+ Color palette Royal Desire (Option A) is applied across all pages (background/foreground/brand colors consistent).
+
+ Search is only on TopBar; responsive widths work.
+
+ No layout jumps, no console errors.
+
+Deliverables
+
+Updated components/pages with comments.
+
+Commit message:
+feat(ui): full-width layout, two-level nav, hero reposition, two-row categories, featured stacks, single language+currency dropdown, Royal Desire palette site-wide, fix luxury route
+
+A short /docs/ui-notes.md explaining:
+
+Palette variables & Tailwind tokens
+
+How to add categories and featured sections
+
+How Language/Currency persistence works
+
+If anything is ambiguous, prefer the cleaner, luxury, fast option and proceed.

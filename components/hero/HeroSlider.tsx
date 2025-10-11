@@ -1,378 +1,396 @@
-'use client'
+// components/hero/HeroSlider.tsx
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
-import { useBrand } from '@/components/BrandProvider'
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import SafeVideo from "@/components/media/SafeVideo";
+import { useBrand } from "@/components/BrandProvider";
+
+interface CTA {
+  text: string;
+  href: string;
+  primary?: boolean;
+}
 
 interface HeroSlide {
-  id: string
-  type: 'image' | 'video'
-  src: string
-  poster?: string // For video poster
-  alt: string
-  title: string
-  subtitle: string
-  cta1: {
-    text: string
-    href: string
-    primary?: boolean
-  }
-  cta2?: {
-    text: string
-    href: string
-    primary?: boolean
-  }
+  id: string;
+  type: "image" | "video";
+  src: string;
+  alt: string;
+  poster?: string; // for video
+  title: string;
+  subtitle: string;
+  cta1: CTA;
+  cta2?: CTA;
 }
 
 interface HeroSliderProps {
-  slides?: HeroSlide[]
-  autoplayInterval?: number
-  className?: string
+  slides?: HeroSlide[];
+  autoplayInterval?: number; // ms
+  className?: string;
 }
 
 const defaultSlides: HeroSlide[] = [
   {
-    id: '1',
-    type: 'image',
-    src: '/images/hero/luxury-collection.jpg',
-    alt: 'Luxury Adult Wellness Collection',
-    title: 'Luxury Adult Wellness',
-    subtitle: 'Discover premium intimate products designed for your pleasure and wellbeing',
+    id: "1",
+    type: "image",
+    src: "/images/hero/luxury-collection.jpg",
+    alt: "Luxury Adult Wellness Collection",
+    title: "Luxury Adult Wellness",
+    subtitle:
+      "Discover premium intimate products designed for your pleasure and wellbeing.",
     cta1: {
-      text: 'Explore Collection',
-      href: '/collections/premium',
-      primary: true
+      text: "Explore Collection",
+      href: "/collections/premium",
+      primary: true,
     },
-    cta2: {
-      text: 'Browse Categories',
-      href: '/categories'
-    }
+    cta2: { text: "Browse Categories", href: "/categories" },
   },
   {
-    id: '2',
-    type: 'video',
-    src: '/videos/hero/wellness-experience.mp4',
-    poster: '/images/hero/wellness-poster.jpg',
-    alt: 'Premium Wellness Experience',
-    title: 'Elevate Your Intimacy',
-    subtitle: 'Experience the finest in adult wellness with our curated collection of premium products',
-    cta1: {
-      text: 'Shop Premium',
-      href: '/premium',
-      primary: true
-    },
-    cta2: {
-      text: 'Learn More',
-      href: '/about'
-    }
+    id: "2",
+    type: "video",
+    src: "/videos/hero/wellness-experience.mp4",
+    poster: "/images/hero/wellness-poster.jpg",
+    alt: "Premium Wellness Experience",
+    title: "Elevate Your Intimacy",
+    subtitle:
+      "Experience the finest in adult wellness with our curated premium selection.",
+    cta1: { text: "Shop Premium", href: "/premium", primary: true },
+    cta2: { text: "Learn More", href: "/about" },
   },
   {
-    id: '3',
-    type: 'image',
-    src: '/images/hero/discreet-luxury.jpg',
-    alt: 'Discreet Luxury Shopping',
-    title: 'Discreet & Luxurious',
-    subtitle: 'Private shopping experience with premium packaging and discreet delivery worldwide',
-    cta1: {
-      text: 'Start Shopping',
-      href: '/store',
-      primary: true
-    },
-    cta2: {
-      text: 'Privacy Policy',
-      href: '/privacy'
-    }
-  }
-]
+    id: "3",
+    type: "image",
+    src: "/images/hero/discreet-luxury.jpg",
+    alt: "Discreet Luxury Shopping",
+    title: "Discreet & Luxurious",
+    subtitle:
+      "Private shopping with premium packaging and discreet worldwide delivery.",
+    cta1: { text: "Start Shopping", href: "/store", primary: true },
+    cta2: { text: "Privacy Policy", href: "/privacy" },
+  },
+];
 
 export default function HeroSlider({
   slides = defaultSlides,
-  autoplayInterval = 18000, // 18 seconds
-  className = ""
+  autoplayInterval = 18000,
+  className = "",
 }: HeroSliderProps) {
-  const { brand, theme } = useBrand()
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [isPaused, setIsPaused] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { theme } = useBrand();
 
-  // Auto-advance slides
+  // Respect reduced motion
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
+    );
+  }, []);
+
+  const [current, setCurrent] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(!prefersReducedMotion);
+  const [isHoverPaused, setIsHoverPaused] = useState(false);
+  const [videoFailedOnce, setVideoFailedOnce] = useState<
+    Record<string, boolean>
+  >({});
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentSlide = slides[current];
+
+  // Announce slide change for SR users
+  const announceSlideChange = useCallback(
+    (index: number) => {
+      const el = document.createElement("div");
+      el.setAttribute("aria-live", "polite");
+      el.setAttribute("aria-atomic", "true");
+      el.className = "sr-only";
+      el.textContent = `Slide ${index + 1} of ${slides.length}: ${slides[index].title}`;
+      document.body.appendChild(el);
+      setTimeout(() => {
+        if (document.body.contains(el)) document.body.removeChild(el);
+      }, 1000);
+    },
+    [slides],
+  );
+
   useEffect(() => {
-    if (!isPlaying || isPaused) return
+    if (typeof window !== "undefined") announceSlideChange(current);
+  }, [current, announceSlideChange]);
 
-    intervalRef.current = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length)
-    }, autoplayInterval)
-
+  // Autoplay
+  useEffect(() => {
+    if (!isPlaying || isHoverPaused || prefersReducedMotion) return;
+    timerRef.current = setInterval(() => {
+      setCurrent((p) => (p + 1) % slides.length);
+    }, autoplayInterval);
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [
+    isPlaying,
+    isHoverPaused,
+    prefersReducedMotion,
+    autoplayInterval,
+    slides.length,
+  ]);
+
+  const goTo = (index: number) => setCurrent(index);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        goTo((current - 1 + slides.length) % slides.length);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        goTo((current + 1) % slides.length);
+        break;
+      case " ":
+        e.preventDefault();
+        setIsPlaying((s) => !s);
+        break;
+      case "Escape":
+        setIsPlaying(false);
+        break;
     }
-  }, [isPlaying, isPaused, autoplayInterval, slides.length])
+  };
 
-  // Handle video play/pause
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
+  const handleVideoErrorOnce = (id: string) => {
+    // Mark failed and let UI fall back to poster (no retry storm)
+    setVideoFailedOnce((m) => ({ ...m, [id]: true }));
+  };
 
-    const currentSlideData = slides[currentSlide]
-    if (currentSlideData.type === 'video') {
-      if (isPlaying && !isPaused) {
-        video.play().catch(console.error)
-      } else {
-        video.pause()
-      }
-    }
-  }, [currentSlide, isPlaying, isPaused, slides])
+  const gradientOverlay =
+    "absolute inset-0 bg-gradient-to-t from-[color:var(--overlay-strong,rgba(0,0,0,0.6))] via-[color:var(--overlay-mid,rgba(0,0,0,0.25))] to-transparent";
 
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index)
-  }
-
-  const announceSlideChange = (index: number) => {
-    const announcement = `Slide ${index + 1} of ${slides.length}: ${slides[index].title}`
-    // Create temporary element for screen reader announcement
-    const announcer = document.createElement('div')
-    announcer.setAttribute('aria-live', 'polite')
-    announcer.setAttribute('aria-atomic', 'true')
-    announcer.className = 'sr-only'
-    announcer.textContent = announcement
-    document.body.appendChild(announcer)
-    
-    // Remove after announcement
-    setTimeout(() => {
-      if (document.body.contains(announcer)) {
-        document.body.removeChild(announcer)
-      }
-    }, 1000)
-  }
-
-  // Announce slide changes whenever currentSlide changes
-  useEffect(() => {
-    announceSlideChange(currentSlide)
-  }, [currentSlide, slides])
-
-  const handleMouseEnter = () => {
-    setIsPaused(true)
-  }
-
-  const handleMouseLeave = () => {
-    setIsPaused(false)
-  }
-
-  const handleVideoEnd = () => {
-    // Move to next slide when video ends
-    goToSlide((currentSlide + 1) % slides.length)
-  }
-
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    switch (event.key) {
-      case 'ArrowLeft':
-        event.preventDefault()
-        goToSlide((currentSlide - 1 + slides.length) % slides.length)
-        break
-      case 'ArrowRight':
-        event.preventDefault()
-        goToSlide((currentSlide + 1) % slides.length)
-        break
-      case ' ':
-        event.preventDefault()
-        setIsPlaying(!isPlaying)
-        break
-      case 'Escape':
-        // Allow users to stop autoplay
-        setIsPlaying(false)
-        break
-    }
-  }
-
-  const currentSlideData = slides[currentSlide]
+  const pillClass =
+    "px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105";
+  const primaryBtn =
+    "px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 bg-[var(--brand-primary)] text-[var(--brand-text,#fff)] hover:opacity-90";
+  const outlineBtn =
+    "px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 bg-white/10 text-white border border-white/30 hover:bg-white/20 backdrop-blur-sm";
 
   return (
-    <div 
-      className={`relative w-full h-[70vh] min-h-[500px] overflow-hidden rounded-2xl ${className}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onKeyDown={handleKeyDown}
+    <section
+      className={`relative w-full h-[70vh] min-h-[500px] overflow-hidden ${className}`}
       tabIndex={0}
       role="region"
-      aria-label="Image carousel"
-      aria-live="polite"
+      aria-label="Hero carousel"
       aria-roledescription="carousel"
+      onKeyDown={onKeyDown}
+      onMouseEnter={() => setIsHoverPaused(true)}
+      onMouseLeave={() => setIsHoverPaused(false)}
     >
       {/* Slides */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentSlideData.id}
-          id={`slide-${currentSlide}`}
+          key={
+            currentSlide.id +
+            (currentSlide.type === "video" && videoFailedOnce[currentSlide.id]
+              ? "-fallback"
+              : "")
+          }
           role="tabpanel"
-          aria-label={`Slide ${currentSlide + 1}: ${currentSlideData.title}`}
-          initial={{ opacity: 0, scale: 1.1 }}
+          aria-label={`Slide ${current + 1}: ${currentSlide.title}`}
+          initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 1.03 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
+          exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.99 }}
+          transition={{
+            duration: prefersReducedMotion ? 0.2 : 0.7,
+            ease: "easeInOut",
+          }}
           className="absolute inset-0"
         >
-          {currentSlideData.type === 'video' ? (
-            <video
-              ref={videoRef}
-              src={currentSlideData.src}
-              poster={currentSlideData.poster}
+          {currentSlide.type === "video" &&
+          !videoFailedOnce[currentSlide.id] ? (
+            <SafeVideo
+              src={currentSlide.src}
+              poster={currentSlide.poster}
               className="w-full h-full object-cover"
-              muted
+              autoPlay
               loop={false}
+              muted
               playsInline
-              onEnded={handleVideoEnd}
-              aria-label={currentSlideData.alt}
+              preload="none"
+              onError={() => handleVideoErrorOnce(currentSlide.id)}
             />
           ) : (
-            <img
-              src={currentSlideData.src}
-              alt={currentSlideData.alt}
-              className="w-full h-full object-cover"
+            <Image
+              src={currentSlide.poster || currentSlide.src}
+              alt={currentSlide.alt}
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
             />
           )}
-          
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+
+          {/* Overlay */}
+          <div className={gradientOverlay} />
         </motion.div>
       </AnimatePresence>
 
-      {/* Content Overlay */}
+      {/* Copy & CTAs */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center text-white px-6 max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto px-6 text-center text-white">
           <motion.h1
-            key={`title-${currentSlideData.id}`}
-            initial={{ opacity: 0, y: 30 }}
+            key={`h-${currentSlide.id}`}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
+            transition={{
+              duration: prefersReducedMotion ? 0.2 : 0.6,
+              delay: 0.2,
+            }}
             className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold mb-6"
-            style={{ textShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+            style={{ textShadow: "0 4px 20px rgba(0,0,0,0.5)" }}
           >
-            {currentSlideData.title}
+            {currentSlide.title}
           </motion.h1>
-          
+
           <motion.p
-            key={`subtitle-${currentSlideData.id}`}
-            initial={{ opacity: 0, y: 20 }}
+            key={`p-${currentSlide.id}`}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-lg md:text-xl lg:text-2xl mb-8 text-white/90 leading-relaxed max-w-3xl mx-auto"
-            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
+            transition={{
+              duration: prefersReducedMotion ? 0.2 : 0.6,
+              delay: 0.35,
+            }}
+            className="text-lg md:text-xl lg:text-2xl mb-8 text-white/90 leading-relaxed mx-auto max-w-3xl"
+            style={{ textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}
           >
-            {currentSlideData.subtitle}
+            {currentSlide.subtitle}
           </motion.p>
-          
+
           <motion.div
-            key={`ctas-${currentSlideData.id}`}
-            initial={{ opacity: 0, y: 20 }}
+            key={`cta-${currentSlide.id}`}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
+            transition={{
+              duration: prefersReducedMotion ? 0.2 : 0.6,
+              delay: 0.5,
+            }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <Link
-              href={currentSlideData.cta1.href}
-              className={`px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                currentSlideData.cta1.primary
-                  ? 'bg-brandPink text-white hover:bg-brandPink-600'
-                  : 'bg-white/20 text-white border border-white/30 hover:bg-white/30 backdrop-blur-sm'
-              }`}
+              href={currentSlide.cta1.href}
+              className={currentSlide.cta1.primary ? primaryBtn : outlineBtn}
             >
-              {currentSlideData.cta1.text}
+              {currentSlide.cta1.text}
             </Link>
-            
-            {currentSlideData.cta2 && (
+            {currentSlide.cta2 && (
               <Link
-                href={currentSlideData.cta2.href}
-                className={`px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                  currentSlideData.cta2.primary
-                    ? 'bg-brandPink text-white hover:bg-brandPink-600'
-                    : 'bg-white/20 text-white border border-white/30 hover:bg-white/30 backdrop-blur-sm'
-                }`}
+                href={currentSlide.cta2.href}
+                className={currentSlide.cta2.primary ? primaryBtn : outlineBtn}
               >
-                {currentSlideData.cta2.text}
+                {currentSlide.cta2.text}
               </Link>
             )}
           </motion.div>
         </div>
       </div>
 
-      {/* Category Pills */}
+      {/* Category pills */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1, duration: 0.8 }}
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
+        transition={{ duration: prefersReducedMotion ? 0.2 : 0.5, delay: 0.7 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
       >
         <div className="flex flex-wrap gap-3 justify-center">
-          {['Wellness', 'Massage', 'Luxury', 'Premium', 'Discreet'].map((category) => (
-            <Link
-              key={category}
-              href={`/categories/${category.toLowerCase()}`}
-              className="px-4 py-2 bg-brandPink hover:bg-brandPink-600 text-white rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
-            >
-              {category}
-            </Link>
-          ))}
+          {["Wellness", "Massage", "Luxury", "Premium", "Discreet"].map(
+            (tag) => (
+              <Link
+                key={tag}
+                href={`/categories/${tag.toLowerCase()}`}
+                className={pillClass}
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
+                  color: "var(--brand-text, #fff)",
+                  opacity: 0.95,
+                }}
+              >
+                {tag}
+              </Link>
+            ),
+          )}
         </div>
       </motion.div>
 
-      {/* Navigation Dots */}
-      <div className="absolute bottom-4 right-6" role="tablist" aria-label="Slide navigation">
+      {/* Dots */}
+      <div
+        className="absolute bottom-4 right-6"
+        role="tablist"
+        aria-label="Slide navigation"
+      >
         <div className="flex gap-2">
-          {slides.map((_, index) => (
+          {slides.map((s, i) => (
             <button
-              key={index}
-              onClick={() => goToSlide(index)}
+              key={s.id}
+              onClick={() => goTo(i)}
               role="tab"
-              aria-selected={index === currentSlide}
-              aria-controls={`slide-${index}`}
+              aria-selected={i === current}
+              aria-controls={`slide-${i}`}
+              aria-label={`Go to slide ${i + 1}: ${s.title}`}
               className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                index === currentSlide
-                  ? 'bg-white shadow-lg scale-110'
-                  : 'bg-white/50 hover:bg-white/70'
+                i === current
+                  ? "bg-white shadow-lg scale-110"
+                  : "bg-white/50 hover:bg-white/70"
               }`}
-              aria-label={`Go to slide ${index + 1}: ${slides[index].title}`}
             />
           ))}
         </div>
       </div>
 
-      {/* Play/Pause Button */}
+      {/* Play / Pause */}
       <button
-        onClick={() => setIsPlaying(!isPlaying)}
+        onClick={() => setIsPlaying((p) => !p)}
         className="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-all duration-300"
-        aria-label={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
+        aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
+        title={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (
-          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+          <svg
+            className="w-6 h-6"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
           </svg>
         ) : (
-          <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z"/>
+          <svg
+            className="w-6 h-6 ml-0.5"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M8 5v14l11-7z" />
           </svg>
         )}
       </button>
 
-      {/* Loading indicator for videos */}
-      {currentSlideData.type === 'video' && (
+      {/* Video badge */}
+      {currentSlide.type === "video" && !videoFailedOnce[currentSlide.id] && (
         <div className="absolute top-4 left-4">
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/30 backdrop-blur-sm text-white text-sm">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true"></div>
+            <span
+              className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+              aria-hidden="true"
+            />
             <span>VIDEO</span>
           </div>
         </div>
       )}
-      
-      {/* Screen reader instructions */}
+
+      {/* SR instructions */}
       <div className="sr-only">
-        Use arrow keys to navigate slides, spacebar to play/pause, escape to stop autoplay. 
-        Currently showing slide {currentSlide + 1} of {slides.length}.
+        Use left and right arrow keys to change slides. Press space to{" "}
+        {isPlaying ? "pause" : "play"}. Press Escape to stop autoplay. Showing
+        slide {current + 1} of {slides.length}.
       </div>
-    </div>
-  )
+    </section>
+  );
 }

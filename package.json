@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 5000",
+    "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 5000",
+    "start": "PORT=${PORT:-3000} next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint"
   },
   "dependencies": {
@@ -13,12 +13,13 @@
     "@stripe/stripe-js": "^7.9.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.57.0",
+    "@supabase/supabase-js": "^2.58.0",
     "@uppy/aws-s3": "^5.0.1",
     "@uppy/core": "^5.0.2",
     "@uppy/dashboard": "^5.0.2",
     "@uppy/react": "^5.0.3",
     "framer-motion": "^12.23.21",
+    "lucide-react": "^0.545.0",
     "next": "^14.2.32",
     "next-intl": "^4.3.9",
     "react": "^18.3.1",

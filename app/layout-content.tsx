@@ -12,29 +12,30 @@ import NotificationDropdown from "@/components/notifications/NotificationDropdow
 import AgeGate from "@/components/AgeGate";
 import { useTranslation } from "@/hooks/useTranslation";
 import { AdminChatWidget } from "@/components/messaging/AdminChatWidget";
+import { routeByRole } from "@/lib/auth/routeByRole";
 
 function BrandSwitcher() {
   const { brand, setBrand } = useBrand();
-  
+
+  const btnBase =
+    "text-xs px-3 py-1 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-gold/60";
+  const active = "bg-accent-gold text-primary-black";
+  const idle =
+    "border border-accent-gold text-accent-gold hover:bg-accent-gold hover:text-primary-black";
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" aria-label="Switch Brand Theme">
       <button
         onClick={() => setBrand("entiznetstore")}
-        className={`text-xs px-3 py-1 rounded-full transition-colors ${
-          brand === "entiznetstore" 
-            ? "bg-accent-gold text-primary-black" 
-            : "border border-accent-gold text-accent-gold hover:bg-accent-gold hover:text-primary-black"
-        }`}
+        className={`${btnBase} ${brand === "entiznetstore" ? active : idle}`}
+        aria-pressed={brand === "entiznetstore"}
       >
         EntizNet
       </button>
       <button
         onClick={() => setBrand("primediscreet")}
-        className={`text-xs px-3 py-1 rounded-full transition-colors ${
-          brand === "primediscreet" 
-            ? "bg-accent-gold text-primary-black" 
-            : "border border-accent-gold text-accent-gold hover:bg-accent-gold hover:text-primary-black"
-        }`}
+        className={`${btnBase} ${brand === "primediscreet" ? active : idle}`}
+        aria-pressed={brand === "primediscreet"}
       >
         PrimeDiscreet
       </button>
@@ -46,71 +47,103 @@ function Navigation() {
   const { config } = useBrand();
   const { user, signOut } = useAuth();
   const { t } = useTranslation();
-  
+
+  // Try to infer a role for smarter dashboard routing (fallback to /dashboard)
+  const role =
+    (user as any)?.user_metadata?.role || (user as any)?.role || undefined;
+  const dashboardHref = routeByRole(role) || "/dashboard";
+
   return (
-    <header className="glass-card sticky top-0 z-40 border-b border-opacity-20">
-      <nav className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
+    <header className="glass-card sticky top-0 z-40 border-b border-opacity-20 backdrop-blur supports-[backdrop-filter]:bg-black/40">
+      <nav
+        className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4"
+        aria-label="Primary"
+      >
         <div className="flex items-center gap-8">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="font-serif font-bold text-2xl text-accent-gold hover:opacity-80 transition-opacity"
+            aria-label={`${config.name} home`}
           >
             {config.name}
           </Link>
-          <div className="flex items-center gap-6 text-sm font-medium">
-            <Link href="/store" className="hover:text-accent-gold transition-colors">
-              {t('store')}
+
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium">
+            <Link
+              href="/store"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("store")}
             </Link>
-            <Link href="/categories" className="hover:text-accent-gold transition-colors">
-              {t('categories')}
+            <Link
+              href="/categories"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("categories")}
             </Link>
-            <Link href="/brands" className="hover:text-accent-gold transition-colors">
-              {t('brands')}
+            <Link
+              href="/brands"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("brands")}
             </Link>
-            <Link href="/popular" className="hover:text-accent-gold transition-colors">
-              {t('popular')}
+            <Link
+              href="/popular"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("popular")}
             </Link>
-            <Link href="/on-sale" className="hover:text-accent-gold transition-colors">
-              {t('onSale')}
+            <Link
+              href="/on-sale"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("onSale")}
             </Link>
-            <Link href="/platform" className="hover:text-accent-gold transition-colors">
-              {t('experience')}
+            <Link
+              href="/platform"
+              className="hover:text-accent-gold transition-colors"
+            >
+              {t("experience")}
             </Link>
             {user && (
-              <Link href="/messages" className="hover:text-accent-gold transition-colors">
-                {t('messages')}
+              <Link
+                href="/messages"
+                className="hover:text-accent-gold transition-colors"
+              >
+                {t("messages")}
               </Link>
             )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-3">
           <LanguageCurrencySwitcher />
           <BrandSwitcher />
           <ThemeToggle />
           {user && <NotificationDropdown />}
           <CartLink />
+
           {user ? (
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/dashboard"
+            <div className="flex items-center gap-3">
+              <Link
+                href={dashboardHref}
                 className="text-sm hover:text-accent-gold transition-colors"
               >
-                {t('dashboard')}
+                {t("dashboard")}
               </Link>
               <button
                 onClick={signOut}
                 className="luxury-button-outline text-sm px-4 py-2"
               >
-                {t('signOut')}
+                {t("signOut")}
               </button>
             </div>
           ) : (
-            <Link 
-              href="/auth/sign-in" 
+            <Link
+              href="/auth"
               className="luxury-button-outline text-sm px-4 py-2"
             >
-              {t('signIn')}
+              {t("signIn")}
             </Link>
           )}
         </div>
@@ -121,52 +154,109 @@ function Navigation() {
 
 function Footer() {
   const { config } = useBrand();
-  
+
   return (
     <footer className="border-t border-opacity-20 mt-20">
-      <div className="mx-auto max-w-7xl px-6 py-16">
+      <div className="w-full px-6 md:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <h3 className="font-serif font-bold text-xl text-accent-gold">
               {config.name}
             </h3>
-            <p className="text-sm opacity-80">
-              {config.description}
-            </p>
+            <p className="text-sm opacity-80">{config.description}</p>
+            <p className="text-xs opacity-60">Must be 18+ to access.</p>
           </div>
-          
+
           <div className="space-y-4">
             <h4 className="font-semibold text-accent-gold">Shop</h4>
             <div className="space-y-2 text-sm">
-              <Link href="/categories" className="block hover:text-accent-gold transition-colors">Categories</Link>
-              <Link href="/brands" className="block hover:text-accent-gold transition-colors">Brands</Link>
-              <Link href="/popular" className="block hover:text-accent-gold transition-colors">Popular</Link>
-              <Link href="/on-sale" className="block hover:text-accent-gold transition-colors">Sale</Link>
+              <Link
+                href="/categories"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Categories
+              </Link>
+              <Link
+                href="/brands"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Brands
+              </Link>
+              <Link
+                href="/popular"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Popular
+              </Link>
+              <Link
+                href="/on-sale"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Sale
+              </Link>
             </div>
           </div>
-          
+
           <div className="space-y-4">
             <h4 className="font-semibold text-accent-gold">Support</h4>
             <div className="space-y-2 text-sm">
-              <Link href="/help" className="block hover:text-accent-gold transition-colors">Help Center</Link>
-              <Link href="/privacy" className="block hover:text-accent-gold transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="block hover:text-accent-gold transition-colors">Terms of Service</Link>
-              <Link href="/contact" className="block hover:text-accent-gold transition-colors">Contact</Link>
+              <Link
+                href="/help"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Help Center
+              </Link>
+              <Link
+                href="/privacy"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/terms"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Terms of Service
+              </Link>
+              <Link
+                href="/contact"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Contact
+              </Link>
             </div>
           </div>
-          
+
           <div className="space-y-4">
             <h4 className="font-semibold text-accent-gold">Sellers</h4>
             <div className="space-y-2 text-sm">
-              <Link href="/seller/apply" className="block hover:text-accent-gold transition-colors">Become a Seller</Link>
-              <Link href="/seller/dashboard" className="block hover:text-accent-gold transition-colors">Seller Dashboard</Link>
-              <Link href="/seller/help" className="block hover:text-accent-gold transition-colors">Seller Resources</Link>
+              <Link
+                href="/sell"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Become a Seller
+              </Link>
+              <Link
+                href="/seller/dashboard"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Seller Dashboard
+              </Link>
+              <Link
+                href="/seller/resources"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Seller Resources
+              </Link>
             </div>
           </div>
         </div>
-        
+
         <div className="border-t border-opacity-20 mt-12 pt-8 text-center text-sm opacity-60">
-          <p>&copy; 2025 {config.name}. All rights reserved. Must be 18+ to access.</p>
+          <p>
+            &copy; {new Date().getFullYear()} {config.name}. All rights
+            reserved.
+          </p>
         </div>
       </div>
     </footer>
@@ -180,14 +270,12 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         <AuthProvider>
           <NotificationProvider>
             <AgeGate>
-            <div className="min-h-screen transition-colors duration-300">
-              <Navigation />
-              <main className="mx-auto max-w-7xl px-6 py-8">
-                {children}
-              </main>
-              <Footer />
-              <AdminChatWidget />
-            </div>
+              <div className="min-h-screen w-full transition-colors duration-300">
+                {/* Navigation now handled in app/layout.tsx Header */}
+                <main className="w-full">{children}</main>
+                <Footer />
+                <AdminChatWidget />
+              </div>
             </AgeGate>
           </NotificationProvider>
         </AuthProvider>

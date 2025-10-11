@@ -4,36 +4,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* EntizNetStore Luxury Design System */
+/* =========================================
+   Brand Tokens — Royal Desire (Option A)
+   ========================================= */
 :root {
-  /* Primary Colors */
+  /* Royal Desire (Option A) — Purple + Gold Luxury */
+  --brand-primary: #7A00D1;   /* Royal Purple */
+  --brand-secondary: #D1B000; /* Luxury Gold */
+  --background: #0B0A0D;      /* Velvet Black */
+  --foreground: #F4F3F6;      /* Off-white text */
+  --muted: #1A1720;
+  --card: #121017;
+  --border: rgba(255,255,255,0.12);
+
+  /* Legacy tokens (kept for compatibility) */
   --primary-black: #0B0B0D;
-  --accent-gold: #D4AF37;
+  --accent-gold: #D1B000;
   --contrast-ivory: #F7F6F3;
   --charcoal: #1A1A1D;
-  
-  /* Light Mode */
-  --background-primary: #F7F6F3;
+
+  /* ====== Design System Mappings (Royal Desire Option A) ====== */
+  --background-primary: var(--background);
+  --background-secondary: var(--card);
+  --text-primary: var(--foreground);
+  --text-secondary: rgba(244, 243, 246, 0.7);
+  --border-subtle: var(--border);
+  --glass-bg: rgba(18, 16, 23, 0.55);
+  --shadow-soft: 0 4px 32px rgba(122, 0, 209, 0.15);
+}
+
+/* =========================================
+   Optional Light Theme (toggle with data-theme="light")
+   ========================================= */
+[data-theme="light"] {
+  --background-primary: #F7F6F3;  /* contrast-ivory */
   --background-secondary: #FFFFFF;
-  --text-primary: #0B0B0D;
-  --text-secondary: #1A1A1D;
+  --text-primary: #0B0B0D;        /* primary-black */
+  --text-secondary: #1A1A1D;      /* charcoal */
   --border-subtle: rgba(11, 11, 13, 0.1);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --shadow-soft: 0 4px 32px rgba(11, 11, 13, 0.1);
 }
 
+/* =========================================
+   (Kept) Dark Theme Mapping via data attr
+   Note: same as default Royal Desire root for consistency
+   ========================================= */
 [data-theme="dark"] {
-  /* Dark Mode */
-  --background-primary: #0B0B0D;
-  --background-secondary: #1A1A1D;
-  --text-primary: #F7F6F3;
-  --text-secondary: #E5E5E5;
-  --border-subtle: rgba(247, 246, 243, 0.1);
-  --glass-bg: rgba(26, 26, 29, 0.7);
-  --shadow-soft: 0 4px 32px rgba(0, 0, 0, 0.3);
+  --background-primary: var(--background);
+  --background-secondary: var(--card);
+  --text-primary: var(--foreground);
+  --text-secondary: rgba(244, 243, 246, 0.7);
+  --border-subtle: var(--border);
+  --glass-bg: rgba(18, 16, 23, 0.55);
+  --shadow-soft: 0 4px 32px rgba(122, 0, 209, 0.15);
 }
 
-/* Base Styles */
+/* =========================================
+   Base Styles
+   ========================================= */
 * {
   border-color: var(--border-subtle);
 }
@@ -52,16 +81,29 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Typography */
+/* Respect brand defaults explicitly (optional) */
+html, body {
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+}
+
+/* Selection to match brand accent */
+::selection {
+  background: var(--brand-secondary);
+  color: var(--background);
+}
+
+/* Typography helpers */
 .font-serif {
   font-family: 'Cormorant Garamond', serif;
 }
-
 .font-sans {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Luxury Components */
+/* =========================================
+   Luxury Components
+   ========================================= */
 .glass-card {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
@@ -70,24 +112,24 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
+/* Gold CTA */
 .luxury-button {
   @apply px-6 py-3 rounded-lg font-medium transition-all duration-300;
   background: var(--accent-gold);
   color: var(--primary-black);
 }
-
 .luxury-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
 }
 
+/* Gold Outline CTA */
 .luxury-button-outline {
   @apply px-6 py-3 rounded-lg font-medium transition-all duration-300;
   background: transparent;
   color: var(--accent-gold);
   border: 2px solid var(--accent-gold);
 }
-
 .luxury-button-outline:hover {
   background: var(--accent-gold);
   color: var(--primary-black);
@@ -98,12 +140,12 @@ body {
 .product-card {
   @apply glass-card overflow-hidden cursor-pointer transition-all duration-300;
 }
-
 .product-card:hover {
   transform: translateY(-4px) scale(1.02);
   box-shadow: 0 12px 40px rgba(212, 175, 55, 0.15);
 }
 
+/* Shimmer Accent (gold line) */
 .shimmer {
   background: linear-gradient(
     90deg,
@@ -115,61 +157,17 @@ body {
   animation: shimmer 2s infinite;
 }
 
+/* =========================================
+   Animations
+   ========================================= */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-/* Input Styles */
-.luxury-input {
-  @apply w-full px-4 py-3 rounded-lg border transition-all duration-200;
-  background: var(--background-secondary);
-  border-color: var(--border-subtle);
-  color: var(--text-primary);
-}
-
-.luxury-input:focus {
-  outline: none;
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--background-secondary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent-gold);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #B8941F;
-}
-
-/* Age Gate Overlay */
-.age-gate-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(11, 11, 13, 0.95);
-  backdrop-filter: blur(10px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Animation Classes */
 .animate-fade-in {
   animation: fadeIn 0.5s ease-in-out;
 }
-
 .animate-slide-up {
   animation: slideUp 0.4s ease-out;
 }
@@ -178,7 +176,6 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
 @keyframes slideUp {
   from { 
     opacity: 0;
@@ -190,8 +187,60 @@ body {
   }
 }
 
-/* Focus visible for accessibility */
+/* =========================================
+   Inputs
+   ========================================= */
+.luxury-input {
+  @apply w-full px-4 py-3 rounded-lg border transition-all duration-200;
+  background: var(--background-secondary);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+.luxury-input:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  /* subtle royal glow */
+  box-shadow:
+    0 0 0 3px rgba(214, 51, 132, 0.12),
+    0 0 0 6px rgba(108, 46, 185, 0.08);
+}
+
+/* =========================================
+   Scrollbar Styling
+   ========================================= */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--brand-secondary);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5723a1; /* darker royal purple */
+}
+
+/* =========================================
+   Overlays
+   ========================================= */
+.age-gate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 2, 19, 0.95); /* deeper velvet */
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* =========================================
+   Accessibility
+   ========================================= */
 *:focus-visible {
-  outline: 2px solid var(--accent-gold);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }

@@ -1,354 +1,343 @@
-'use client'
+// app/categories/[slug]/page.tsx
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Header from "@/components/layout/Header";
+import {
+  findCategoryBySlug,
+  getAllCategories,
+  type Cat,
+} from "@/data/taxonomy";
 
-import { useState, useEffect } from 'react'
-import { useBrand } from '@/components/BrandProvider'
-import Link from 'next/link'
-
-interface Product {
-  id: string
-  title: string
-  slug: string
-  price: number
-  originalPrice?: number
-  description: string
-  category: string
-  brand: string
-  rating: number
-  reviews: number
-  onSale?: boolean
+/* -------------------------------------------
+   Static params + metadata
+-------------------------------------------- */
+export async function generateStaticParams() {
+  return getAllCategories().map((c) => ({ slug: c.slug }));
 }
 
-interface CategoryPageProps {
-  params: { slug: string }
+type PageProps = {
+  params: { slug: string };
+  searchParams?: { sub?: string };
+};
+
+export async function generateMetadata({ params }: PageProps) {
+  const cat = findCategoryBySlug(params.slug);
+  if (!cat) return {};
+  return {
+    title: `${cat.name} | EntizNetStore`,
+    description: `Explore ${cat.name} at EntizNetStore — the premium markethub for luxury–adult lifestyle goods.`,
+    robots: { index: true, follow: true },
+  };
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
-  const { theme, brand } = useBrand()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sortBy, setSortBy] = useState('featured')
+export const revalidate = 0; // dynamic per-request for filters
 
-  // Category mapping
-  const categoryMap: Record<string, { name: string; description: string }> = {
-    'wellness': {
-      name: 'Wellness & Self-Care',
-      description: 'Premium wellness products for self-discovery and personal care'
-    },
-    'massage': {
-      name: 'Massage & Relaxation',
-      description: 'Professional massage tools and relaxation accessories'
-    },
-    'essentials': {
-      name: 'Essential Care',
-      description: 'Daily care essentials and must-have products'
-    },
-    'couples': {
-      name: 'Couples & Intimacy',
-      description: 'Products designed to enhance connection and intimacy'
-    },
-    'personal-care': {
-      name: 'Personal Care',
-      description: 'High-quality personal care and hygiene products'
-    },
-    'gift-sets': {
-      name: 'Gift Sets & Bundles',
-      description: 'Curated gift collections for special occasions'
-    },
-    'luxury': {
-      name: 'Luxury Collection',
-      description: 'Premium luxury products for the discerning customer'
-    }
-  }
+/* -------------------------------------------
+   Local UI helpers (keep consistent with Store)
+-------------------------------------------- */
+const grad =
+  "bg-[linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))]";
+const cardBase =
+  "overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] backdrop-blur transition hover:bg-white/[0.08]";
+const titleH2 = "mb-3 text-[22px] md:text-[26px] font-black tracking-tight";
+const titleH3 = "mb-4 text-[18px] md:text-[20px] font-extrabold";
 
-  const category = categoryMap[params.slug] || { 
-    name: 'Category',
-    description: 'Explore our premium products'
-  }
+/* -------------------------------------------
+   Image helper for categories (fallback-safe)
+-------------------------------------------- */
+const CATEGORY_IMG_MAP: Record<string, string> = {
+  "sex-toys": "/images/categories/sex-toys.jpg",
+  "supplements-and-enhancers": "/images/categories/supplements.jpg",
+  condoms: "/images/categories/condoms.jpg",
+  essentials: "/images/categories/essentials.jpg",
+  "massage-oils-and-creams": "/images/categories/massage-oils.jpg",
+  "lubricants-and-perfumes": "/images/categories/lubricants.jpg",
+  "lingerie-and-costumes": "/images/categories/lingerie.jpg",
+  "candles-and-atmosphere": "/images/categories/candles.jpg",
+  "couple-essentials": "/images/categories/couples.jpg",
+  "fetish-and-bdsm-gear": "/images/categories/bdsm.jpg",
+  "health-and-hygiene": "/images/categories/hygiene.jpg",
+  "app-and-smart-toys": "/images/categories/smart-toys.jpg",
+  "lgbtq-collection": "/images/categories/lgbtq.jpg",
+  "luxury-and-collectibles": "/images/categories/luxury.jpg",
+  "education-and-accessories": "/images/categories/education.jpg",
+  "native-and-herbal-blends": "/images/categories/herbal.jpg",
+  "discreet-kits": "/images/categories/discreet-kits.jpg",
+};
 
-  useEffect(() => {
-    loadCategoryProducts()
-  }, [params.slug, brand])
+function categoryImage(slug: string) {
+  return CATEGORY_IMG_MAP[slug] || "/images/menu/default-category.jpg";
+}
 
-  const loadCategoryProducts = async () => {
-    setLoading(true)
-    
-    // Demo products based on category and brand
-    const demoProducts: Product[] = brand === 'primediscreet' ? [
-      // PrimeDiscreet products
-      {
-        id: '1', title: 'Elite Platinum Wellness Set', slug: 'elite-platinum-wellness',
-        price: 299.99, originalPrice: 399.99, description: 'Premium wellness collection with luxury accessories',
-        category: params.slug, brand: 'Platinum Elite', rating: 4.9, reviews: 127, onSale: true
-      },
-      {
-        id: '2', title: 'Designer Silk Collection', slug: 'designer-silk-collection',
-        price: 149.99, description: 'Luxurious silk accessories for intimate moments',
-        category: params.slug, brand: 'Silk Dreams', rating: 4.7, reviews: 156
-      },
-      {
-        id: '3', title: 'Artisan Crystal Set', slug: 'artisan-crystal-set',
-        price: 219.99, originalPrice: 279.99, description: 'Hand-crafted crystal accessories with premium finish',
-        category: params.slug, brand: 'Crystal Artisans', rating: 4.8, reviews: 89, onSale: true
-      },
-      {
-        id: '4', title: 'Elite Couples Bundle', slug: 'elite-couples-bundle',
-        price: 199.99, description: 'Sophisticated accessories for intimate connection',
-        category: params.slug, brand: 'Intimate Elite', rating: 4.9, reviews: 76
-      },
-      {
-        id: '5', title: 'Gold Anniversary Collection', slug: 'gold-anniversary-collection',
-        price: 349.99, description: 'Exclusive gold-accented luxury collection',
-        category: params.slug, brand: 'Gold Artisans', rating: 5.0, reviews: 45
-      },
-      {
-        id: '6', title: 'Platinum Care Set', slug: 'platinum-care-set',
-        price: 179.99, originalPrice: 229.99, description: 'Premium personal care with platinum-grade materials',
-        category: params.slug, brand: 'Platinum Care', rating: 4.6, reviews: 201, onSale: true
-      }
-    ] : [
-      // EntizNetStore products
-      {
-        id: '1', title: 'Wellness Starter Kit', slug: 'wellness-starter-kit',
-        price: 79.99, originalPrice: 99.99, description: 'Complete wellness kit for beginners',
-        category: params.slug, brand: 'EntizCare', rating: 4.6, reviews: 234, onSale: true
-      },
-      {
-        id: '2', title: 'Essential Care Bundle', slug: 'essential-care-bundle',
-        price: 59.99, description: 'Daily essentials for personal care and wellness',
-        category: params.slug, brand: 'EntizCare', rating: 4.4, reviews: 312
-      },
-      {
-        id: '3', title: 'Comfort Massage Collection', slug: 'comfort-massage-collection',
-        price: 109.99, originalPrice: 149.99, description: 'Professional massage tools for home relaxation',
-        category: params.slug, brand: 'ComfortZone', rating: 4.5, reviews: 145, onSale: true
-      },
-      {
-        id: '4', title: 'Couples Communication Kit', slug: 'couples-communication-kit',
-        price: 89.99, description: 'Tools and guides for better intimate communication',
-        category: params.slug, brand: 'Together+', rating: 4.7, reviews: 123
-      },
-      {
-        id: '5', title: 'Complete Care Package', slug: 'complete-care-package',
-        price: 129.99, description: 'Comprehensive personal care solution',
-        category: params.slug, brand: 'CareFirst', rating: 4.3, reviews: 89
-      },
-      {
-        id: '6', title: 'Wellness Journey Kit', slug: 'wellness-journey-kit',
-        price: 199.99, description: 'Advanced wellness products for experienced users',
-        category: params.slug, brand: 'Journey+', rating: 4.8, reviews: 98
-      }
-    ]
+/* -------------------------------------------
+   Demo products (replace with server data later)
+-------------------------------------------- */
+type Item = {
+  id: string;
+  title: string;
+  img: string;
+  price: string;
+  currency: string;
+  subcat?: string;
+};
 
-    // Simulate API delay
-    setTimeout(() => {
-      setProducts(demoProducts)
-      setLoading(false)
-    }, 500)
-  }
+function demo(
+  categorySlug: string,
+  categoryName: string,
+  subcat?: string,
+  n = 15,
+): Item[] {
+  return Array.from({ length: n }).map((_, i) => ({
+    id: `${categorySlug}-${subcat ? subcat.toLowerCase().replace(/\s+/g, "-") + "-" : ""}${i}`,
+    title: `${categoryName} • ${subcat ?? "Assorted"} #${i + 1}`,
+    img: `/demo/products/p${(i % 6) + 1}.jpg`,
+    price: `€${(19 + (i % 7)).toFixed(2)}`,
+    currency: "EUR",
+    subcat,
+  }));
+}
 
-  const sortedProducts = [...products].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low':
-        return a.price - b.price
-      case 'price-high':
-        return b.price - a.price
-      case 'rating':
-        return b.rating - a.rating
-      case 'newest':
-        return b.id.localeCompare(a.id)
-      default:
-        return 0
-    }
-  })
-
-  const ProductCard = ({ product }: { product: Product }) => (
-    <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 group"
-         style={{ borderColor: theme.colors.glass.border }}>
-      
-      {/* Product Image */}
-      <div className="aspect-square relative overflow-hidden"
-           style={{ backgroundColor: theme.colors.surface }}>
-        
-        {/* Sale Badge */}
-        {product.onSale && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold z-10">
-            SALE
-          </div>
-        )}
-        
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center p-4">
-            <div className="text-3xl mb-2" style={{ color: theme.colors.accent }}>
-              {params.slug === 'wellness' ? '🧘' :
-               params.slug === 'massage' ? '💆' :
-               params.slug === 'essentials' ? '✨' :
-               params.slug === 'couples' ? '💕' :
-               params.slug === 'personal-care' ? '🌿' :
-               params.slug === 'gift-sets' ? '🎁' : '💎'}
-            </div>
-            <p className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-              {product.title.split(' ').slice(0, 2).join(' ')}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Product Info */}
-      <div className="p-4">
-        <h3 className="font-semibold mb-1 line-clamp-2" style={{ color: theme.colors.text.primary }}>
-          {product.title}
-        </h3>
-        
-        <p className="text-sm mb-2" style={{ color: theme.colors.text.secondary }}>
-          by {product.brand}
+/* -------------------------------------------
+   UI sections
+-------------------------------------------- */
+function Banner({ cat }: { cat: Cat }) {
+  const img = categoryImage(cat.slug);
+  return (
+    <div className="relative h-[160px] w-full overflow-hidden rounded-xl md:h-[220px]">
+      <Image src={img} alt={cat.name} fill className="object-cover" priority />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+      <div className="absolute left-4 top-4 md:left-6 md:top-6">
+        <h2 className={titleH2}>
+          <span className="mr-2 text-xl">{cat.icon ?? "🛍️"}</span>
+          {cat.name}
+        </h2>
+        <p className="max-w-[60ch] text-sm opacity-85">
+          Discover curated items under <strong>{cat.name}</strong>.
         </p>
-
-        <p className="text-xs mb-3 line-clamp-2" style={{ color: theme.colors.text.secondary }}>
-          {product.description}
-        </p>
-
-        {/* Rating */}
-        <div className="flex items-center gap-1 mb-3">
-          <div className="flex">
-            {[1, 2, 3, 4, 5].map(star => (
-              <span 
-                key={star}
-                className="text-sm"
-                style={{ color: star <= product.rating ? theme.colors.accent : theme.colors.text.secondary }}
-              >
-                ★
-              </span>
-            ))}
-          </div>
-          <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
-            ({product.reviews})
-          </span>
-        </div>
-
-        {/* Price */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg" style={{ color: theme.colors.accent }}>
-              ${product.price}
-            </span>
-            {product.originalPrice && (
-              <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-                ${product.originalPrice}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* View Button */}
-        <Link
-          href={`/products/${product.slug}`}
-          className="w-full py-2 rounded-lg font-medium text-center block transition-all hover:opacity-90 group-hover:scale-[1.02]"
-          style={{
-            backgroundColor: theme.colors.accent,
-            color: brand === 'primediscreet' ? theme.colors.background : 'white'
-          }}
-        >
-          View Details
-        </Link>
+        {/* If you later attach counts on server, show them here */}
       </div>
     </div>
-  )
+  );
+}
+
+function SubcategoryChips({
+  cat,
+  current,
+}: {
+  cat: Cat;
+  current?: string | null;
+}) {
+  const chips = (cat.sub ?? []).map((s) => s.name);
+  if (!chips.length) return null;
+  return (
+    <div className="mt-4 flex flex-wrap gap-2" aria-label="Subcategory filters">
+      <FilterChip href={`/categories/${cat.slug}`} active={!current}>
+        All
+      </FilterChip>
+      {chips.map((name) => {
+        const encoded = encodeURIComponent(name);
+        return (
+          <FilterChip
+            key={name}
+            href={`/categories/${cat.slug}?sub=${encoded}`}
+            active={current === name}
+          >
+            {name}
+          </FilterChip>
+        );
+      })}
+    </div>
+  );
+}
+
+function FilterChip({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "rounded-full border px-3 py-1 text-xs transition focus:outline-none focus:ring-2 focus:ring-white/30",
+        active
+          ? "border-white/20 bg-white/20"
+          : "border-white/10 bg-white/10 hover:bg-white/15",
+      ].join(" ")}
+      aria-current={active ? "true" : undefined}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function SortBar() {
+  return (
+    <div className="flex items-center justify-between">
+      <h3 className={titleH3}>Products</h3>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="opacity-75">Sort by:</span>
+        <select
+          className="rounded-md border border-white/10 bg-transparent px-2 py-1 outline-none"
+          defaultValue="featured"
+          aria-label="Sort products"
+        >
+          <option value="featured">Featured</option>
+          <option value="best">Best Sellers</option>
+          <option value="price_low">Price: Low → High</option>
+          <option value="price_high">Price: High → Low</option>
+          <option value="new">New Arrivals</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+function ProductGrid({ items }: { items: Item[] }) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+      role="list"
+    >
+      {items.map((p) => (
+        <Link
+          key={p.id}
+          href={`/p/${p.id}`}
+          className={cardBase}
+          role="listitem"
+        >
+          <div className="relative aspect-[4/3]">
+            <Image
+              src={p.img}
+              alt={p.title}
+              fill
+              sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 18vw"
+              className="object-cover"
+            />
+          </div>
+          <div className="p-3">
+            <div className="line-clamp-2 text-[13.5px] font-bold">
+              {p.title}
+            </div>
+            <div
+              className={`${grad} bg-clip-text font-extrabold text-transparent`}
+            >
+              {p.price}{" "}
+              <span className="ml-1 text-xs opacity-80">{p.currency}</span>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------
+   Page (Server Component)
+-------------------------------------------- */
+export default function CategoryPage({ params, searchParams }: PageProps) {
+  const cat = findCategoryBySlug(params.slug);
+  if (!cat) return notFound();
+
+  const all = getAllCategories();
+
+  const currentSub = searchParams?.sub
+    ? decodeURIComponent(searchParams.sub)
+    : null;
+
+  const validSub =
+    currentSub &&
+    (cat.sub ?? []).some(
+      (s) => s.name.toLowerCase() === currentSub.toLowerCase(),
+    )
+      ? currentSub
+      : null;
+
+  // Demo items; later replace with DB query using params.slug + validSub
+  const items = demo(cat.slug, cat.name, validSub ?? undefined, 15);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        
-        {/* Breadcrumb */}
-        <nav className="text-sm mb-6">
-          <Link href="/" className="hover:opacity-70 transition-colors" style={{ color: theme.colors.text.secondary }}>
+    <main className="min-h-screen bg-background text-foreground">
+      <Header />
+
+      <section className="mx-auto max-w-screen-xl px-4 py-6">
+        {/* Breadcrumbs */}
+        <nav className="mb-4 text-sm text-foreground/70">
+          <Link href="/" className="hover:underline">
             Home
           </Link>
-          <span className="mx-2" style={{ color: theme.colors.text.secondary }}>→</span>
-          <Link href="/categories" className="hover:opacity-70 transition-colors" style={{ color: theme.colors.text.secondary }}>
+          <span className="mx-2">/</span>
+          <Link href="/categories" className="hover:underline">
             Categories
           </Link>
-          <span className="mx-2" style={{ color: theme.colors.text.secondary }}>→</span>
-          <span style={{ color: theme.colors.accent }}>{category.name}</span>
+          <span className="mx-2">/</span>
+          <span className="text-foreground">{cat.name}</span>
         </nav>
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4" style={{ color: theme.colors.text.primary }}>
-            {category.name}
-          </h1>
-          <p className="text-lg max-w-2xl" style={{ color: theme.colors.text.secondary }}>
-            {category.description}
-          </p>
-        </div>
+        {/* Banner + Subfilters */}
+        <Banner cat={cat} />
+        <SubcategoryChips cat={cat} current={validSub} />
 
-        {/* Filters and Sorting */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-            {loading ? 'Loading...' : `${products.length} products found`}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
-              Sort by:
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.glass.border,
-                color: theme.colors.text.primary
-              }}
-            >
-              <option value="featured">Featured</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="rating">Highest Rated</option>
-              <option value="newest">Newest First</option>
-            </select>
+        {/* Results header */}
+        <div className="mt-6">
+          <SortBar />
+          <div className="mt-2 text-xs opacity-75">
+            Showing <strong>{items.length}</strong>{" "}
+            {validSub ? `“${validSub}”` : "items"} in{" "}
+            <strong>{cat.name}</strong>.
           </div>
         </div>
 
-        {/* Products Grid */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, index) => (
-              <div key={index} className="border rounded-lg overflow-hidden animate-pulse"
-                   style={{ borderColor: theme.colors.glass.border }}>
-                <div className="aspect-square" style={{ backgroundColor: theme.colors.surface }}></div>
-                <div className="p-4 space-y-3">
-                  <div className="h-4 rounded" style={{ backgroundColor: theme.colors.surface }}></div>
-                  <div className="h-3 rounded w-2/3" style={{ backgroundColor: theme.colors.surface }}></div>
-                  <div className="h-6 rounded w-1/3" style={{ backgroundColor: theme.colors.surface }}></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
+        {/* Grid */}
+        <section className="mt-4">
+          <ProductGrid items={items} />
+        </section>
 
-        {/* Back to Categories */}
-        <div className="mt-12 text-center">
-          <Link 
-            href="/categories"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.glass.border,
-              color: theme.colors.text.primary,
-              border: `1px solid ${theme.colors.glass.border}`
-            }}
+        {/* Explore more categories */}
+        <section className="mt-10">
+          <h3 className={titleH3}>Explore More</h3>
+          <div
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+            role="list"
           >
-            ← Browse Other Categories
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
+            {all
+              .filter((c) => c.slug !== cat.slug)
+              .slice(0, 6)
+              .map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/categories/${c.slug}`}
+                  className={`${cardBase} relative`}
+                  role="listitem"
+                  aria-label={`${c.name}`}
+                >
+                  <div className="relative aspect-[16/10]">
+                    <Image
+                      src={categoryImage(c.slug)}
+                      alt={c.name}
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/60" />
+                  </div>
+                  <div className="p-3">
+                    <div className="line-clamp-1 text-[13.5px] font-bold">
+                      {c.name}
+                    </div>
+                    <div className="line-clamp-2 text-[12.5px] opacity-80">
+                      Explore curated picks
+                    </div>
+                  </div>
+                </Link>
+              ))}
+          </div>
+        </section>
+      </section>
+    </main>
+  );
 }
