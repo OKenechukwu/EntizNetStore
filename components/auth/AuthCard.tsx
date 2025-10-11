@@ -224,11 +224,14 @@ export default function AuthCard({ variant = "combined" as Variant }) {
       </h1>
 
       {/* Role tabs */}
-      <div className="flex justify-center gap-2 mb-4">
+      <div className="flex justify-center gap-2 mb-2">
         <RoleTab value="buyer" label="Buyer" />
         <RoleTab value="seller" label="Seller" />
         <RoleTab value="bsm" label="BSM" />
       </div>
+      <p className="text-center text-xs text-foreground/60 mb-4">
+        BSM = Brands, Suppliers & Manufacturers
+      </p>
 
       {/* Mode tabs (hidden for signin-only variant) */}
       {variant === "combined" && (

@@ -7,6 +7,7 @@ export type UserRole =
   | "EntizStore"
   | "buyer"
   | "seller"
+  | "bsm"
   | "client"
   | "admin";
 
@@ -32,13 +33,15 @@ export function routeByRole(role?: string | null): string {
     case "entizstore":
       return "/dashboard/seller";
 
-    // Legacy/alternate aliases
+    // Standard roles
     case "buyer":
-      return "/dashboard/buyer"; // keep legacy path for backwards-compat
+      return "/dashboard/buyer";
+    case "seller":
+      return "/dashboard/vendor";
+    case "bsm":
+      return "/dashboard/bsm";
     case "client":
       return "/dashboard/client";
-    case "seller":
-      return "/dashboard/seller";
 
     // Admin
     case "admin":

@@ -1,0 +1,218 @@
+gent Task: Fix 404s, Auth tabs (Buyer/Seller/BSM), Profile/Notifications routing, i18n & Currency, and add BSM footer section — no unrelated changes
+
+Tech context: Next.js (App Router), Tailwind, current “Royal Desire” palette.
+Rule: Do not modify unrelated components, styles, colors, spacing, or copy. Only touch the files/routes listed below.
+
+1) Auth: Sign in / Sign up with 3 role tabs
+
+Goal: /auth must support both Sign in and Sign up with 3 tabs: Buyer, Seller, BSM.
+Show small helper text for BSM: “BSM = Brands, Suppliers & Manufacturers.”
+
+Implement
+
+File: app/auth/page.tsx
+
+Keep existing UI but ensure three tabs switch role = buyer | seller | bsm.
+
+Show helper text under tabs (non-intrusive, small).
+
+When the user clicks Sign in:
+
+On success: route by role
+
+buyer → /dashboard/buyer (or /account if that’s what we use)
+
+seller → /dashboard/vendor
+
+bsm → /dashboard/bsm
+
+When the user clicks Sign up:
+
+Keep existing fields; ensure role is stored and used for post-signup redirect (same mapping as above).
+
+Do not change visual design beyond adding the tabs + helper text.
+
+2) Header profile icon behavior
+
+Goal: Clicking the profile/avatar icon should:
+
+If not authenticated → go to /auth?mode=signin
+
+If authenticated → go to the correct dashboard by role (same mapping as above)
+
+Implement
+
+File: components/layout/Header.tsx (or wherever the profile icon lives)
+
+Add a small client component/hook that checks auth (existing auth helper if available).
+
+On click: route accordingly.
+
+Do not change header layout, colors, or spacing.
+
+3) Notifications route (fix 404)
+
+Goal: Clicking the Notifications bell opens /notifications (no 404).
+
+Implement
+
+Create: app/notifications/page.tsx
+
+Minimal page + heading “Notifications”.
+
+If not signed in, redirect to /auth?mode=signin.
+
+Make sure the header bell links to /notifications.
+
+4) Footer 404s (circled in screenshot) — create stub pages
+
+Goal: The following links must resolve (no 404):
+
+Help Center → /help
+
+Privacy Policy → /privacy
+
+Terms of Service → /terms
+
+Contact → /contact
+
+Sellers:
+
+Become a Seller → /seller/apply
+
+Seller Dashboard → /dashboard/vendor
+
+Seller Resources → /seller/resources (stub)
+
+Implement
+
+Create minimal pages:
+
+app/help/page.tsx
+
+app/privacy/page.tsx
+
+app/terms/page.tsx
+
+app/contact/page.tsx
+
+app/seller/apply/page.tsx
+
+app/seller/resources/page.tsx
+
+Keep content simple (“Coming soon” blocks). Do not alter footer styling.
+
+5) Add BSM section to footer (bottom bar)
+
+Goal: Next to “Sellers”, add a “BSM” column with:
+
+“Sell as a Brand, Supplier, Manufacturer (BSM)” → /bsm/apply
+
+“BSM Dashboard” → /dashboard/bsm
+
+“BSM Resources” → /bsm/resources
+
+Implement
+
+File: components/layout/Footer.tsx (or equivalent)
+
+Add a new column titled BSM with those 3 links.
+
+Create stub pages:
+
+app/bsm/apply/page.tsx
+
+app/bsm/resources/page.tsx
+
+Keep the same typography and spacing as the “Sellers” column.
+
+6) Translation & Currency pickers (make them actually work)
+
+Goal: Language & currency selectors must change state immediately, persist, and reflect across pages.
+
+Implement (lightweight, no design changes):
+
+Files:
+
+components/LanguageCurrencyPicker.tsx (or wherever the picker lives)
+
+components/BrandProvider.tsx or providers/SettingsProvider.tsx (use existing context if present)
+
+middleware.ts (only if locale cookie is already used)
+
+lib/currency.ts (or create lib/currency.ts)
+
+Behavior
+
+Language
+
+On change: set cookie: locale=<code> and localStorage.setItem('locale', <code>).
+
+If we have i18n already, trigger a client-side refresh (router.refresh()); if not, just persist value for now.
+
+Currency
+
+On change: set localStorage.setItem('currency', <code>) and update a global settings context.
+
+Provide a single formatter util:
+
+// lib/currency.ts
+export function formatMoney(amount: number, currency = 'USD', locale = 'en-US') {
+  try { return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount); }
+  catch { return `$${amount.toFixed(2)}`; }
+}
+
+
+Use this formatter wherever prices render (do not restyle anything; touch only the formatter import line).
+
+Persistence order: read cookie/localStorage on boot → hydrate provider → render.
+
+7) Routing helpers (centralize role redirects)
+
+Goal: Avoid drift between places.
+
+Implement
+
+File: lib/auth/routeByRole.ts
+
+export const routeByRole = (role: 'buyer'|'seller'|'bsm') =>
+  role === 'buyer' ? '/dashboard/buyer'
+  : role === 'seller' ? '/dashboard/vendor'
+  : '/dashboard/bsm';
+
+
+Use this in: app/auth/page.tsx, header profile click, and any other login redirects.
+
+8) QA / Acceptance tests (manual)
+
+/auth renders with Buyer / Seller / BSM tabs and helper text for BSM.
+
+Sign in redirects to the correct dashboard based on role.
+
+Profile icon routes to /auth?mode=signin when logged out; to the correct dashboard when logged in.
+
+/notifications loads (redirects to auth if signed out).
+
+Footer links open with no 404:
+
+/help, /privacy, /terms, /contact
+
+/seller/apply, /seller/resources, /dashboard/vendor
+
+New BSM footer column exists with:
+
+/bsm/apply, /bsm/resources, /dashboard/bsm
+
+Language & currency pickers persist selections and reflect on refresh (no visual changes).
+
+No layout, color, or spacing changes anywhere else.
+
+9) Do-NOT list
+
+Do not change any colors, typography, paddings, margins, grids, hero, categories, or product cards.
+
+Do not rename existing components or move files (only add the pages above and tiny hook/logic).
+
+Do not touch payment, cart, or product logic.
+
+Deliverables: PR with only the files listed, plus new stub pages. Include a 1-paragraph changelog confirming each acceptance item
