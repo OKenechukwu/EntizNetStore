@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Globe, DollarSign } from "lucide-react";
 
 const LANGUAGES = [
@@ -23,25 +24,29 @@ const CURRENCIES = [
 ];
 
 export default function LanguageCurrencyMenu() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState("en");
   const [currency, setCurrency] = useState("USD");
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("preferred_language");
-    const savedCurrency = localStorage.getItem("preferred_currency");
-    if (savedLang) setLanguage(savedLang);
-    if (savedCurrency) setCurrency(savedCurrency);
+    const savedLang = localStorage.getItem("preferred_language") || "en";
+    const savedCurrency = localStorage.getItem("preferred_currency") || "USD";
+    setLanguage(savedLang);
+    setCurrency(savedCurrency);
   }, []);
 
   const handleLanguageChange = (code: string) => {
     setLanguage(code);
     localStorage.setItem("preferred_language", code);
+    document.cookie = `locale=${code}; path=/; max-age=31536000`;
+    router.refresh();
   };
 
   const handleCurrencyChange = (code: string) => {
     setCurrency(code);
     localStorage.setItem("preferred_currency", code);
+    router.refresh();
   };
 
   const currentLang = LANGUAGES.find((l) => l.code === language);

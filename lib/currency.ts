@@ -268,3 +268,14 @@ export function detectUserCurrency(): string {
   
   return DEFAULT_CURRENCY
 }
+
+/**
+ * Format a money amount with currency symbol and locale
+ */
+export function formatMoney(amount: number, currency = 'USD', locale = 'en-US') {
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}

@@ -158,7 +158,7 @@ function Footer() {
   return (
     <footer className="border-t border-opacity-20 mt-20">
       <div className="w-full px-6 md:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="space-y-4">
             <h3 className="font-serif font-bold text-xl text-accent-gold">
               {config.name}
@@ -231,13 +231,13 @@ function Footer() {
             <h4 className="font-semibold text-accent-gold">Sellers</h4>
             <div className="space-y-2 text-sm">
               <Link
-                href="/sell"
+                href="/seller/apply"
                 className="block hover:text-accent-gold transition-colors"
               >
                 Become a Seller
               </Link>
               <Link
-                href="/seller/dashboard"
+                href="/dashboard/vendor"
                 className="block hover:text-accent-gold transition-colors"
               >
                 Seller Dashboard
@@ -247,6 +247,30 @@ function Footer() {
                 className="block hover:text-accent-gold transition-colors"
               >
                 Seller Resources
+              </Link>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-semibold text-accent-gold">BSM</h4>
+            <div className="space-y-2 text-sm">
+              <Link
+                href="/bsm/apply"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                Sell as a Brand, Supplier, Manufacturer (BSM)
+              </Link>
+              <Link
+                href="/dashboard/bsm"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                BSM Dashboard
+              </Link>
+              <Link
+                href="/bsm/resources"
+                className="block hover:text-accent-gold transition-colors"
+              >
+                BSM Resources
               </Link>
             </div>
           </div>
