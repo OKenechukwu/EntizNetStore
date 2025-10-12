@@ -1,0 +1,86 @@
+Task:
+Expand the i18n string coverage to include all storefront utility pages and UI elements: Cart, Checkout, Footer, and all Empty States (no items, no orders, etc.).
+Do not touch any code that’s already translated from Phase 1.
+
+Instructions:
+
+Locate files
+
+app/cart/page.tsx
+
+app/checkout/page.tsx
+
+components/layout/Footer.tsx
+
+components/cart/EmptyCart.tsx
+
+components/orders/EmptyOrders.tsx
+
+Any other empty-state components (e.g., EmptyFavorites, EmptyResults).
+
+Replace hard-coded text
+Wrap all visible UI text with <T k="…" /> using the same key style as Phase 1 (home.*, category.*, etc.).
+Use new namespaces:
+
+cart.* → cart-related text
+
+checkout.* → checkout pages
+
+footer.* → footer links & copy
+
+empty.* → empty-state messages
+
+Examples
+
+<h1><T k="cart.title" /></h1>            // Cart
+<p><T k="cart.totalLabel" /></p>
+<button><T k="checkout.payNow" /></button>
+<p><T k="empty.noItems" /></p>
+<footer><T k="footer.rights" /></footer>
+
+
+Add new keys to the language JSON files under /locales/en.json (and other locales if present):
+
+{
+  "cart": {
+    "title": "Your Cart",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "checkout": "Go to Checkout",
+    "empty": "Your cart is empty."
+  },
+  "checkout": {
+    "title": "Checkout",
+    "shipping": "Shipping Details",
+    "payment": "Payment Method",
+    "confirm": "Confirm Order",
+    "success": "Order placed successfully!"
+  },
+  "footer": {
+    "about": "About Us",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "rights": "© 2025 EntizNetStore. All rights reserved."
+  },
+  "empty": {
+    "noItems": "Nothing here yet.",
+    "noOrders": "You haven’t placed any orders yet.",
+    "noFavorites": "No favorites added."
+  }
+}
+
+
+Use the hook only where string composition is required:
+
+const { t } = useI18n();
+<p>{t("cart.itemsCount", { count })}</p>
+
+
+Verify build
+
+Run and confirm no hydration or missing-key errors.
+
+Confirm translations render for all affected pages.
+
+✅ Goal: All cart, checkout, footer, and empty-state texts are fully internationalized with <T/> or useI18n() and matching keys added to locale files — without touching existing Phase 1 strings.
