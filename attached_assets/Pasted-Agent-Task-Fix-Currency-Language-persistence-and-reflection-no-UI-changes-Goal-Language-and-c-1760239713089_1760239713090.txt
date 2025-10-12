@@ -1,0 +1,82 @@
+Agent Task: Fix Currency & Language persistence and reflection (no UI changes)
+
+Goal:
+Language and currency selectors must fully work—values persist, re-hydrate on reload, and update display immediately.
+
+Do only this:
+
+In components/LanguageCurrencyPicker.tsx (or current picker file):
+
+On select change:
+
+import { useRouter } from "next/navigation";
+const router = useRouter();
+
+// Language
+document.cookie = `locale=${code}; path=/; max-age=31536000`;
+localStorage.setItem("locale", code);
+router.refresh();
+
+// Currency
+localStorage.setItem("currency", code);
+document.cookie = `currency=${code}; path=/; max-age=31536000`;
+window.dispatchEvent(new Event("currencyChange"));
+
+
+Ensure dropdown shows the stored values on mount:
+
+const [locale, setLocale] = useState(localStorage.getItem("locale") || "en");
+const [currency, setCurrency] = useState(localStorage.getItem("currency") || "USD");
+
+
+In global provider (components/BrandProvider.tsx or providers/SettingsProvider.tsx):
+
+On mount (useEffect), hydrate and listen:
+
+useEffect(() => {
+  const locale = localStorage.getItem("locale") || "en";
+  const currency = localStorage.getItem("currency") || "USD";
+  setState({ locale, currency });
+
+  const handleCurrency = () => {
+    const c = localStorage.getItem("currency") || "USD";
+    setState(s => ({ ...s, currency: c }));
+  };
+  window.addEventListener("currencyChange", handleCurrency);
+  return () => window.removeEventListener("currencyChange", handleCurrency);
+}, []);
+
+
+In lib/currency.ts (or create if missing):
+
+export function formatMoney(amount: number, currency = "USD", locale = "en-US") {
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
+  } catch {
+    return `$${amount?.toFixed?.(2) ?? amount}`;
+  }
+}
+
+
+Replace any manual $${price} or .toFixed() usage with formatMoney(price, currentCurrency, currentLocale).
+
+Ensure all prices (product cards, PDP, cart) read currency & locale from the provider context.
+No redesign—just import and use formatMoney.
+
+QA Checklist
+
+Language & currency pickers show last selected value after refresh.
+
+Changing either updates UI immediately (prices or flag/symbol).
+
+Both values persist via localStorage + cookies.
+
+No color, layout, or component structure changed.
+
+✅ Deliverables
+
+Updated: LanguageCurrencyPicker.tsx, BrandProvider.tsx, lib/currency.ts.
+
+No other file modifications, moves, or visual changes.
+
+Add small changelog: CHANGELOG-CURRENCY-LANGFIX.md summarizing the persistence fix.

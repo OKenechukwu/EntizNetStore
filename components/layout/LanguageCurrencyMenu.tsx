@@ -30,22 +30,24 @@ export default function LanguageCurrencyMenu() {
   const [currency, setCurrency] = useState("USD");
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("preferred_language") || "en";
-    const savedCurrency = localStorage.getItem("preferred_currency") || "USD";
+    const savedLang = localStorage.getItem("locale") || "en";
+    const savedCurrency = localStorage.getItem("currency") || "USD";
     setLanguage(savedLang);
     setCurrency(savedCurrency);
   }, []);
 
   const handleLanguageChange = (code: string) => {
     setLanguage(code);
-    localStorage.setItem("preferred_language", code);
+    localStorage.setItem("locale", code);
     document.cookie = `locale=${code}; path=/; max-age=31536000`;
     router.refresh();
   };
 
   const handleCurrencyChange = (code: string) => {
     setCurrency(code);
-    localStorage.setItem("preferred_currency", code);
+    localStorage.setItem("currency", code);
+    document.cookie = `currency=${code}; path=/; max-age=31536000`;
+    window.dispatchEvent(new Event("currencyChange"));
     router.refresh();
   };
 
