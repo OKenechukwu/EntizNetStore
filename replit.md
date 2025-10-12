@@ -6,14 +6,19 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
+### October 2025 - Currency & Language Persistence Fix
+- **Full Persistence**: Language and currency now persist via both localStorage and cookies for client/server sync
+- **BrandProvider Enhancement**: Extended with locale and currency state, hydration on mount, and currencyChange event listener
+- **Standardized Keys**: Unified localStorage keys to `locale` and `currency` (from `preferred_*`)
+- **Event-Driven Updates**: Currency changes dispatch `currencyChange` event for cross-component updates
+- **formatMoney Verified**: Currency formatter in lib/currency.ts working correctly with Intl.NumberFormat
+- **Immediate Updates**: Picker changes trigger `router.refresh()` for instant UI reflection
+
 ### October 2025 - Auth Sign-in Fix, BSM/Seller Links, i18n & Currency
 - **Sign-in Link Fixed**: Header "Sign in" now correctly routes to `/auth?mode=signin` instead of 404 `/auth/signin`
 - **Compatibility Route**: Created `/auth/signin` redirect for backward compatibility
 - **Footer BSM/Seller Links**: Updated footer to route "Become a Seller", "Sell as BSM", and "BSM Dashboard" to `/auth?mode=signin` with role parameters
 - **Auth Guards**: Added server-side auth checks to `/seller/apply` and `/bsm/apply` pages that redirect unauthenticated users
-- **Language & Currency Persistence**: Verified full cookie + localStorage persistence system working via LanguageCurrencySwitcher
-- **formatMoney Utility**: Currency formatter in lib/currency.ts for consistent price display across the app
-- **Auto-Detection**: Currency automatically detects from user locale/timezone on first visit
 
 ### October 2025 - 3-Role Auth System & BSM Integration
 - **3-Role Auth System**: Auth page supports Buyer/Seller/BSM tabs with helper text
