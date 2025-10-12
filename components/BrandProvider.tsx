@@ -23,8 +23,12 @@ type BrandContextType = {
   config: BrandConfig;
   theme: BrandTheme; // computed palette (brand + resolved mode)
   mode: ThemeMode; // user-chosen mode
+  locale: string;
+  currency: string;
   setBrand: (brand: Brand) => void;
   setMode: (mode: ThemeMode) => void;
+  setLocale: (locale: string) => void;
+  setCurrency: (currency: string) => void;
 };
 
 const BrandContext = createContext<BrandContextType | undefined>(undefined);
@@ -64,6 +68,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   const [brand, setBrandState] = useState<Brand>(initialBrand);
   const [mode, setModeState] = useState<ThemeMode>(initialMode);
+  const [locale, setLocaleState] = useState("en");
+  const [currency, setCurrencyState] = useState("USD");
   const resolved = resolveMode(mode);
 
   const config = useMemo(() => getBrandConfig(brand), [brand]);
@@ -113,14 +119,34 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     };
   }, [brand, mode]);
 
+  // Hydrate locale and currency from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const savedLocale = localStorage.getItem("locale") || "en";
+    const savedCurrency = localStorage.getItem("currency") || "USD";
+    setLocaleState(savedLocale);
+    setCurrencyState(savedCurrency);
+
+    const handleCurrencyChange = () => {
+      const c = localStorage.getItem("currency") || "USD";
+      setCurrencyState(c);
+    };
+    
+    window.addEventListener("currencyChange", handleCurrencyChange);
+    return () => window.removeEventListener("currencyChange", handleCurrencyChange);
+  }, []);
+
   useEffect(() => setMounted(true), []);
 
   const setBrand = useCallback((b: Brand) => setBrandState(b), []);
   const setMode = useCallback((m: ThemeMode) => setModeState(m), []);
+  const setLocale = useCallback((l: string) => setLocaleState(l), []);
+  const setCurrency = useCallback((c: string) => setCurrencyState(c), []);
 
   const value = useMemo<BrandContextType>(
-    () => ({ brand, config, theme, mode, setBrand, setMode }),
-    [brand, config, theme, mode, setBrand, setMode],
+    () => ({ brand, config, theme, mode, locale, currency, setBrand, setMode, setLocale, setCurrency }),
+    [brand, config, theme, mode, locale, currency, setBrand, setMode, setLocale, setCurrency],
   );
 
   if (!mounted) {
@@ -156,8 +182,12 @@ export function useBrand(): BrandContextType {
       config: getBrandConfig(fallbackBrand),
       theme: getBrandTheme(fallbackBrand, resolved),
       mode,
+      locale: "en",
+      currency: "USD",
       setBrand: () => {},
       setMode: () => {},
+      setLocale: () => {},
+      setCurrency: () => {},
     };
   }
   return ctx;
