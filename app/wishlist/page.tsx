@@ -198,17 +198,10 @@ export default function WishlistPage() {
                     </h3>
                   </Link>
 
-                  {/* Variant Info */}
-                  {item.variant && (
-                    <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                      {item.variant.title}
-                    </p>
-                  )}
-
                   {/* Price */}
                   {item.product && formatPrice(
-                    item.product.current_price, 
-                    item.product.original_price
+                    item.product.base_price, 
+                    item.product.compare_at_price
                   )}
 
                   {/* Add to Cart Button */}
@@ -264,18 +257,13 @@ export default function WishlistPage() {
                           {item.product?.title}
                         </h3>
                       </Link>
-                      {item.variant && (
-                        <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                          {item.variant.title}
-                        </p>
-                      )}
                     </div>
                     
                     <div className="flex items-center gap-2">
                       {/* Price */}
                       {item.product && formatPrice(
-                        item.product.current_price, 
-                        item.product.original_price
+                        item.product.base_price, 
+                        item.product.compare_at_price
                       )}
                       
                       {/* Remove Button */}
