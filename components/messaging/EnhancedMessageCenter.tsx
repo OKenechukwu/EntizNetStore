@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import ConversationList from './ConversationList'
 import ChatWindow from './ChatWindow'
 
@@ -32,7 +32,7 @@ export default function EnhancedMessageCenter({ currentUserId, userType }: Messa
     orders: 0,
     promos: 0
   })
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   const categories: CategoryConfig[] = [
     {

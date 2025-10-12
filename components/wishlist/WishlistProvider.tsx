@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBrand } from '@/components/BrandProvider'
 
 interface WishlistItem {
@@ -53,7 +53,7 @@ export default function WishlistProvider({ children }: WishlistProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const { brand } = useBrand()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     // Get initial user and load wishlist

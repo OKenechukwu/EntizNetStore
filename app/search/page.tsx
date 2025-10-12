@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 interface Product {
@@ -27,7 +27,7 @@ function SearchResults() {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     if (query) {

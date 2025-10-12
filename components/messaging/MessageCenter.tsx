@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import ConversationList from './ConversationList'
 import ChatWindow from './ChatWindow'
 
@@ -16,7 +16,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
   const [conversations, setConversations] = useState<any[]>([])
   const [activeConversation, setActiveConversation] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadConversations()

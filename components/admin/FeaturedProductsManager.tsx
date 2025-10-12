@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface FeaturedProduct {
   id: string
@@ -51,7 +51,7 @@ export default function FeaturedProductsManager() {
     starts_at: new Date().toISOString().slice(0, 16),
     ends_at: ''
   })
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   const featureTypes = [
     { value: 'hero', label: 'Hero Banner', description: 'Main homepage banner' },

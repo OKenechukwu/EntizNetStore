@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 
 type FxRates = Record<string, number>;
@@ -28,13 +28,7 @@ function toUSD(amount: number, currency: string, rates: FxRates): number {
 
 export default function NewProductForm() {
   const router = useRouter();
-
-  // Build a Supabase client directly (avoids local helper export mismatch)
-  const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    return createSupabaseClient(url, anon);
-  }, []);
+  const supabase = getSupabaseClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

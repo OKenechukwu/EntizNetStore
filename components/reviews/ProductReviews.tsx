@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import ReviewForm from './ReviewForm'
 
 interface ProductReviewsProps {
@@ -23,7 +23,7 @@ export default function ProductReviews({
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
   const [filterBy, setFilterBy] = useState('all')
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadReviews()

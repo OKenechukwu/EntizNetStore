@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { RealTimeMessaging, DecryptedMessage } from '@/lib/messaging'
 import { useBrand } from '@/components/BrandProvider'
 
@@ -15,7 +15,7 @@ export const AdminChatWidget = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const { brand, theme } = useBrand()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
   
   // Admin user ID - in production this would be dynamic
   const ADMIN_USER_ID = 'admin-support-team'

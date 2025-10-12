@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/AuthProvider'
 
 export interface Notification {
@@ -45,7 +45,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   const unreadCount = notifications.filter(n => !n.read).length
 

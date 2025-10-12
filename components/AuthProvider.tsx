@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: currentUser.id,
         email: currentUser.email!,
         role,
-        profile
+        profile: profile || undefined
       })
     } catch (error) {
       console.error('Error refreshing profile:', error)

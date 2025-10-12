@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import CategoryManager from './CategoryManager'
 import FeaturedProductsManager from './FeaturedProductsManager'
 
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [timeFilter, setTimeFilter] = useState('7d')
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadDashboardData()

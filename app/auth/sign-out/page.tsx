@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 
 export default function SignOutPage() {
   const [loading, setLoading] = useState(false);

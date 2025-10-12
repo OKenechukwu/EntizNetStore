@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface ReviewModerationPanelProps {
   isAdmin?: boolean
@@ -14,7 +14,7 @@ export default function ReviewModerationPanel({ isAdmin = false }: ReviewModerat
   const [loading, setLoading] = useState(true)
   const [moderating, setModerating] = useState<string | null>(null)
   const [filter, setFilter] = useState('pending_moderation')
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     if (isAdmin) {

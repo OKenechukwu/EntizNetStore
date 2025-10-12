@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface ReviewFormProps {
   productId: string
@@ -32,7 +32,7 @@ export default function ReviewForm({
   const [hoveredRating, setHoveredRating] = useState(0)
   const [hoveredSellerRating, setHoveredSellerRating] = useState(0)
   const [submitting, setSubmitting] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   const ratingLabels = {
     1: 'Poor',

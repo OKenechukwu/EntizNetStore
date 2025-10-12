@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -33,7 +33,7 @@ function CheckoutForm({ product, variant, quantity, onSuccess, onError }: Checko
       country: 'US'
     }
   })
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   const calculateTotal = () => {
     const basePrice = variant?.price || product.base_price

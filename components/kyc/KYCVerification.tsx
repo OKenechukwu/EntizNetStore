@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import DocumentUpload from './DocumentUpload'
 import IdentityVerification from './IdentityVerification'
 import VerificationStatus from './VerificationStatus'
@@ -17,7 +17,7 @@ export default function KYCVerification({ sellerId, onVerificationComplete }: KY
   const [currentStep, setCurrentStep] = useState(1)
   const [kycData, setKYCData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadKYCData()

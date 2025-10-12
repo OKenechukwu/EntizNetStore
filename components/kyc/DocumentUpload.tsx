@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface DocumentUploadProps {
   sellerId: string
@@ -28,7 +28,7 @@ export default function DocumentUpload({
   })
   const [uploading, setUploading] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
 
   const documentTypes = [

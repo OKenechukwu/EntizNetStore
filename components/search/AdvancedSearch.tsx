@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface AdvancedSearchProps {
   onResults?: (results: any[]) => void
@@ -37,7 +37,7 @@ export default function AdvancedSearch({
   const [categories, setCategories] = useState<any[]>([])
   const [availableBrands, setAvailableBrands] = useState<any[]>([])
   const debounceRef = useRef<NodeJS.Timeout>()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadCategories()

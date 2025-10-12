@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import ProductBasicInfo from './ProductBasicInfo'
 import ProductVariants from './ProductVariants'
 import ProductMedia from './ProductMedia'
@@ -27,7 +27,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const { brand, theme } = useBrand()
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
   
   const [activeTab, setActiveTab] = useState('basic')
   const [loading, setLoading] = useState(false)

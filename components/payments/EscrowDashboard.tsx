@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface EscrowDashboardProps {
   sellerId: string
@@ -13,7 +13,7 @@ export default function EscrowDashboard({ sellerId }: EscrowDashboardProps) {
   const [escrowRecords, setEscrowRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [requestingPayout, setRequestingPayout] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadEscrowData()
