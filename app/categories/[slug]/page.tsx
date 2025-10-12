@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/layout/Header";
+import Price from "@/components/common/Price";
 import {
   findCategoryBySlug,
   getAllCategories,
@@ -26,15 +27,16 @@ export async function generateMetadata({ params }: PageProps) {
   if (!cat) return {};
   return {
     title: `${cat.name} | EntizNetStore`,
-    description: `Explore ${cat.name} at EntizNetStore — the premium markethub for luxury–adult lifestyle goods.`,
+    description: `Explore ${cat.name} at EntizNetStore — premium adult-lifestyle & luxury goods.`,
     robots: { index: true, follow: true },
   };
 }
 
-export const revalidate = 0; // dynamic per-request for filters
+// Keep this dynamic while you wire real data later
+export const revalidate = 0;
 
 /* -------------------------------------------
-   Local UI helpers (keep consistent with Store)
+   Local UI helpers (consistent with Store)
 -------------------------------------------- */
 const grad =
   "bg-[linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))]";
@@ -44,7 +46,7 @@ const titleH2 = "mb-3 text-[22px] md:text-[26px] font-black tracking-tight";
 const titleH3 = "mb-4 text-[18px] md:text-[20px] font-extrabold";
 
 /* -------------------------------------------
-   Image helper for categories (fallback-safe)
+   Category image map (fallback-safe)
 -------------------------------------------- */
 const CATEGORY_IMG_MAP: Record<string, string> = {
   "sex-toys": "/images/categories/sex-toys.jpg",
@@ -65,7 +67,6 @@ const CATEGORY_IMG_MAP: Record<string, string> = {
   "native-and-herbal-blends": "/images/categories/herbal.jpg",
   "discreet-kits": "/images/categories/discreet-kits.jpg",
 };
-
 function categoryImage(slug: string) {
   return CATEGORY_IMG_MAP[slug] || "/images/menu/default-category.jpg";
 }
@@ -77,8 +78,7 @@ type Item = {
   id: string;
   title: string;
   img: string;
-  price: string;
-  currency: string;
+  price: number;
   subcat?: string;
 };
 
@@ -88,14 +88,16 @@ function demo(
   subcat?: string,
   n = 15,
 ): Item[] {
-  return Array.from({ length: n }).map((_, i) => ({
-    id: `${categorySlug}-${subcat ? subcat.toLowerCase().replace(/\s+/g, "-") + "-" : ""}${i}`,
-    title: `${categoryName} • ${subcat ?? "Assorted"} #${i + 1}`,
-    img: `/demo/products/p${(i % 6) + 1}.jpg`,
-    price: `€${(19 + (i % 7)).toFixed(2)}`,
-    currency: "EUR",
-    subcat,
-  }));
+  return Array.from({ length: n }).map((_, i) => {
+    const price = 19 + (i % 7) + (i % 3) * 0.99;
+    return {
+      id: `${categorySlug}-${subcat ? subcat.toLowerCase().replace(/\s+/g, "-") + "-" : ""}${i}`,
+      title: `${categoryName} • ${subcat ?? "Assorted"} #${i + 1}`,
+      img: `/demo/products/p${(i % 6) + 1}.jpg`,
+      price,
+      subcat,
+    };
+  });
 }
 
 /* -------------------------------------------
@@ -115,7 +117,6 @@ function Banner({ cat }: { cat: Cat }) {
         <p className="max-w-[60ch] text-sm opacity-85">
           Discover curated items under <strong>{cat.name}</strong>.
         </p>
-        {/* If you later attach counts on server, show them here */}
       </div>
     </div>
   );
@@ -221,14 +222,11 @@ function ProductGrid({ items }: { items: Item[] }) {
             />
           </div>
           <div className="p-3">
-            <div className="line-clamp-2 text-[13.5px] font-bold">
+            <div className="line-clamp-2 text-[13.5px] font-bold text-foreground">
               {p.title}
             </div>
-            <div
-              className={`${grad} bg-clip-text font-extrabold text-transparent`}
-            >
-              {p.price}{" "}
-              <span className="ml-1 text-xs opacity-80">{p.currency}</span>
+            <div className={`${grad} bg-clip-text font-extrabold text-transparent`}>
+              <Price amount={p.price} />
             </div>
           </div>
         </Link>

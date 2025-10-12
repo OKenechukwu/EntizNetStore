@@ -342,6 +342,36 @@ export const adultWellnessTaxonomy: CategoryItem[] = [
  *  --------------------------------------------- */
 const RAW: { name: string; icon?: string; sub?: { name: string }[] }[] = [
   {
+    name: "Vibrators",
+    icon: "⚡",
+    sub: [
+      { name: "Rose Vibrators" },
+      { name: "Tongue Vibrators" },
+      { name: "Rabbit Vibrators" },
+      { name: "Clitoral Vibrators" },
+      { name: "Butterfly Vibrators" },
+      { name: "Bullet Vibrators" },
+      { name: "Wearable Vibrators" },
+      { name: "G-Spot Vibrators" },
+      { name: "Wand Massagers" },
+      { name: "Quiet Vibrators" },
+    ],
+  },
+  {
+    name: "Dildos",
+    icon: "✨",
+    sub: [
+      { name: "Strap-On Dildos" },
+      { name: "Anal Dildos" },
+      { name: "Double Dildos" },
+      { name: "Huge Dildos" },
+      { name: "Realistic Dildos" },
+      { name: "Thrusting Dildos" },
+      { name: "Squirting Dildos" },
+      { name: "Silicone Dildos" },
+    ],
+  },
+  {
     name: "Sex Toys",
     icon: "🛠️",
     sub: [
