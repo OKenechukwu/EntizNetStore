@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
 import { getCart, setQty, removeItem, clearCart, subtotalBase, type CartItem } from '@/lib/cart'
+import Price from '@/components/common/Price'
 
 export default function CartPage() {
   const { theme, brand } = useBrand()
@@ -154,7 +155,7 @@ export default function CartPage() {
                     {/* Price and Remove */}
                     <div className="text-right">
                       <p className="font-bold text-lg mb-2" style={{ color: theme.colors.accent }}>
-                        ${(item.priceBase * item.qty).toFixed(2)}
+                        <Price amount={item.priceBase * item.qty} />
                       </p>
                       <button
                         onClick={() => handleRemoveItem(item.id)}
@@ -195,7 +196,7 @@ export default function CartPage() {
                       Items ({cart.reduce((total, item) => total + item.qty, 0)})
                     </span>
                     <span style={{ color: theme.colors.text.primary }}>
-                      ${subtotal.toFixed(2)}
+                      <Price amount={subtotal} />
                     </span>
                   </div>
                   
@@ -208,7 +209,7 @@ export default function CartPage() {
                     <div className="flex justify-between text-lg font-bold">
                       <span style={{ color: theme.colors.text.primary }}>Total</span>
                       <span style={{ color: theme.colors.accent }}>
-                        ${subtotal.toFixed(2)}
+                        <Price amount={subtotal} />
                       </span>
                     </div>
                   </div>

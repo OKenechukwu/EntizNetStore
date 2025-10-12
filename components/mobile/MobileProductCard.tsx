@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import WishlistButton from '@/components/wishlist/WishlistButton'
 import Link from 'next/link'
+import Price from '@/components/common/Price'
 
 interface MobileProductCardProps {
   product: {
@@ -51,11 +52,11 @@ export default function MobileProductCard({ product, className = '' }: MobilePro
   const formatPrice = (price: number, comparePrice?: number) => (
     <div className="flex items-center gap-1 flex-wrap">
       <span className="font-bold text-base" style={{ color: theme.colors.accent }}>
-        ${price.toFixed(2)}
+        <Price amount={price} />
       </span>
       {comparePrice && comparePrice > price && (
         <span className="text-xs line-through" style={{ color: theme.colors.text.secondary }}>
-          ${comparePrice.toFixed(2)}
+          <Price amount={comparePrice} />
         </span>
       )}
     </div>

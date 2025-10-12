@@ -6,6 +6,7 @@ import { useBrand } from '@/components/BrandProvider'
 import { useAuth } from '@/components/AuthProvider'
 import WishlistButton from '@/components/wishlist/WishlistButton'
 import Link from 'next/link'
+import Price from '@/components/common/Price'
 
 export default function WishlistPage() {
   const { wishlistItems, isLoading, clearWishlist } = useWishlist()
@@ -22,11 +23,11 @@ export default function WishlistPage() {
   const formatPrice = (price: number, originalPrice?: number) => (
     <div className="flex items-center gap-2">
       <span className="font-semibold text-lg" style={{ color: theme.colors.accent }}>
-        ${price.toFixed(2)}
+        <Price amount={price} />
       </span>
       {originalPrice && originalPrice > price && (
         <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-          ${originalPrice.toFixed(2)}
+          <Price amount={originalPrice} />
         </span>
       )}
     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
+import Price from '@/components/common/Price'
 
 interface SaleProduct {
   id: string
@@ -228,14 +229,14 @@ export default function OnSalePage() {
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-lg" style={{ color: theme.colors.accent }}>
-              ${product.base_price}
+              <Price amount={product.base_price} />
             </span>
             <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-              ${product.compare_at_price}
+              <Price amount={product.compare_at_price} />
             </span>
           </div>
           <p className="text-xs font-medium text-green-600">
-            You save ${(product.compare_at_price - product.base_price).toFixed(2)}!
+            You save <Price amount={product.compare_at_price - product.base_price} />!
           </p>
         </div>
 

@@ -42,9 +42,13 @@ export default function SearchResults({
 
   const formatPrice = (price: number, comparePrice?: number) => (
     <div className="flex items-center gap-2">
-      <Price amount={price} className="font-semibold text-lg" style={{ color: theme.colors.accent }} />
+      <span className="font-semibold text-lg" style={{ color: theme.colors.accent }}>
+        <Price amount={price} />
+      </span>
       {comparePrice && comparePrice > price && (
-        <Price amount={comparePrice} className="text-sm line-through" style={{ color: theme.colors.text.secondary }} />
+        <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
+          <Price amount={comparePrice} />
+        </span>
       )}
     </div>
   )
