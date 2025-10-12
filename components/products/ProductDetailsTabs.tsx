@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { useTranslation } from '@/hooks/useTranslation'
+import Price from '@/components/ui/Price'
 
 interface ProductDetailsTabsProps {
   product: {
@@ -186,7 +187,7 @@ export default function ProductDetailsTabs({ product }: ProductDetailsTabsProps)
               <div className="space-y-3">
                 <div>
                   <h4 className="font-semibold mb-1" style={{ color: theme.colors.text.primary }}>Shipping</h4>
-                  <p>Discreet packaging with 2-3 business day delivery. Free shipping on orders over $75.</p>
+                  <p>Discreet packaging with 2-3 business day delivery. Free shipping on orders over <Price amount={75} />.</p>
                 </div>
                 
                 <div>

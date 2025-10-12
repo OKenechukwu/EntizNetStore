@@ -1,6 +1,7 @@
 'use client'
 
 import { useBrand } from '@/components/BrandProvider'
+import Price from '@/components/ui/Price'
 
 interface EarningsOverviewProps {
   orders: any[]
@@ -69,7 +70,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
             Available for Payout
           </h3>
           <p className="text-3xl font-bold" style={{ color: theme.colors.accent }}>
-            ${availableEarnings.toFixed(2)}
+            <Price amount={availableEarnings} />
           </p>
           <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
             From completed orders
@@ -84,7 +85,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
             Pending Earnings
           </h3>
           <p className="text-3xl font-bold" style={{ color: theme.colors.text.primary }}>
-            ${pendingEarnings.toFixed(2)}
+            <Price amount={pendingEarnings} />
           </p>
           <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
             From processing orders
@@ -99,7 +100,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
             Total Gross Revenue
           </h3>
           <p className="text-3xl font-bold" style={{ color: theme.colors.text.primary }}>
-            ${totalEarnings.toFixed(2)}
+            <Price amount={totalEarnings} />
           </p>
           <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
             All time
@@ -121,7 +122,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
                style={{ backgroundColor: theme.colors.background }}>
             <span style={{ color: theme.colors.text.primary }}>Gross Revenue</span>
             <span className="font-bold" style={{ color: theme.colors.text.primary }}>
-              ${totalEarnings.toFixed(2)}
+              <Price amount={totalEarnings} />
             </span>
           </div>
           
@@ -140,7 +141,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
               )}
             </span>
             <span style={{ color: theme.colors.text.secondary }}>
-              -${platformFees.toFixed(2)}
+              -<Price amount={platformFees} />
             </span>
           </div>
           
@@ -150,7 +151,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
                 Net Earnings
               </span>
               <span className="font-bold text-lg" style={{ color: theme.colors.accent }}>
-                ${netEarnings.toFixed(2)}
+                <Price amount={netEarnings} />
               </span>
             </div>
           </div>
@@ -179,7 +180,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
                   </span>
                   <div className="text-right">
                     <span className="font-bold" style={{ color: theme.colors.accent }}>
-                      ${month.earnings.toFixed(2)}
+                      <Price amount={month.earnings} />
                     </span>
                     <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
                       {month.orders} orders
@@ -230,7 +231,7 @@ export default function EarningsOverview({ orders }: EarningsOverviewProps) {
               Minimum Payout
             </h4>
             <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-              {brand === 'primediscreet' ? '$50.00 minimum' : '$100.00 minimum'}
+              {brand === 'primediscreet' ? <><Price amount={50} /> minimum</> : <><Price amount={100} /> minimum</>}
             </p>
           </div>
         </div>

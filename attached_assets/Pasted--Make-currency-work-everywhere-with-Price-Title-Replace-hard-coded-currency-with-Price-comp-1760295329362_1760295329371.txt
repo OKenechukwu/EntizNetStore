@@ -1,0 +1,146 @@
+“Make currency work everywhere with <Price/>”
+
+Title: Replace hard-coded currency with <Price/> component
+
+Instructions for Agent 3:
+
+Ensure dependencies/files exist
+
+Create (or overwrite) components/ui/Price.tsx with:
+
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { usePrefs } from "@/hooks/usePrefs";
+
+type Props = {
+  amount: number;
+  className?: string;
+  minimumFractionDigits?: number;
+  maximumFractionDigits?: number;
+};
+
+export default function Price({
+  amount,
+  className = "",
+  minimumFractionDigits = 2,
+  maximumFractionDigits = 2,
+}: Props) {
+  const { currency } = usePrefs();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const formatter = useMemo(() => {
+    const cur = (currency || "USD").toUpperCase();
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: cur,
+      minimumFractionDigits,
+      maximumFractionDigits,
+    });
+  }, [currency, minimumFractionDigits, maximumFractionDigits]);
+  if (!mounted) return <span className={className}> </span>;
+  return <span className={className}>{formatter.format(amount)}</span>;
+}
+
+
+Ensure hooks/usePrefs.ts matches this (hydration-safe; cookie+localStorage):
+
+"use client";
+import { useEffect, useState, useCallback } from "react";
+type Prefs = { lang: string; currency: string; setLang: (v: string)=>void; setCurrency:(v:string)=>void; };
+const LANG_KEY="entiz_lang"; const CUR_KEY="entiz_currency";
+export function usePrefs(): Prefs {
+  const [mounted, setMounted] = useState(false);
+  const [lang, setLangState] = useState("en");
+  const [currency, setCurrencyState] = useState("USD");
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const l = localStorage.getItem(LANG_KEY);
+      const c = localStorage.getItem(CUR_KEY);
+      if (l) setLangState(l);
+      if (c) setCurrencyState(c.toUpperCase());
+    } catch {}
+  }, []);
+  const setLang = useCallback((v:string) => {
+    setLangState(v);
+    try { localStorage.setItem(LANG_KEY,v); document.cookie=`lang=${encodeURIComponent(v)};path=/;max-age=31536000;SameSite=Lax`; } catch {}
+  },[]);
+  const setCurrency = useCallback((v:string) => {
+    const up=v.toUpperCase();
+    setCurrencyState(up);
+    try { localStorage.setItem(CUR_KEY,up); document.cookie=`currency=${encodeURIComponent(up)};path=/;max-age=31536000;SameSite=Lax`; } catch {}
+  },[]);
+  if (!mounted) return { lang:"en", currency:"USD", setLang, setCurrency };
+  return { lang, currency, setLang, setCurrency };
+}
+
+
+Refactor all price displays to use <Price/>
+
+Search the whole repo (TS/TSX/JS/JSX) for hard-coded currency strings and price labels:
+
+Regex A (explicit dollars in JSX/text):
+\$\s*\{?[0-9][0-9.,]*\}?
+
+Regex B (object literals with price strings):
+price\s*:\s*["']\s*\$?\s*[0-9][0-9.,]*\s*["']
+
+Regex C (labels like priceLabel:):
+price(Label)?\s*:\s*["']\s*\$?\s*[0-9][0-9.,]*\s*["']
+
+For UI components rendering a price:
+
+Add import Price from "@/components/ui/Price"; (de-dupe if present).
+
+Replace visible price snippets with:
+<Price amount={NUMBER_EXPRESSION} className="font-extrabold" />
+
+If the price comes as a string like "67.24" or "$67.24" → wrap with Number(String(value).replace(/[^0-9.]/g, "")).
+
+If the data uses cents (integers) → divide by 100:
+<Price amount={price_cents / 100} />.
+
+For mock/demo generators (home page, grids, app/categories/[slug]/page.tsx, etc.):
+
+Keep numeric source values. If a label exists (e.g., priceLabel: "67.24"), do not render the string; render <Price amount={Number(p.priceLabel)} />.
+
+Ensure all product types expose either price (number) or priceCents (number). Avoid strings for price.
+
+Do NOT touch plain text in policies/docs; only price UI.
+
+Specific edits (so you don’t miss spots)
+
+In app/categories/[slug]/page.tsx:
+
+Ensure there’s import Price from "@/components/ui/Price";.
+
+In ProductGrid, replace the price block with:
+
+<div className={`${grad} bg-clip-text font-extrabold text-transparent`}>
+  <Price amount={Number(p.priceLabel)} />
+</div>
+
+
+In any home/landing sections that show cards (e.g., “Best Selling Products”, “Featured”, etc.), replace $xx.xx text with <Price amount={...} />.
+
+Fix dropdown readability (if not already)
+
+In components/layout/LanguageCurrencyMenu.tsx, both <select> must use:
+className="w-full rounded-md border border-white/15 bg-white text-black px-2 py-2 text-sm outline-none"
+
+QA & commit
+
+Reload the app; switch currency between USD, EUR, GBP, PHP and confirm card prices change everywhere.
+
+Confirm no hydration warnings in console.
+
+Commit with message:
+feat(currency): unify price rendering via <Price/>; prefs hydration-safe; fix select readability
+
+Acceptance criteria:
+
+No $ hard-codes remain in product cards/pages.
+
+Currency switch immediately updates all visible prices without hydration errors.
+
+Native selects are readable on Windows (white bg, black text).
