@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
+import Price from '@/components/common/Price'
 
 interface SearchResultsProps {
   results: any[]
@@ -41,13 +42,9 @@ export default function SearchResults({
 
   const formatPrice = (price: number, comparePrice?: number) => (
     <div className="flex items-center gap-2">
-      <span className="font-semibold text-lg" style={{ color: theme.colors.accent }}>
-        ${price.toFixed(2)}
-      </span>
+      <Price amount={price} className="font-semibold text-lg" style={{ color: theme.colors.accent }} />
       {comparePrice && comparePrice > price && (
-        <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-          ${comparePrice.toFixed(2)}
-        </span>
+        <Price amount={comparePrice} className="text-sm line-through" style={{ color: theme.colors.text.secondary }} />
       )}
     </div>
   )
