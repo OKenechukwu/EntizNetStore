@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ShoppingCart,
-  Bell,
-  Search,
-  Menu,
-  X,
-} from "lucide-react";
+import { ShoppingCart, Bell, Search, Menu, X } from "lucide-react";
 import LanguageCurrencyMenu from "./LanguageCurrencyMenu";
 import ProfileIconClient from "./ProfileIconClient";
 
@@ -84,16 +78,16 @@ export default function Header() {
           {/* Right: Language + Icons */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
             <LanguageCurrencyMenu />
-            
+
             <Link
               href="/auth?mode=signin"
               className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
             >
               Sign in
             </Link>
-            
+
             <ProfileIconClient />
-            
+
             <Link
               href="/cart"
               className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
@@ -101,7 +95,7 @@ export default function Header() {
             >
               <ShoppingCart className="h-5 w-5" />
             </Link>
-            
+
             <Link
               href="/notifications"
               className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
@@ -117,7 +111,11 @@ export default function Header() {
             aria-label="Toggle menu"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {mobileOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
       </div>

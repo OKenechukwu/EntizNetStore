@@ -1,0 +1,136 @@
+Update all price displays to use <Price/>
+
+Goal: Replace hard-coded price text with the reusable <Price/> component so prices respect the selected currency.
+
+Do exactly this:
+
+Ensure the Price component exists
+
+Create (or overwrite) components/common/Price.tsx with:
+
+"use client";
+
+import { useCurrencyFormatter } from "@/hooks/useCurrencyFormatter";
+
+type PriceProps = {
+  amount: number;   // base units (e.g., 129.99) or cents if cents=true
+  cents?: boolean;  // set true if amount is in cents
+  className?: string;
+};
+
+export default function Price({ amount, cents = false, className = "" }: PriceProps) {
+  const { formatPrice } = useCurrencyFormatter();
+  const value = cents ? amount / 100 : amount;
+  return <span className={className}>{formatPrice(value)}</span>;
+}
+
+
+Update files that render prices
+
+Target files (create if missing):
+
+components/products/ProductBasicInfo.tsx
+
+components/products/ProductVariants.tsx
+
+Any product grids/lists in app/store/page.tsx and components/home/** that display product prices.
+
+In each target file:
+
+Add import at the top (once per file):
+
+import Price from "@/components/common/Price";
+
+
+Replace hard-coded prices with <Price/>:
+
+A) ProductBasicInfo.tsx
+
+Replace patterns like:
+
+<div className="text-xl font-extrabold">${product.price}</div>
+
+
+with:
+
+<div className="text-xl font-extrabold">
+  <Price amount={product.price} />
+</div>
+
+
+If the schema uses cents (e.g., product.price_cents), use:
+
+<div className="text-xl font-extrabold">
+  <Price amount={product.price_cents} cents />
+</div>
+
+
+B) ProductVariants.tsx
+
+Replace patterns like:
+
+<span className="font-semibold">${variant.price}</span>
+
+
+with:
+
+<span className="font-semibold">
+  <Price amount={variant.price} />
+</span>
+
+
+If using cents:
+
+<span className="font-semibold">
+  <Price amount={variant.price_cents} cents />
+</span>
+
+
+C) Any grids/lists (home/store pages)
+
+Replace occurrences like:
+
+<span className="font-extrabold">${p.price}</span>
+
+
+with:
+
+<span className="font-extrabold">
+  <Price amount={p.price} />
+</span>
+
+
+Or, if cents:
+
+<span className="font-extrabold">
+  <Price amount={p.price_cents} cents />
+</span>
+
+
+Guard against multiple shapes
+
+Also replace these common variants if found:
+
+{`$${product.price}`} → <Price amount={product.price} />
+
+{product.price} USD → <Price amount={product.price} />
+
+Hard-coded Intl.NumberFormat(...) → <Price amount={...} />
+
+price.toFixed(2) with $ prefix → <Price amount={price} />
+
+Do not change anything else. Do not touch middleware or header.
+
+Build & verify
+
+Ensure the dev server runs.
+
+Manually test: change currency from the existing single Language/Currency menu → verify all updated price spots reflect the new currency symbol/format (USD $, EUR €, GBP £, PHP ₱, etc.).
+
+If a file doesn’t have a price field:
+
+Skip it. Only modify files that actually render a price.
+
+If both price and price_cents exist:
+
+Prefer price_cents with cents prop. Otherwise use price directly.
