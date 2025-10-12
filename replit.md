@@ -6,6 +6,13 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
+### October 2025 - Category Routing & Navigation Fix
+- **Category Taxonomy Update**: Added Vibrators and Dildos as top-level categories with full subcategory support
+- **Routing Consistency**: Updated CategoriesRow to use correct slugs matching taxonomy (16 categories total)
+- **Price Component Integration**: Category pages now use `<Price/>` component for currency-aware price displays
+- **Subcategory Filtering**: Chips system supports filtering by subcategory with URL query parameters
+- **No 404s**: All category links properly mapped to existing taxonomy entries
+
 ### October 2025 - Price Component & Currency Display Standardization
 - **Reusable Price Component**: Created `<Price/>` component for all customer-facing price displays
 - **Currency-Aware Formatting**: All prices automatically respect selected currency and locale
