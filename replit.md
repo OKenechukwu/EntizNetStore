@@ -6,6 +6,14 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
+### October 2025 - Price Component & Currency Display Standardization
+- **Reusable Price Component**: Created `<Price/>` component for all customer-facing price displays
+- **Currency-Aware Formatting**: All prices automatically respect selected currency and locale
+- **useCurrencyFormatter Hook**: Updated to use BrandProvider for centralized currency state
+- **8 Pages Updated**: SearchResults, MobileProductCard, Cart, On-Sale, Sale, Wishlist, and more now use Price component
+- **Real-time Updates**: Currency changes instantly update all price displays via event-driven system
+- **TypeScript Safety**: All price displays are type-safe and use correct product properties
+
 ### October 2025 - Currency & Language Persistence Fix
 - **Full Persistence**: Language and currency now persist via both localStorage and cookies for client/server sync
 - **BrandProvider Enhancement**: Extended with locale and currency state, hydration on mount, and currencyChange event listener
