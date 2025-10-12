@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ShoppingCart, Bell, Search, Menu, X } from "lucide-react";
+import { T } from "@/components/i18n/I18nProvider";
 import LanguageCurrencyMenu from "./LanguageCurrencyMenu";
 import ProfileIconClient from "./ProfileIconClient";
 
@@ -51,7 +52,7 @@ export default function Header() {
               href="/on-sale"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              On Sale
+              <T k="home.onSale" />
             </Link>
             <Link
               href="/learn"

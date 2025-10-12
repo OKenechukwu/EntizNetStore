@@ -1,0 +1,24 @@
+{
+  "common": {
+    "loading": "Wird geladen...",
+    "save": "Speichern",
+    "cancel": "Abbrechen"
+  },
+  "home": {
+    "welcome": "Willkommen bei EntizNetStore",
+    "bestSellingProducts": "Bestseller",
+    "featuredProducts": "Empfohlene Produkte",
+    "topCategories": "Top-Kategorien",
+    "onSale": "Angebote"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "email": "E-Mail",
+    "password": "Passwort"
+  },
+  "category": {
+    "allSubcategories": "Alle Unterkategorien",
+    "viewAll": "Alle anzeigen"
+  }
+}

@@ -1,0 +1,148 @@
+Goal: Replace specific hard-coded UI strings with our i18n helper across the codebase, using <T/> or useI18n() from @/components/i18n/I18nProvider. Do not change any other logic, styles, or markup structure.
+
+Scope & Safety Guards
+
+Only edit .tsx files inside app/** and components/**.
+
+Do NOT modify .css, .svg, .json, .md, server actions, API routes, or SQL.
+
+Only replace exact text literals listed below.
+
+If a target string is already dynamic (variable/prop/JSX expression), skip it.
+
+If a file already imports { T } or { useI18n }, reuse the import; otherwise add it at top-level.
+
+Keep existing classes and wrappers intact; only replace the inner text content.
+
+Run TypeScript check after edits; fix only import/typing errors you created.
+
+Imports to use
+
+import { T } from "@/components/i18n/I18nProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
+
+
+String → Key mapping (exact matches only)
+
+"Best Selling Products" → home.bestSellingProducts
+
+"Featured Products" → home.featuredProducts
+
+"Top Categories" → home.topCategories
+
+"On Sale" → home.onSale
+
+"View all" → category.viewAll
+
+"All subcategories" → category.allSubcategories
+
+"Welcome to EntizNetStore" → home.welcome
+
+Auth (only if you see them as plain text in UI):
+
+"Sign In" → auth.signIn
+
+"Sign Up" → auth.signUp
+
+"Email" → auth.email
+
+"Password" → auth.password
+
+Edits to perform
+
+Replace exact text nodes with <T/>
+
+Pattern: <h1|h2|h3|h4|p|span|div ...>ExactString</...>
+
+Replace content with <T k="mapped.key" /> and keep outer tag unchanged.
+
+Example:
+
+Before:
+
+<h3 className="mb-4 text-[22px] font-extrabold">Best Selling Products</h3>
+
+
+After:
+
+import { T } from "@/components/i18n/I18nProvider";
+// ...
+<h3 className="mb-4 text-[22px] font-extrabold">
+  <T k="home.bestSellingProducts" />
+</h3>
+
+
+Replace inline text inside mixed JSX
+
+If the literal is inside another element, replace only the literal with <T k="..." />.
+
+Example:
+
+Before:
+
+<Button aria-label="View all">View all</Button>
+
+
+After:
+
+import { T } from "@/components/i18n/I18nProvider";
+// ...
+<Button aria-label="View all"><T k="category.viewAll" /></Button>
+
+
+Use useI18n() only when string composition is needed
+
+If you find code concatenating these exact literals (rare), replace the literal with t("mapped.key").
+
+Example:
+
+Before:
+
+const title = "Featured Products";
+
+
+After:
+
+import { useI18n } from "@/components/i18n/I18nProvider";
+// inside component
+const { t } = useI18n();
+const title = t("home.featuredProducts");
+
+
+Files to scan first (typical locations)
+
+app/store/page.tsx
+
+app/page.tsx
+
+components/home/**
+
+components/layout/Header.tsx
+
+components/category/**
+
+app/categories/**/page.tsx or app/category/**/page.tsx
+
+Do NOT
+
+Do not rename components or props.
+
+Do not reorder children.
+
+Do not change className values.
+
+Do not touch any price logic (that’s handled by <Price/> already).
+
+Validation
+
+After changes: run typecheck and build.
+
+Navigate through Home, Category pages, and any component showing the above strings; confirm they render with <T/> and no UI regressions.
+
+If a target string is not found, skip gracefully.
+
+Deliverables
+
+Edited files with the safe replacements above.
+
+Short summary listing each file changed and which strings were replaced

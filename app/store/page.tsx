@@ -4,6 +4,7 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { T, useI18n } from "@/components/i18n/I18nProvider";
 
 import Header from "@/components/layout/Header";
 import HeroSlider from "@/components/home/HeroSlider";
@@ -172,6 +173,7 @@ const demo = (prefix: string, n: number): Item[] =>
    Main Page
 -------------------------------------------- */
 export default function StoreHome() {
+  const { t } = useI18n();
   const featured = useMemo(() => demo("feat", 10), []);
   const best = useMemo(() => demo("best", 10), []);
   const top = useMemo(() => demo("top", 10), []);
@@ -189,7 +191,7 @@ export default function StoreHome() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60" />
           <div className="absolute inset-x-0 bottom-0 p-6">
             <h1 className="text-2xl font-extrabold">
-              Welcome to EntizNetStore
+              <T k="home.welcome" />
             </h1>
             <p className="mt-1 max-w-xl text-sm text-white/80">
               Premium markethub where buyers meet sellers, brands, suppliers &
@@ -207,8 +209,8 @@ export default function StoreHome() {
       <FeaturedBrands />
 
       {/* Product Sections */}
-      <ProductGrid title="Featured Products" items={featured} />
-      <ProductGrid title="Best Selling Products" items={best} />
+      <ProductGrid title={t("home.featuredProducts")} items={featured} />
+      <ProductGrid title={t("home.bestSellingProducts")} items={best} />
       <ProductGrid title="Top Sellers" items={top} />
       <ProductGrid title="From Nearby Sellers" items={near} />
 

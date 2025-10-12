@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
 import HeroSlider from "@/components/hero/HeroSlider";
 import CategoriesRow from "@/components/home/CategoriesRow";
 import FeaturedSection from "@/components/home/FeaturedSection";
@@ -14,6 +15,8 @@ const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
 }));
 
 export default function HomePage() {
+  const { t } = useI18n();
+  
   return (
     <div className="w-full">
       {/* Hero Slider - Full width, directly under MainNav */}
@@ -25,7 +28,7 @@ export default function HomePage() {
       {/* Featured Sections - 9 sections in specified order */}
       <div className="space-y-6 pb-12">
         <FeaturedSection
-          title="Best Selling Products"
+          title={t("home.bestSellingProducts")}
           items={DEMO_PRODUCTS}
           viewAllHref="/store"
         />

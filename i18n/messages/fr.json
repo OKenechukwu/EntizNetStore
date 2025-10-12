@@ -1,0 +1,24 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  },
+  "home": {
+    "welcome": "Bienvenue sur EntizNetStore",
+    "bestSellingProducts": "Meilleures ventes",
+    "featuredProducts": "Produits vedettes",
+    "topCategories": "Catégories populaires",
+    "onSale": "En promotion"
+  },
+  "auth": {
+    "signIn": "Se connecter",
+    "signUp": "S’inscrire",
+    "email": "E-mail",
+    "password": "Mot de passe"
+  },
+  "category": {
+    "allSubcategories": "Toutes les sous-catégories",
+    "viewAll": "Tout voir"
+  }
+}
