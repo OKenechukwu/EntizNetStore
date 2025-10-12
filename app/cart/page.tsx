@@ -5,9 +5,11 @@ import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
 import { getCart, setQty, removeItem, clearCart, subtotalBase, type CartItem } from '@/lib/cart'
 import Price from '@/components/common/Price'
+import { T, useI18n } from '@/components/i18n/I18nProvider'
 
 export default function CartPage() {
   const { theme, brand } = useBrand()
+  const { t } = useI18n()
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -43,7 +45,7 @@ export default function CartPage() {
                  borderColor: theme.colors.glass.border,
                  borderTopColor: theme.colors.accent 
                }}></div>
-          <p style={{ color: theme.colors.text.secondary }}>Loading cart...</p>
+          <p style={{ color: theme.colors.text.secondary }}><T k="cart.loadingCart" /></p>
         </div>
       </div>
     )
@@ -56,14 +58,14 @@ export default function CartPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl md:text-4xl font-bold" style={{ color: theme.colors.text.primary }}>
-            Shopping Cart
+            <T k="cart.title" />
           </h1>
           <Link 
             href="/store"
             className="text-sm hover:opacity-70 transition-colors"
             style={{ color: theme.colors.accent }}
           >
-            ← Continue Shopping
+            ← <T k="cart.continueShopping" />
           </Link>
         </div>
 
@@ -74,13 +76,13 @@ export default function CartPage() {
               🛒
             </div>
             <h2 className="text-2xl font-bold mb-4" style={{ color: theme.colors.text.primary }}>
-              Your Cart is Empty
+              <T k="cart.empty" />
             </h2>
             <p className="text-lg mb-8 max-w-md mx-auto" style={{ color: theme.colors.text.secondary }}>
-              {brand === 'primediscreet' 
-                ? 'Discover our exclusive luxury collection and find something special.'
-                : 'Browse our premium products and add items you love to your cart.'
-              }
+              <T k={brand === 'primediscreet' 
+                ? 'cart.emptyDescriptionPrimediscreet'
+                : 'cart.emptyDescriptionEntiznet'
+              } />
             </p>
             <Link
               href="/store"
@@ -90,7 +92,7 @@ export default function CartPage() {
                 color: brand === 'primediscreet' ? theme.colors.background : 'white'
               }}
             >
-              Start Shopping
+              <T k="cart.startShopping" />
             </Link>
           </div>
         ) : (
@@ -120,13 +122,13 @@ export default function CartPage() {
                         {item.title}
                       </h3>
                       <p className="text-sm mb-3" style={{ color: theme.colors.text.secondary }}>
-                        ${item.priceBase} each
+                        ${item.priceBase} <T k="cart.each" />
                       </p>
                       
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
-                          Quantity:
+                          <T k="cart.quantity" />
                         </span>
                         <div className="flex items-center border rounded-lg"
                              style={{ borderColor: theme.colors.glass.border }}>
@@ -162,7 +164,7 @@ export default function CartPage() {
                         className="text-sm hover:opacity-70 transition-colors"
                         style={{ color: '#EF4444' }}
                       >
-                        Remove
+                        <T k="cart.remove" />
                       </button>
                     </div>
                   </div>
@@ -176,7 +178,7 @@ export default function CartPage() {
                   className="text-sm hover:opacity-70 transition-colors"
                   style={{ color: theme.colors.text.secondary }}
                 >
-                  Clear All Items
+                  <T k="cart.clearAll" />
                 </button>
               </div>
             </div>
@@ -187,13 +189,13 @@ export default function CartPage() {
                    style={{ borderColor: theme.colors.glass.border }}>
                 
                 <h3 className="text-xl font-bold mb-6" style={{ color: theme.colors.text.primary }}>
-                  Order Summary
+                  <T k="cart.orderSummary" />
                 </h3>
 
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between text-sm">
                     <span style={{ color: theme.colors.text.secondary }}>
-                      Items ({cart.reduce((total, item) => total + item.qty, 0)})
+                      <T k="cart.items" /> ({cart.reduce((total, item) => total + item.qty, 0)})
                     </span>
                     <span style={{ color: theme.colors.text.primary }}>
                       <Price amount={subtotal} />
@@ -201,13 +203,13 @@ export default function CartPage() {
                   </div>
                   
                   <div className="flex justify-between text-sm">
-                    <span style={{ color: theme.colors.text.secondary }}>Shipping</span>
-                    <span style={{ color: '#10B981' }}>FREE</span>
+                    <span style={{ color: theme.colors.text.secondary }}><T k="cart.shipping" /></span>
+                    <span style={{ color: '#10B981' }}><T k="cart.free" /></span>
                   </div>
                   
                   <div className="border-t pt-4" style={{ borderColor: theme.colors.glass.border }}>
                     <div className="flex justify-between text-lg font-bold">
-                      <span style={{ color: theme.colors.text.primary }}>Total</span>
+                      <span style={{ color: theme.colors.text.primary }}><T k="cart.total" /></span>
                       <span style={{ color: theme.colors.accent }}>
                         <Price amount={subtotal} />
                       </span>
@@ -224,20 +226,20 @@ export default function CartPage() {
                     color: brand === 'primediscreet' ? theme.colors.background : 'white'
                   }}
                 >
-                  Proceed to Checkout
+                  <T k="cart.proceedToCheckout" />
                 </Link>
 
                 {/* Security Features */}
                 <div className="space-y-3 text-sm">
                   {[
-                    { icon: '🔒', text: 'Secure SSL checkout' },
-                    { icon: '🚚', text: 'Discreet packaging' },
-                    { icon: '↩️', text: '30-day returns' }
+                    { icon: '🔒', textKey: 'cart.secureCheckout' },
+                    { icon: '🚚', textKey: 'cart.discreetPackaging' },
+                    { icon: '↩️', textKey: 'cart.returns' }
                   ].map((feature, index) => (
                     <div key={index} className="flex items-center gap-2"
                          style={{ color: theme.colors.text.secondary }}>
                       <span>{feature.icon}</span>
-                      <span>{feature.text}</span>
+                      <span><T k={feature.textKey} /></span>
                     </div>
                   ))}
                 </div>

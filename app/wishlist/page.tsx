@@ -7,11 +7,13 @@ import { useAuth } from '@/components/AuthProvider'
 import WishlistButton from '@/components/wishlist/WishlistButton'
 import Link from 'next/link'
 import Price from '@/components/common/Price'
+import { T, useI18n } from '@/components/i18n/I18nProvider'
 
 export default function WishlistPage() {
   const { wishlistItems, isLoading, clearWishlist } = useWishlist()
   const { theme, brand } = useBrand()
   const { user } = useAuth()
+  const { t } = useI18n()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
@@ -66,11 +68,12 @@ export default function WishlistPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2" style={{ color: theme.colors.text.primary }}>
-              {brand === 'primediscreet' ? 'Elite Favorites' : 'My Wishlist'}
+              <T k={brand === 'primediscreet' ? 'empty.eliteFavorites' : 'empty.myWishlist'} />
             </h1>
             <p style={{ color: theme.colors.text.secondary }}>
-              {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved
-              {!user && ' (Guest list - sign in to save permanently)'}
+              <T k={wishlistItems.length === 1 ? 'empty.itemSaved' : 'empty.itemsSaved'} 
+                 vars={{ count: wishlistItems.length }} />
+              {!user && ` ${t('empty.guestNotice')}`}
             </p>
           </div>
 
@@ -117,7 +120,7 @@ export default function WishlistPage() {
                   color: theme.colors.text.secondary
                 }}
               >
-                Clear All
+                <T k="empty.clearAll" />
               </button>
             </div>
           )}
@@ -131,13 +134,13 @@ export default function WishlistPage() {
             </div>
             <div className="space-y-2">
               <h3 className="text-xl font-semibold" style={{ color: theme.colors.text.primary }}>
-                {brand === 'primediscreet' ? 'No elite favorites yet' : 'Your wishlist is empty'}
+                <T k={brand === 'primediscreet' ? 'empty.noItemsWishlistPrimediscreet' : 'empty.noItemsWishlist'} />
               </h3>
               <p style={{ color: theme.colors.text.secondary }}>
-                {brand === 'primediscreet' 
-                  ? 'Start building your elite collection by saving products you love'
-                  : 'Save products you love to view them later'
-                }
+                <T k={brand === 'primediscreet' 
+                  ? 'empty.wishlistDescriptionPrimediscreet'
+                  : 'empty.wishlistDescriptionEntiznet'
+                } />
               </p>
             </div>
             <Link 
@@ -148,7 +151,7 @@ export default function WishlistPage() {
                 color: brand === 'primediscreet' ? theme.colors.background : 'white'
               }}
             >
-              {brand === 'primediscreet' ? 'Browse Elite Collection' : 'Browse Products'}
+              <T k={brand === 'primediscreet' ? 'empty.browseElite' : 'empty.browseProducts'} />
             </Link>
           </div>
         )}
@@ -212,7 +215,7 @@ export default function WishlistPage() {
                       color: brand === 'primediscreet' ? theme.colors.background : 'white'
                     }}
                   >
-                    Add to Cart
+                    <T k="empty.addToCart" />
                   </button>
                 </div>
               </div>
@@ -284,7 +287,7 @@ export default function WishlistPage() {
                         color: brand === 'primediscreet' ? theme.colors.background : 'white'
                       }}
                     >
-                      Add to Cart
+                      <T k="empty.addToCart" />
                     </button>
                     <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
                       Saved {new Date(item.created_at).toLocaleDateString()}

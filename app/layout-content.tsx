@@ -154,6 +154,7 @@ function Navigation() {
 
 function Footer() {
   const { config } = useBrand();
+  const { t } = useTranslation();
 
   return (
     <footer className="border-t border-opacity-20 mt-20">
@@ -164,113 +165,113 @@ function Footer() {
               {config.name}
             </h3>
             <p className="text-sm opacity-80">{config.description}</p>
-            <p className="text-xs opacity-60">Must be 18+ to access.</p>
+            <p className="text-xs opacity-60">{t("footer.ageRestriction")}</p>
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-semibold text-accent-gold">Shop</h4>
+            <h4 className="font-semibold text-accent-gold">{t("footer.shop")}</h4>
             <div className="space-y-2 text-sm">
               <Link
                 href="/categories"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Categories
+                {t("footer.categories")}
               </Link>
               <Link
                 href="/brands"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Brands
+                {t("footer.brands")}
               </Link>
               <Link
                 href="/popular"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Popular
+                {t("footer.popular")}
               </Link>
               <Link
                 href="/on-sale"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Sale
+                {t("footer.sale")}
               </Link>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-semibold text-accent-gold">Support</h4>
+            <h4 className="font-semibold text-accent-gold">{t("footer.support")}</h4>
             <div className="space-y-2 text-sm">
               <Link
                 href="/help"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Help Center
+                {t("footer.helpCenter")}
               </Link>
               <Link
                 href="/privacy"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Privacy Policy
+                {t("footer.privacy")}
               </Link>
               <Link
                 href="/terms"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Terms of Service
+                {t("footer.terms")}
               </Link>
               <Link
                 href="/contact"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Contact
+                {t("footer.contact")}
               </Link>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-semibold text-accent-gold">Sellers</h4>
+            <h4 className="font-semibold text-accent-gold">{t("footer.sellers")}</h4>
             <div className="space-y-2 text-sm">
               <Link
                 href="/auth?mode=signin&role=seller"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Become a Seller
+                {t("footer.becomeSeller")}
               </Link>
               <Link
                 href="/dashboard/vendor"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Seller Dashboard
+                {t("footer.sellerDashboard")}
               </Link>
               <Link
                 href="/seller/resources"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Seller Resources
+                {t("footer.sellerResources")}
               </Link>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-semibold text-accent-gold">BSM</h4>
+            <h4 className="font-semibold text-accent-gold">{t("footer.bsm")}</h4>
             <div className="space-y-2 text-sm">
               <Link
                 href="/auth?mode=signin&role=bsm"
                 className="block hover:text-accent-gold transition-colors"
               >
-                Sell as a Brand, Supplier, Manufacturer (BSM)
+                {t("footer.sellAsBsm")}
               </Link>
               <Link
                 href="/auth?mode=signin&role=bsm"
                 className="block hover:text-accent-gold transition-colors"
               >
-                BSM Dashboard
+                {t("footer.bsmDashboard")}
               </Link>
               <Link
                 href="/bsm/resources"
                 className="block hover:text-accent-gold transition-colors"
               >
-                BSM Resources
+                {t("footer.bsmResources")}
               </Link>
             </div>
           </div>
@@ -278,8 +279,7 @@ function Footer() {
 
         <div className="border-t border-opacity-20 mt-12 pt-8 text-center text-sm opacity-60">
           <p>
-            &copy; {new Date().getFullYear()} {config.name}. All rights
-            reserved.
+            &copy; {new Date().getFullYear()} {config.name}. {t("footer.copyright")}
           </p>
         </div>
       </div>

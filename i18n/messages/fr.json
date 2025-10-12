@@ -47,6 +47,7 @@
     "title": "Paiement",
     "continueShopping": "Continuer vos achats",
     "orderSuccess": "✓ Commande passée avec succès! Merci pour votre achat.",
+    "orderFailure": "Échec du passage de commande. Veuillez réessayer.",
     "emptyCart": "Votre panier est vide",
     "emptyDescription": "Parcourez notre boutique pour trouver des produits que vous souhaitez acheter.",
     "each": "chacun",

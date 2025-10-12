@@ -12,8 +12,10 @@ import {
   subtotalBase,
   type CartItem,
 } from "@/lib/cart";
+import { T, useI18n } from "@/components/i18n/I18nProvider";
 
 export default function CheckoutClient() {
+  const { t } = useI18n();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userCurrency, setUserCurrency] = useState(DEFAULT_CURRENCY);
   const [rates, setRates] = useState<Record<string, number>>({});
@@ -108,7 +110,7 @@ export default function CheckoutClient() {
       }
     } catch (error) {
       console.error("Order failed:", error);
-      alert("Failed to place order. Please try again.");
+      alert(t("checkout.orderFailure"));
     } finally {
       setIsLoading(false);
     }
@@ -124,11 +126,11 @@ export default function CheckoutClient() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <Link href="/store" className="text-sm underline hover:opacity-80">
-          ← Continue Shopping
+          ← <T k="checkout.continueShopping" />
         </Link>
       </div>
 
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+      <h1 className="text-3xl font-bold mb-8"><T k="checkout.title" /></h1>
 
       {orderSuccess && (
         <div
@@ -137,22 +139,22 @@ export default function CheckoutClient() {
           aria-live="polite"
         >
           <p className="text-green-800 font-medium">
-            ✓ Order placed successfully! Thank you for your purchase.
+            <T k="checkout.orderSuccess" />
           </p>
         </div>
       )}
 
       {cart.length === 0 ? (
         <div className="text-center py-10">
-          <h2 className="text-2xl font-semibold mb-4">Your Cart is Empty</h2>
+          <h2 className="text-2xl font-semibold mb-4"><T k="checkout.emptyCart" /></h2>
           <p className="text-gray-600 mb-6">
-            Browse our store to find products you&apos;d like to purchase.
+            <T k="checkout.emptyDescription" />
           </p>
           <Link
             href="/store"
             className="inline-block px-6 py-3 bg-black text-white rounded-lg hover:opacity-90 transition-opacity"
           >
-            Continue Shopping
+            <T k="checkout.continueShopping" />
           </Link>
         </div>
       ) : (
@@ -178,7 +180,7 @@ export default function CheckoutClient() {
                   <h3 className="font-medium">{item.title}</h3>
                   <p className="text-sm text-gray-600">
                     {formatPrice(convertPrice(item.priceBase), userCurrency)}{" "}
-                    each
+                    <T k="checkout.each" />
                   </p>
                 </div>
 
@@ -210,7 +212,7 @@ export default function CheckoutClient() {
                     onClick={() => handleRemoveItem(item.id)}
                     className="text-sm text-red-600 hover:underline"
                   >
-                    Remove
+                    <T k="checkout.remove" />
                   </button>
                 </div>
               </div>
@@ -219,7 +221,7 @@ export default function CheckoutClient() {
 
           <div className="border-t pt-6">
             <div className="flex justify-between items-center mb-6">
-              <span className="text-lg font-semibold">Total:</span>
+              <span className="text-lg font-semibold"><T k="checkout.total" /></span>
               <span className="text-2xl font-bold">
                 {formatPrice(totalConverted, userCurrency)}
               </span>
@@ -230,7 +232,7 @@ export default function CheckoutClient() {
               disabled={isLoading || cart.length === 0}
               className="w-full py-3 bg-black text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {isLoading ? "Placing Order..." : "Place Order"}
+              {isLoading ? t("checkout.placingOrder") : t("checkout.placeOrder")}
             </button>
           </div>
         </>

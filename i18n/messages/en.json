@@ -47,6 +47,7 @@
     "title": "Checkout",
     "continueShopping": "Continue Shopping",
     "orderSuccess": "✓ Order placed successfully! Thank you for your purchase.",
+    "orderFailure": "Failed to place order. Please try again.",
     "emptyCart": "Your Cart is Empty",
     "emptyDescription": "Browse our store to find products you'd like to purchase.",
     "each": "each",

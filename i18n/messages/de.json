@@ -47,6 +47,7 @@
     "title": "Kasse",
     "continueShopping": "Weiter einkaufen",
     "orderSuccess": "✓ Bestellung erfolgreich aufgegeben! Vielen Dank für Ihren Einkauf.",
+    "orderFailure": "Bestellung konnte nicht aufgegeben werden. Bitte versuchen Sie es erneut.",
     "emptyCart": "Ihr Warenkorb ist leer",
     "emptyDescription": "Durchsuchen Sie unseren Shop, um Produkte zu finden, die Sie kaufen möchten.",
     "each": "je",

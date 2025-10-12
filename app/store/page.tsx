@@ -218,7 +218,7 @@ export default function StoreHome() {
       <footer className="mt-16 w-full bg-[var(--brand-primary,#5B0060)] py-10 text-white">
         <div className="px-4 text-center md:px-8 lg:px-12">
           <p className="text-sm opacity-70">
-            © {new Date().getFullYear()} EntizNetStore — All Rights Reserved.
+            © {new Date().getFullYear()} EntizNetStore — <T k="footer.copyright" />
           </p>
         </div>
       </footer>
