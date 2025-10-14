@@ -4,13 +4,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ShoppingCart, Bell, Search, Menu, X } from "lucide-react";
-import { T } from "@/components/i18n/I18nProvider";
+import { T, useI18n } from "@/components/i18n/I18nProvider";
 import LanguageCurrencySwitcher from "@/components/i18n/LanguageCurrencySwitcher";
 import ProfileIconClient from "./ProfileIconClient";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { t } = useI18n();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-md">
@@ -35,31 +36,31 @@ export default function Header() {
               href="/stores"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              Stores
+              <T k="nav.stores" />
             </Link>
             <Link
               href="/brands"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              Brands
+              <T k="nav.brands" />
             </Link>
             <Link
               href="/live"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              Live
+              <T k="nav.live" />
             </Link>
             <Link
               href="/on-sale"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="home.onSale" />
+              <T k="nav.onSale" />
             </Link>
             <Link
               href="/learn"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              Learn
+              <T k="nav.learn" />
             </Link>
           </nav>
 
@@ -69,10 +70,11 @@ export default function Header() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
               <input
                 type="search"
-                placeholder="Search products..."
+                placeholder={t("search.placeholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-foreground/50 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/20"
+                aria-label={t("search.aria")}
               />
             </div>
           </div>
@@ -85,7 +87,7 @@ export default function Header() {
               href="/auth?mode=signin"
               className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
             >
-              Sign in
+              <T k="nav.signIn" />
             </Link>
 
             <ProfileIconClient />
@@ -128,37 +130,37 @@ export default function Header() {
           href="/"
           className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
         >
-          Home
+          <T k="nav.home" />
         </Link>
         <Link
           href="/premium"
           className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
         >
-          Premium
+          <T k="nav.premium" />
         </Link>
         <Link
           href="/luxury"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
+          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:text-brand-secondary"
         >
-          Luxury
+          <T k="nav.luxury" />
         </Link>
         <Link
           href="/collections"
           className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
         >
-          Collections
+          <T k="nav.collections" />
         </Link>
         <Link
           href="/smart-devices"
           className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
         >
-          Smart Devices
+          <T k="nav.smartDevices" />
         </Link>
         <Link
           href="/gift-sets"
           className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
         >
-          Gift Sets
+          <T k="nav.giftSets" />
         </Link>
       </div>
 
@@ -171,27 +173,28 @@ export default function Header() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
               <input
                 type="search"
-                placeholder="Search products..."
+                placeholder={t("search.placeholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-foreground/50 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/20"
+                aria-label={t("search.aria")}
               />
             </div>
 
             {/* Mobile Navigation */}
             <div className="flex flex-col gap-2">
               {[
-                { href: "/", label: "Home" },
-                { href: "/premium", label: "Premium" },
-                { href: "/luxury", label: "Luxury" },
-                { href: "/collections", label: "Collections" },
-                { href: "/smart-devices", label: "Smart Devices" },
-                { href: "/gift-sets", label: "Gift Sets" },
-                { href: "/stores", label: "Stores" },
-                { href: "/brands", label: "Brands" },
-                { href: "/live", label: "Live" },
-                { href: "/on-sale", label: "On Sale" },
-                { href: "/learn", label: "Learn" },
+                { href: "/", labelKey: "nav.home" },
+                { href: "/premium", labelKey: "nav.premium" },
+                { href: "/luxury", labelKey: "nav.luxury" },
+                { href: "/collections", labelKey: "nav.collections" },
+                { href: "/smart-devices", labelKey: "nav.smartDevices" },
+                { href: "/gift-sets", labelKey: "nav.giftSets" },
+                { href: "/stores", labelKey: "nav.stores" },
+                { href: "/brands", labelKey: "nav.brands" },
+                { href: "/live", labelKey: "nav.live" },
+                { href: "/on-sale", labelKey: "nav.onSale" },
+                { href: "/learn", labelKey: "nav.learn" },
               ].map((link) => (
                 <Link
                   key={link.href}
@@ -199,7 +202,7 @@ export default function Header() {
                   className="rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10"
                   onClick={() => setMobileOpen(false)}
                 >
-                  {link.label}
+                  <T k={link.labelKey} />
                 </Link>
               ))}
             </div>
@@ -212,7 +215,7 @@ export default function Header() {
                 className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"
                 onClick={() => setMobileOpen(false)}
               >
-                Sign in
+                <T k="nav.signIn" />
               </Link>
             </div>
           </div>

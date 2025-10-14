@@ -4,6 +4,24 @@
     "save": "Enregistrer",
     "cancel": "Annuler"
   },
+  "nav": {
+    "stores": "Boutiques",
+    "brands": "Marques",
+    "live": "En direct",
+    "onSale": "En promotion",
+    "learn": "Apprendre",
+    "home": "Accueil",
+    "premium": "Premium",
+    "luxury": "Luxe",
+    "collections": "Collections",
+    "smartDevices": "Appareils intelligents",
+    "giftSets": "Coffrets cadeaux",
+    "signIn": "Se connecter"
+  },
+  "search": {
+    "placeholder": "Rechercher des produits...",
+    "aria": "Rechercher des produits"
+  },
   "home": {
     "welcome": "Bienvenue sur EntizNetStore",
     "bestSellingProducts": "Meilleures ventes",

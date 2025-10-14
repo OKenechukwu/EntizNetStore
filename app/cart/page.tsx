@@ -122,7 +122,7 @@ export default function CartPage() {
                         {item.title}
                       </h3>
                       <p className="text-sm mb-3" style={{ color: theme.colors.text.secondary }}>
-                        ${item.priceBase} <T k="cart.each" />
+                        <Price amount={item.priceBase} /> <T k="cart.each" />
                       </p>
                       
                       {/* Quantity Controls */}

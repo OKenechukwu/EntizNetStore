@@ -4,6 +4,24 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "nav": {
+    "stores": "Stores",
+    "brands": "Brands",
+    "live": "Live",
+    "onSale": "On Sale",
+    "learn": "Learn",
+    "home": "Home",
+    "premium": "Premium",
+    "luxury": "Luxury",
+    "collections": "Collections",
+    "smartDevices": "Smart Devices",
+    "giftSets": "Gift Sets",
+    "signIn": "Sign in"
+  },
+  "search": {
+    "placeholder": "Search products...",
+    "aria": "Search products"
+  },
   "home": {
     "welcome": "Welcome to EntizNetStore",
     "bestSellingProducts": "Best Selling Products",

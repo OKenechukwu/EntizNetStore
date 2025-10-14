@@ -1,7 +1,7 @@
 // components/product/ProductsGrid.tsx
 "use client";
 
-import ProductCard, { ProductCardData } from "@/components/product/ProductCard";
+import ProductCard, { ProductCardData } from "@/components/products/ProductCard";
 
 /**
  * A simple responsive grid for displaying product cards.

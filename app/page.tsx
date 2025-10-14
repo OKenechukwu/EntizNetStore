@@ -8,7 +8,7 @@ import FeaturedSection from "@/components/home/FeaturedSection";
 const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
   id: `product-${i + 1}`,
   title: `Premium Product ${i + 1}`,
-  price: `$${(Math.random() * 100 + 20).toFixed(2)}`,
+  price: Number((Math.random() * 100 + 20).toFixed(2)),
   rating: parseFloat((Math.random() * 2 + 3).toFixed(1)),
   href: `/products/demo-${i + 1}`,
   image: `/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg`

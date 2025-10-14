@@ -3,11 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
+import Price from "@/components/ui/Price";
 
 interface FeaturedProduct {
   id: string;
   title: string;
-  price: string;
+  price: number;
   image?: string;
   rating?: number;
   href: string;
@@ -68,7 +69,9 @@ export default function FeaturedSection({ title, items, viewAllHref }: FeaturedS
                   </div>
                 )}
               </div>
-              <p className="text-sm font-bold text-brand-secondary">{item.price}</p>
+              <p className="text-sm font-bold text-brand-secondary">
+                <Price amount={item.price} />
+              </p>
             </div>
           </Link>
         ))}
