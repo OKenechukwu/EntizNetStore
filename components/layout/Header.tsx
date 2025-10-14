@@ -1,10 +1,11 @@
+// components/layout/Header.tsx
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { ShoppingCart, Bell, Search, Menu, X } from "lucide-react";
 import { T } from "@/components/i18n/I18nProvider";
-import LanguageCurrencyMenu from "./LanguageCurrencyMenu";
+import LanguageCurrencySwitcher from "@/components/i18n/LanguageCurrencySwitcher";
 import ProfileIconClient from "./ProfileIconClient";
 
 export default function Header() {
@@ -78,7 +79,7 @@ export default function Header() {
 
           {/* Right: Language + Icons */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
-            <LanguageCurrencyMenu />
+            <LanguageCurrencySwitcher className="ml-2" />
 
             <Link
               href="/auth?mode=signin"
@@ -205,7 +206,7 @@ export default function Header() {
 
             {/* Mobile Actions */}
             <div className="flex items-center gap-2 pt-2">
-              <LanguageCurrencyMenu />
+              <LanguageCurrencySwitcher className="ml-2" />
               <Link
                 href="/auth?mode=signin"
                 className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"

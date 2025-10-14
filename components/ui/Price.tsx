@@ -1,11 +1,11 @@
 // components/ui/Price.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePrefs } from "@/hooks/usePrefs";
+import { useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Props = {
-  amount: number; // e.g. 129.99
+  amount: number | string;
   className?: string;
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
@@ -14,27 +14,33 @@ type Props = {
 export default function Price({
   amount,
   className = "",
-  minimumFractionDigits = 2,
-  maximumFractionDigits = 2,
+  minimumFractionDigits,
+  maximumFractionDigits,
 }: Props) {
-  const { currency } = usePrefs();
+  const { locale, currency } = useI18n();
+
+  // Avoid SSR/CSR mismatch in header/cart totals, etc.
   const [mounted, setMounted] = useState(false);
-
   useEffect(() => setMounted(true), []);
+  if (!mounted) return <span className={className} />;
 
-  const formatter = useMemo(() => {
-    const cur = (currency || "USD").toUpperCase();
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: cur,
-      minimumFractionDigits,
-      maximumFractionDigits,
-    });
-  }, [currency, minimumFractionDigits, maximumFractionDigits]);
+  const numeric =
+    typeof amount === "string"
+      ? Number(amount)
+      : Number.isFinite(amount)
+        ? (amount as number)
+        : 0;
 
-  // Prevent SSR/CSR mismatch
-  if (!mounted) {
-    return <span className={className}> </span>;
-  }
-  return <span className={className}>{formatter.format(amount)}</span>;
+  const formatter = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    ...(minimumFractionDigits !== undefined ? { minimumFractionDigits } : {}),
+    ...(maximumFractionDigits !== undefined ? { maximumFractionDigits } : {}),
+  });
+
+  return (
+    <span className={className}>
+      {formatter.format(Number.isFinite(numeric) ? numeric : 0)}
+    </span>
+  );
 }

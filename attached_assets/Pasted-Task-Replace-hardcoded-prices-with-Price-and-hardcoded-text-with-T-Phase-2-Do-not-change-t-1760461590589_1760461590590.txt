@@ -1,0 +1,217 @@
+Task: Replace hardcoded prices with <Price/> and hardcoded text with <T/> (Phase 2)
+
+Do not change the visual structure of the top nav bars. Only update price/text rendering in the listed files.
+
+0) Guardrails
+
+Keep existing markup structure and classes everywhere (no layout/styling changes).
+
+Use existing providers. Do not add another i18n provider.
+
+<Price/> is at @/components/ui/Price.
+
+<T/> and useI18n() come from @/components/i18n/I18nProvider.
+
+1) Prices → <Price/>
+1.1 Search & replace targets
+
+Run (repo root):
+
+rg -n '\$[0-9]' app components
+rg -n 'price(Label)?\s*:\s*"\$' app components data
+
+1.2 Update these files (at minimum)
+
+components/product/ProductCard.tsx
+
+components/product/ProductsGrid.tsx
+
+components/cart/** (line items, totals, mini-cart, order summary)
+
+app/p/[slug]/page.tsx (already updated by user—leave as-is)
+
+app/categories/[slug]/page.tsx
+
+Any demo sections that render product prices on home/store pages
+
+1.3 Replacement rules
+
+At the top of each file that renders a price:
+
+import Price from "@/components/ui/Price";
+
+
+Replace hardcoded price nodes:
+
+// BEFORE
+<div className="font-extrabold">$67.24</div>
+
+// AFTER
+<div className="font-extrabold">
+  <Price amount={67.24} />
+</div>
+
+
+Replace dynamic strings ("$99" or priceLabel: "$..."):
+
+// BEFORE
+<div className="font-extrabold">{product.priceLabel}</div>
+
+// AFTER
+<div className="font-extrabold">
+  <Price amount={Number(product.price ?? product.priceLabel)} />
+</div>
+
+
+If the value includes currency symbols (e.g., "€99" / "USD 99"), strip non-digits:
+
+const clean = Number(String(product.priceLabel ?? product.price).replace(/[^\d.]/g, ""));
+<Price amount={clean} />
+
+
+Prefer normalizing mock data once:
+
+// data/mock*.ts
+price: Number(String(priceLabel).replace(/[^\d.]/g, "")),
+// then:
+<Price amount={item.price} />
+
+
+Cart math must remain numeric:
+
+// BEFORE
+const subtotal = `$${(qty * unitPrice).toFixed(2)}`;
+
+// AFTER
+const subtotal = qty * unitPrice;
+<Price amount={subtotal} className="font-semibold" />
+
+1.4 File-specific minimal edits
+
+A) components/product/ProductCard.tsx (price line only)
+
+import Price from "@/components/ui/Price";
+// ...
+<div className="text-sm md:text-base font-extrabold">
+  <Price amount={Number(p.price ?? p.priceLabel)} />
+</div>
+
+
+B) components/product/ProductsGrid.tsx
+
+import Price from "@/components/ui/Price";
+// ...
+<Price amount={Number(item.price ?? item.priceLabel)} className="font-extrabold" />
+
+
+C) app/categories/[slug]/page.tsx (inside item map)
+
+import Price from "@/components/ui/Price";
+// ...
+<Price amount={Number(prod.price ?? prod.priceLabel)} className="font-extrabold" />
+
+
+D) components/cart/CartSummary.tsx, components/cart/*
+
+Ensure all totals/line items use numeric math + <Price/> for rendering.
+
+2) Text → <T/> or t()
+2.1 Search targets
+rg -n '"(Featured Products|Best Selling|Categories|Sale|Sign in|Home|Premium|Luxury|Collections|Smart Devices|Gift Sets)"' app components
+
+2.2 Replace literals
+
+Import:
+
+import { T, useI18n } from "@/components/i18n/I18nProvider";
+
+
+Headings:
+
+// BEFORE
+<h3 className="mb-4 text-[22px] font-extrabold">Best Selling Products</h3>
+
+// AFTER
+<h3 className="mb-4 text-[22px] font-extrabold">
+  <T k="home.bestSellingProducts" />
+</h3>
+
+
+Buttons/links (do not change their classes or structure):
+
+// BEFORE
+<Link href="/on-sale">On Sale</Link>
+
+// AFTER
+<Link href="/on-sale">
+  <T k="nav.onSale" />
+</Link>
+
+
+Placeholders/aria (use the hook):
+
+const { t } = useI18n();
+// ...
+<input
+  placeholder={t("search.placeholder", "Search products...")}
+  aria-label={t("search.aria", "Search products")}
+/>
+
+2.3 Ensure these keys exist in dictionaries
+
+Update i18n/dictionaries/en.ts (replicate in other locales):
+
+export const dict = {
+  nav: {
+    stores: "Stores",
+    brands: "Brands",
+    live: "Live",
+    onSale: "On Sale",
+    learn: "Learn",
+    home: "Home",
+    premium: "Premium",
+    luxury: "Luxury",
+    collections: "Collections",
+    smartDevices: "Smart Devices",
+    giftSets: "Gift Sets",
+    signIn: "Sign in",
+  },
+  home: {
+    bestSellingProducts: "Best Selling Products",
+    featuredProducts: "Featured Products",
+  },
+  search: {
+    placeholder: "Search products...",
+    aria: "Search products",
+  },
+  cart: {
+    subtotal: "Subtotal",
+    total: "Total",
+    checkout: "Checkout",
+  },
+};
+
+3) Order of work
+
+Prices first: ProductCard → ProductsGrid → PDP → Cart/MiniCart → Category page → any demo/home sections.
+
+Then text: section headings → nav labels (wrap text only; no structural changes) → search placeholders/aria.
+
+4) Acceptance criteria (must pass)
+
+Switching currency updates all visible prices rendered via <Price/> (cards, PDP, cart, summaries).
+
+No $99 or currency symbols remain hardcoded in UI.
+
+Translated labels render via <T/>/t() with existing dictionaries.
+
+No hydration warnings introduced.
+
+Top navigation bars remain visually and structurally unchanged.
+
+5) Deliverables
+
+Modified files committed with message:
+feat(i18n,price): replace hardcoded prices with <Price/> and texts with <T/>; preserve nav layout
+
+Brief list of files touched and any remaining spots (if any) still needing keys or numeric normalization.

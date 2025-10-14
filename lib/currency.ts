@@ -1,15 +1,16 @@
 // lib/currency.ts
-export const BASE_CURRENCY = "USD";
-export const DEFAULT_CURRENCY = "USD";
 
-/**
- * A broad, practical set of ISO-4217 currency codes shown in the picker.
- * Frankfurter covers most of these; for any it doesn’t, we fall back
- * to STATIC_RATES_BY_BASE so the app still works.
- */
-export const SUPPORTED_CURRENCIES: string[] = [
-  "USD", // US Dollar - World's primary reserve currency
-  "EUR", // Euro - European Union
+/** ------------------------------------------------------------------
+ * Currency constants & types
+ * ------------------------------------------------------------------ */
+
+export const BASE_CURRENCY = "USD" as const;
+
+// Keep the list tight but practical for your market.
+// Add/remove codes here and the union type updates automatically.
+export const SUPPORTED_CURRENCIES = [
+  "USD", // US Dollar
+  "EUR", // Euro
   "GBP", // British Pound
   "JPY", // Japanese Yen
   "CNY", // Chinese Yuan
@@ -28,12 +29,17 @@ export const SUPPORTED_CURRENCIES: string[] = [
   "PHP", // Philippine Peso
   "NGN", // Nigerian Naira
   "THB", // Thai Baht
-];
+] as const;
 
-/**
- * Currency display names with symbols
- */
-export const CURRENCY_NAMES: Record<string, { name: string; symbol: string }> = {
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+
+export const DEFAULT_CURRENCY: SupportedCurrency = "USD";
+
+/** Display names & symbols (used for fallbacks / UI labels) */
+export const CURRENCY_NAMES: Record<
+  SupportedCurrency,
+  { name: string; symbol: string }
+> = {
   USD: { name: "US Dollar", symbol: "$" },
   EUR: { name: "Euro", symbol: "€" },
   GBP: { name: "British Pound", symbol: "£" },
@@ -56,17 +62,16 @@ export const CURRENCY_NAMES: Record<string, { name: string; symbol: string }> = 
   THB: { name: "Thai Baht", symbol: "฿" },
 };
 
-/**
- * Fallback static rates (rough dev values) used when the live API
- * fails or doesn’t include a given currency. Update periodically.
- * Prices in DB are stored in BASE_CURRENCY (USD).
- */
-const STATIC_RATES_BY_BASE: Record<string, Record<string, number>> = {
+/** ------------------------------------------------------------------
+ * Fallback static FX rates (rough dev values).
+ * DB prices are assumed to be stored in BASE_CURRENCY (USD).
+ * ------------------------------------------------------------------ */
+const STATIC_RATES_BY_BASE: Record<
+  SupportedCurrency,
+  Partial<Record<SupportedCurrency, number>>
+> = {
   USD: {
-    // self
     USD: 1,
-
-    // Top 20 currencies
     EUR: 0.92,
     GBP: 0.78,
     JPY: 157,
@@ -87,10 +92,15 @@ const STATIC_RATES_BY_BASE: Record<string, Record<string, number>> = {
     NGN: 1600,
     THB: 36,
   },
-};
+  // If you later store in other bases, add blocks here.
+} as const;
+
+/** ------------------------------------------------------------------
+ * Live FX fetch + cache (Frankfurter, no API key)
+ * ------------------------------------------------------------------ */
 
 type FxCache = {
-  base: string;
+  base: SupportedCurrency;
   ts: number;
   rates: Record<string, number>;
 };
@@ -101,11 +111,11 @@ declare global {
 }
 
 /**
- * Fetch FX rates for a base currency and cache them in memory for 1 hour.
+ * Fetch rates for a base currency and cache for 1 hour.
  * We MERGE fallback + live so missing currencies still convert.
  */
 export async function getFxRates(
-  base: string,
+  base: SupportedCurrency = BASE_CURRENCY,
   maxAgeMs = 60 * 60 * 1000, // 1 hour
 ): Promise<Record<string, number>> {
   const now = Date.now();
@@ -119,51 +129,51 @@ export async function getFxRates(
     return globalThis.__fxCache.rates;
   }
 
-  // Fallback map (covers currencies not always in the live API)
+  // Fallback map (covers currencies not always in live API)
   const fallback: Record<string, number> = {
     [base]: 1,
     ...(STATIC_RATES_BY_BASE[base] || {}),
   };
 
   try {
-    // Frankfurter (no API key required)
     const res = await fetch(
       `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}`,
+      // Next.js: cache on server for 1 hour
       { next: { revalidate: 3600 } },
     );
 
     if (res.ok) {
       const json: any = await res.json();
       const live: Record<string, number> = json?.rates || {};
-
-      // Merge: fallback first, then live (live wins where present)
-      const merged: Record<string, number> = { ...fallback, ...live };
+      const merged = { ...fallback, ...live };
 
       globalThis.__fxCache = { base, ts: now, rates: merged };
       return merged;
     }
   } catch {
-    // ignore; we'll return fallback below
+    // ignore; we’ll use fallback
   }
 
   globalThis.__fxCache = { base, ts: now, rates: fallback };
   return fallback;
 }
 
-/** Convert an amount from BASE_CURRENCY into target currency using rates */
+/** ------------------------------------------------------------------
+ * Conversions
+ * ------------------------------------------------------------------ */
+
 export function convertFromBase(
   amount: number,
-  targetCurrency: string,
+  targetCurrency: SupportedCurrency,
   rates: Record<string, number>,
 ): number {
   const rate = rates[targetCurrency] ?? 1;
   return round(amount * rate);
 }
 
-/** Convert an amount typed in sourceCurrency back to BASE_CURRENCY using rates */
 export function convertToBase(
   amount: number,
-  sourceCurrency: string,
+  sourceCurrency: SupportedCurrency,
   rates: Record<string, number>,
 ): number {
   const rate = rates[sourceCurrency] ?? 1;
@@ -175,107 +185,158 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * Mapping of common locales to currencies
- */
-const LOCALE_TO_CURRENCY: Record<string, string> = {
-  // Americas
-  'en-US': 'USD', 'en-CA': 'CAD', 'fr-CA': 'CAD',
-  'es-MX': 'MXN', 'pt-BR': 'BRL', 'es-AR': 'USD', // Argentina often uses USD
-  
-  // Europe
-  'en-GB': 'GBP', 'de-DE': 'EUR', 'fr-FR': 'EUR', 'es-ES': 'EUR',
-  'it-IT': 'EUR', 'nl-NL': 'EUR', 'pt-PT': 'EUR', 'de-CH': 'CHF',
-  'fr-CH': 'CHF', 'it-CH': 'CHF', 'tr-TR': 'TRY', 'ru-RU': 'RUB',
-  
-  // Asia Pacific
-  'ja-JP': 'JPY', 'ko-KR': 'KRW', 'zh-CN': 'CNY', 'zh-TW': 'USD', // Taiwan often uses USD
-  'en-AU': 'AUD', 'en-HK': 'HKD', 'en-SG': 'SGD', 'zh-SG': 'SGD',
-  'hi-IN': 'INR', 'en-IN': 'INR', 'th-TH': 'THB', 'en-PH': 'PHP',
-  'tl-PH': 'PHP', 'fil-PH': 'PHP', 'en-NG': 'NGN', 'ha-NG': 'NGN',
-  'yo-NG': 'NGN', 'en-ZA': 'ZAR'
-}
+/** ------------------------------------------------------------------
+ * Detection helpers (locale/timezone → currency)
+ * ------------------------------------------------------------------ */
 
-/**
- * Mapping of common timezones to currencies
- */
-const TIMEZONE_TO_CURRENCY: Record<string, string> = {
+const LOCALE_TO_CURRENCY: Record<string, SupportedCurrency> = {
   // Americas
-  'America/New_York': 'USD', 'America/Chicago': 'USD', 'America/Denver': 'USD',
-  'America/Los_Angeles': 'USD', 'America/Toronto': 'CAD', 'America/Vancouver': 'CAD',
-  'America/Mexico_City': 'MXN', 'America/Sao_Paulo': 'BRL', 'America/Buenos_Aires': 'USD',
-  
-  // Europe
-  'Europe/London': 'GBP', 'Europe/Berlin': 'EUR', 'Europe/Paris': 'EUR',
-  'Europe/Madrid': 'EUR', 'Europe/Rome': 'EUR', 'Europe/Amsterdam': 'EUR',
-  'Europe/Zurich': 'CHF', 'Europe/Istanbul': 'TRY', 'Europe/Moscow': 'RUB',
-  
-  // Asia Pacific
-  'Asia/Tokyo': 'JPY', 'Asia/Seoul': 'KRW', 'Asia/Shanghai': 'CNY',
-  'Asia/Hong_Kong': 'HKD', 'Asia/Singapore': 'SGD', 'Asia/Kolkata': 'INR',
-  'Asia/Bangkok': 'THB', 'Asia/Manila': 'PHP', 'Australia/Sydney': 'AUD',
-  'Australia/Melbourne': 'AUD', 'Africa/Lagos': 'NGN', 'Africa/Johannesburg': 'ZAR'
-}
+  "en-US": "USD",
+  "en-CA": "CAD",
+  "fr-CA": "CAD",
+  "es-MX": "MXN",
+  "pt-BR": "BRL",
 
-/**
- * Detect user's likely currency based on browser locale and timezone
- */
-export function detectUserCurrency(): string {
-  if (typeof window === 'undefined') return DEFAULT_CURRENCY
-  
+  // Europe
+  "en-GB": "GBP",
+  "de-DE": "EUR",
+  "fr-FR": "EUR",
+  "es-ES": "EUR",
+  "it-IT": "EUR",
+  "nl-NL": "EUR",
+  "pt-PT": "EUR",
+  "de-CH": "CHF",
+  "fr-CH": "CHF",
+  "it-CH": "CHF",
+  "tr-TR": "TRY",
+  "ru-RU": "RUB",
+
+  // Asia Pacific
+  "ja-JP": "JPY",
+  "ko-KR": "KRW",
+  "zh-CN": "CNY",
+  "en-AU": "AUD",
+  "en-HK": "HKD",
+  "en-SG": "SGD",
+  "zh-SG": "SGD",
+  "hi-IN": "INR",
+  "en-IN": "INR",
+  "th-TH": "THB",
+  "en-PH": "PHP",
+  "tl-PH": "PHP",
+  "fil-PH": "PHP",
+
+  // Africa
+  "en-NG": "NGN",
+  "ha-NG": "NGN",
+  "yo-NG": "NGN",
+  "en-ZA": "ZAR",
+};
+
+const TIMEZONE_TO_CURRENCY: Record<string, SupportedCurrency> = {
+  // Americas
+  "America/New_York": "USD",
+  "America/Chicago": "USD",
+  "America/Denver": "USD",
+  "America/Los_Angeles": "USD",
+  "America/Toronto": "CAD",
+  "America/Vancouver": "CAD",
+  "America/Mexico_City": "MXN",
+  "America/Sao_Paulo": "BRL",
+
+  // Europe
+  "Europe/London": "GBP",
+  "Europe/Berlin": "EUR",
+  "Europe/Paris": "EUR",
+  "Europe/Madrid": "EUR",
+  "Europe/Rome": "EUR",
+  "Europe/Amsterdam": "EUR",
+  "Europe/Zurich": "CHF",
+  "Europe/Istanbul": "TRY",
+  "Europe/Moscow": "RUB",
+
+  // Asia Pacific
+  "Asia/Tokyo": "JPY",
+  "Asia/Seoul": "KRW",
+  "Asia/Shanghai": "CNY",
+  "Asia/Hong_Kong": "HKD",
+  "Asia/Singapore": "SGD",
+  "Asia/Kolkata": "INR",
+  "Asia/Bangkok": "THB",
+  "Asia/Manila": "PHP",
+  "Australia/Sydney": "AUD",
+  "Australia/Melbourne": "AUD",
+
+  // Africa
+  "Africa/Lagos": "NGN",
+  "Africa/Johannesburg": "ZAR",
+};
+
+/** Detect likely currency from browser locale/timezone (client only). */
+export function detectUserCurrency(): SupportedCurrency {
+  if (typeof window === "undefined") return DEFAULT_CURRENCY;
+
   try {
-    // Try locale first (more specific)
-    const locale = navigator.language || navigator.languages?.[0]
+    const locale = navigator.language || navigator.languages?.[0];
+
     if (locale && LOCALE_TO_CURRENCY[locale]) {
-      const currency = LOCALE_TO_CURRENCY[locale]
-      if (SUPPORTED_CURRENCIES.includes(currency)) {
-        return currency
-      }
+      const cur = LOCALE_TO_CURRENCY[locale];
+      if (SUPPORTED_CURRENCIES.includes(cur)) return cur;
     }
-    
-    // Try broader locale (e.g., 'en-US' -> 'en')
+
     if (locale) {
-      const baseLocale = locale.split('-')[0]
-      for (const [key, currency] of Object.entries(LOCALE_TO_CURRENCY)) {
-        if (key.startsWith(baseLocale + '-') && SUPPORTED_CURRENCIES.includes(currency)) {
-          return currency
+      const base = locale.split("-")[0];
+      // try to match 'en-*' etc
+      for (const [k, cur] of Object.entries(LOCALE_TO_CURRENCY)) {
+        if (k.startsWith(`${base}-`) && SUPPORTED_CURRENCIES.includes(cur)) {
+          return cur;
         }
       }
     }
-    
-    // Fall back to timezone
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    if (timezone && TIMEZONE_TO_CURRENCY[timezone]) {
-      const currency = TIMEZONE_TO_CURRENCY[timezone]
-      if (SUPPORTED_CURRENCIES.includes(currency)) {
-        return currency
-      }
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz && TIMEZONE_TO_CURRENCY[tz]) {
+      const cur = TIMEZONE_TO_CURRENCY[tz];
+      if (SUPPORTED_CURRENCIES.includes(cur)) return cur;
     }
-    
-    // Try to match timezone region
-    if (timezone) {
-      const region = timezone.split('/')[0]
-      if (region === 'America') return 'USD'
-      if (region === 'Europe') return 'EUR'
-      if (region === 'Asia') return 'CNY'
-      if (region === 'Australia') return 'AUD'
-      if (region === 'Africa') return 'ZAR'
+
+    if (tz) {
+      const region = tz.split("/")[0];
+      if (region === "America") return "USD";
+      if (region === "Europe") return "EUR";
+      if (region === "Asia") return "CNY";
+      if (region === "Australia") return "AUD";
+      if (region === "Africa") return "ZAR";
     }
-    
-  } catch (error) {
-    console.warn('Currency detection failed:', error)
+  } catch {
+    // ignore
   }
-  
-  return DEFAULT_CURRENCY
+
+  return DEFAULT_CURRENCY;
 }
 
-/**
- * Format a money amount with currency symbol and locale
- */
-export function formatMoney(amount: number, currency = 'USD', locale = 'en-US') {
+/** ------------------------------------------------------------------
+ * Single money formatter (used everywhere in UI)
+ * ------------------------------------------------------------------ */
+
+export function formatMoney(
+  amount: number | string,
+  currency: SupportedCurrency = DEFAULT_CURRENCY,
+  locale = "en-US",
+) {
+  const n = typeof amount === "string" ? Number(amount) : amount;
+  if (Number.isNaN(n)) return String(amount);
+
   try {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+    }).format(n);
   } catch {
-    return `$${amount.toFixed(2)}`;
+    // Fallback if Intl rejects a combo; use symbol map.
+    const symbol = CURRENCY_NAMES[currency]?.symbol ?? "$";
+    const value =
+      typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : String(n);
+    return `${symbol}${value}`;
   }
 }
