@@ -20,4 +20,22 @@ export const dict = {
   giftSets: "礼品套装",
   onSale: "特卖",
   "auth.signin": "登录",
+  
+  // nav keys with namespace
+  "nav.stores": "店铺",
+  "nav.brands": "品牌",
+  "nav.live": "直播",
+  "nav.onSale": "特卖",
+  "nav.learn": "学习",
+  "nav.home": "首页",
+  "nav.premium": "高级",
+  "nav.luxury": "奢华",
+  "nav.collections": "系列",
+  "nav.smartDevices": "智能设备",
+  "nav.giftSets": "礼品套装",
+  "nav.signIn": "登录",
+  
+  // search keys
+  "search.placeholder": "搜索产品...",
+  "search.aria": "搜索产品",
 };

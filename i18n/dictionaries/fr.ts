@@ -22,4 +22,22 @@ export const dict = {
   onSale: "En promotion",
   
   "auth.signin": "Se connecter",
+  
+  // nav keys with namespace
+  "nav.stores": "Boutiques",
+  "nav.brands": "Marques",
+  "nav.live": "En direct",
+  "nav.onSale": "En promotion",
+  "nav.learn": "Apprendre",
+  "nav.home": "Accueil",
+  "nav.premium": "Premium",
+  "nav.luxury": "Luxe",
+  "nav.collections": "Collections",
+  "nav.smartDevices": "Appareils intelligents",
+  "nav.giftSets": "Coffrets cadeaux",
+  "nav.signIn": "Se connecter",
+  
+  // search keys
+  "search.placeholder": "Rechercher des produits...",
+  "search.aria": "Rechercher des produits",
 };

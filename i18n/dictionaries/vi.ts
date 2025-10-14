@@ -20,4 +20,22 @@ export const dict = {
   giftSets: "Bộ quà tặng",
   onSale: "Giảm giá",
   "auth.signin": "Đăng nhập",
+  
+  // nav keys with namespace
+  "nav.stores": "Cửa hàng",
+  "nav.brands": "Thương hiệu",
+  "nav.live": "Trực tiếp",
+  "nav.onSale": "Giảm giá",
+  "nav.learn": "Học hỏi",
+  "nav.home": "Trang chủ",
+  "nav.premium": "Cao cấp",
+  "nav.luxury": "Sang trọng",
+  "nav.collections": "Bộ sưu tập",
+  "nav.smartDevices": "Thiết bị thông minh",
+  "nav.giftSets": "Bộ quà tặng",
+  "nav.signIn": "Đăng nhập",
+  
+  // search keys
+  "search.placeholder": "Tìm kiếm sản phẩm...",
+  "search.aria": "Tìm kiếm sản phẩm",
 };

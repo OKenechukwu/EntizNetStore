@@ -24,4 +24,22 @@ export const dict = {
 
   // scoped key variant used by <T k="auth.signin" />
   "auth.signin": "Sign in",
+  
+  // nav keys with namespace
+  "nav.stores": "Stores",
+  "nav.brands": "Brands",
+  "nav.live": "Live",
+  "nav.onSale": "On Sale",
+  "nav.learn": "Learn",
+  "nav.home": "Home",
+  "nav.premium": "Premium",
+  "nav.luxury": "Luxury",
+  "nav.collections": "Collections",
+  "nav.smartDevices": "Smart Devices",
+  "nav.giftSets": "Gift Sets",
+  "nav.signIn": "Sign in",
+  
+  // search keys
+  "search.placeholder": "Search products...",
+  "search.aria": "Search products",
 };
