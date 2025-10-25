@@ -1,21 +1,54 @@
 // components/layout/Header.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShoppingCart, Bell, Search, Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShoppingCart, Bell, Menu, X } from "lucide-react";
 import { T, useI18n } from "@/components/i18n/I18nProvider";
 import LanguageCurrencySwitcher from "@/components/i18n/LanguageCurrencySwitcher";
 import ProfileIconClient from "./ProfileIconClient";
+import GlobalSearch from "@/components/search/GlobalSearch";
+
+/**
+ * Auth presence detector...
+ */
+function useAuthPresence() {
+  const [isAuthed, setIsAuthed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hasNextAuthCookie =
+      /(?:^|;\s*)(?:__Secure-next-auth\.session-token|next-auth\.session-token)=/.test(
+        document.cookie,
+      );
+    const hasSupabaseCookie = /(?:^|;\s*)(sb-[^=]+)=/.test(document.cookie);
+    const hasSupabaseLS =
+      Object.keys(localStorage || {}).some(
+        (k) => /^sb-.+-auth-token$/.test(k) || k === "supabase.auth.token",
+      ) && !!Object.values(localStorage || {}).length;
+
+    setIsAuthed(
+      Boolean(hasNextAuthCookie || hasSupabaseCookie || hasSupabaseLS),
+    );
+  }, []);
+
+  return isAuthed;
+}
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const { t } = useI18n();
+  const router = useRouter();
+  const isAuthed = useAuthPresence();
+
+  const goProfile = () => {
+    router.push(isAuthed ? "/account" : "/auth/sign-in");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-md">
-      {/* TopBar - Logo, Links, Search, Language, Icons */}
       <div className="w-full px-4 py-3 md:px-8">
         <div className="flex items-center gap-4">
           {/* Logo */}
@@ -26,71 +59,73 @@ export default function Header() {
           >
             <span className="text-xl md:text-2xl font-extrabold">
               EntizNet
-              <span className="text-brand-secondary">Store</span>
+              <span className="text-brand-secondary">
+                <T k="common.store" fallback="Store" />
+              </span>
             </span>
           </Link>
 
-          {/* TopBar Links - Desktop Only */}
+          {/* TopBar Links */}
           <nav className="hidden lg:flex items-center gap-1">
             <Link
               href="/stores"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="nav.stores" />
+              <T k="nav.stores" fallback="Stores" />
             </Link>
             <Link
               href="/brands"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="nav.brands" />
+              <T k="nav.brands" fallback="Brands" />
             </Link>
             <Link
               href="/live"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="nav.live" />
+              <T k="nav.live" fallback="Live" />
             </Link>
             <Link
               href="/on-sale"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="nav.onSale" />
+              <T k="nav.onSale" fallback="On Sale" />
             </Link>
             <Link
               href="/learn"
               className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
             >
-              <T k="nav.learn" />
+              <T k="nav.learn" fallback="Learn" />
             </Link>
           </nav>
 
-          {/* Search Bar - Compact */}
+          {/* Search */}
           <div className="hidden md:flex flex-1 max-w-[520px] lg:max-w-[520px]">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
-              <input
-                type="search"
-                placeholder={t("search.placeholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-foreground/50 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/20"
-                aria-label={t("search.aria")}
-              />
-            </div>
+            <GlobalSearch />
           </div>
 
-          {/* Right: Language + Icons */}
+          {/* Right Icons */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
-            <LanguageCurrencySwitcher className="ml-2" />
+            <span suppressHydrationWarning>
+              <LanguageCurrencySwitcher className="ml-2" />
+            </span>
 
             <Link
               href="/auth?mode=signin"
               className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
             >
-              <T k="nav.signIn" />
+              <T k="nav.signIn" fallback="Sign in" />
             </Link>
 
-            <ProfileIconClient />
+            {/* ✅ FIXED: Profile icon wrapped in <div> instead of <button> */}
+            <div
+              onClick={goProfile}
+              role="button"
+              aria-label="Profile"
+              className="cursor-pointer rounded-lg p-2 text-foreground/90 transition hover:bg-white/10"
+            >
+              <ProfileIconClient />
+            </div>
 
             <Link
               href="/cart"
@@ -99,7 +134,6 @@ export default function Header() {
             >
               <ShoppingCart className="h-5 w-5" />
             </Link>
-
             <Link
               href="/notifications"
               className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
@@ -109,7 +143,7 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Toggle */}
           <button
             className="ml-auto rounded-lg p-2 text-foreground md:hidden"
             aria-label="Toggle menu"
@@ -124,77 +158,53 @@ export default function Header() {
         </div>
       </div>
 
-      {/* MainNav - Category Tabs */}
+      {/* Nav Tabs */}
       <div className="hidden md:flex w-full items-center justify-center gap-6 border-t border-white/10 bg-background/70 px-4 py-2.5">
-        <Link
-          href="/"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
-        >
-          <T k="nav.home" />
-        </Link>
-        <Link
-          href="/premium"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
-        >
-          <T k="nav.premium" />
-        </Link>
-        <Link
-          href="/luxury"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:text-brand-secondary"
-        >
-          <T k="nav.luxury" />
-        </Link>
-        <Link
-          href="/collections"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
-        >
-          <T k="nav.collections" />
-        </Link>
-        <Link
-          href="/smart-devices"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
-        >
-          <T k="nav.smartDevices" />
-        </Link>
-        <Link
-          href="/gift-sets"
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
-        >
-          <T k="nav.giftSets" />
-        </Link>
+        {[
+          ["nav.home", "Home", "/"],
+          ["nav.premium", "Premium", "/premium"],
+          ["nav.luxury", "Luxury", "/luxury"],
+          ["nav.collections", "Collections", "/collections"],
+          ["nav.smartDevices", "Smart Devices", "/smart-devices"],
+          ["nav.giftSets", "Gift Sets", "/gift-sets"],
+        ].map(([key, fallback, href]) => (
+          <Link
+            key={href}
+            href={href}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
+          >
+            <T k={key} fallback={fallback} />
+          </Link>
+        ))}
       </div>
 
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-white/10 bg-background/95">
           <div className="px-4 py-4 space-y-4">
-            {/* Mobile Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50" />
-              <input
-                type="search"
-                placeholder={t("search.placeholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-foreground/50 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/20"
-                aria-label={t("search.aria")}
-              />
-            </div>
+            <GlobalSearch />
 
-            {/* Mobile Navigation */}
             <div className="flex flex-col gap-2">
               {[
-                { href: "/", labelKey: "nav.home" },
-                { href: "/premium", labelKey: "nav.premium" },
-                { href: "/luxury", labelKey: "nav.luxury" },
-                { href: "/collections", labelKey: "nav.collections" },
-                { href: "/smart-devices", labelKey: "nav.smartDevices" },
-                { href: "/gift-sets", labelKey: "nav.giftSets" },
-                { href: "/stores", labelKey: "nav.stores" },
-                { href: "/brands", labelKey: "nav.brands" },
-                { href: "/live", labelKey: "nav.live" },
-                { href: "/on-sale", labelKey: "nav.onSale" },
-                { href: "/learn", labelKey: "nav.learn" },
+                { href: "/", key: "nav.home", fb: "Home" },
+                { href: "/premium", key: "nav.premium", fb: "Premium" },
+                { href: "/luxury", key: "nav.luxury", fb: "Luxury" },
+                {
+                  href: "/collections",
+                  key: "nav.collections",
+                  fb: "Collections",
+                },
+                {
+                  href: "/smart-devices",
+                  key: "nav.smartDevices",
+                  fb: "Smart Devices",
+                },
+                { href: "/gift-sets", key: "nav.giftSets", fb: "Gift Sets" },
+                { href: "/stores", key: "nav.stores", fb: "Stores" },
+                { href: "/brands", key: "nav.brands", fb: "Brands" },
+                { href: "/live", key: "nav.live", fb: "Live" },
+                { href: "/on-sale", key: "nav.onSale", fb: "On Sale" },
+                { href: "/learn", key: "nav.learn", fb: "Learn" },
               ].map((link) => (
                 <Link
                   key={link.href}
@@ -202,20 +212,33 @@ export default function Header() {
                   className="rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10"
                   onClick={() => setMobileOpen(false)}
                 >
-                  <T k={link.labelKey} />
+                  <T k={link.key} fallback={link.fb} />
                 </Link>
               ))}
             </div>
 
-            {/* Mobile Actions */}
             <div className="flex items-center gap-2 pt-2">
-              <LanguageCurrencySwitcher className="ml-2" />
+              <span suppressHydrationWarning>
+                <LanguageCurrencySwitcher className="ml-2" />
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  goProfile();
+                }}
+                className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"
+              >
+                <T k="nav.profile" fallback="Profile" />
+              </button>
+
               <Link
                 href="/auth?mode=signin"
-                className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"
+                className="flex-1 rounded-lg bg-white/5 px-4 py-2.5 text-center text-sm font-semibold text-foreground transition hover:bg-white/10"
                 onClick={() => setMobileOpen(false)}
               >
-                <T k="nav.signIn" />
+                <T k="nav.signIn" fallback="Sign in" />
               </Link>
             </div>
           </div>

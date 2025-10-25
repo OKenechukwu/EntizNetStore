@@ -1,0 +1,222 @@
+Replit Agent Prompt — EntizNetStore i18n & Currency Hotfix (NO UI CHANGES)
+
+Project: EntizNetStore (Next.js App Router + Supabase + Tailwind + shadcn + Lucide)
+Non-negotiable: Do NOT change any visuals, markup structure, classes, or layout. Fix logic only. Keep the current header design exactly as it is.
+
+Goals
+
+Decouple language & currency:
+
+Changing language must not change currency or prices.
+
+Changing currency must update prices everywhere (home, categories, subcategories, product page, cart/checkout).
+
+Make currency state global & consistent across SSR + CSR so a full refresh preserves the selected currency.
+
+Fix search suggestions in the top bar search (the dropdown stopped appearing after we reverted header code). Restore previous behavior without altering layout.
+
+Current Symptoms (replicate before fixing)
+
+Switching language (e.g., EN → FR or ZH) unexpectedly changes the currency to CNY and alters price amounts.
+
+On category/subcategory pages and product detail, currency switch doesn’t re-render prices (works on Home only).
+
+Search suggestions no longer appear in the header search.
+
+Architecture Rules (do exactly this)
+
+Create/confirm a centralized currency store:
+
+File: components/BrandProvider.tsx (or create components/currency/CurrencyProvider.tsx if cleaner).
+
+Expose a context/hook:
+
+type CurrencyCode = "USD" | "EUR" | "GBP" | "CAD" | "JPY" | "CNY" | ...; // already defined in lib/currency
+interface CurrencyState { currency: CurrencyCode; rates: Record<string, number>; lastUpdated?: number; }
+
+
+API:
+
+const { currency, setCurrency, rates, refreshRates } = useCurrency();
+
+
+Persist currency in a cookie (e.g., entiz_currency) and read it during SSR to avoid hydration mismatch.
+
+Never auto-map locale → currency.
+Remove/disable any code that sets currency from locale or language. Language affects translations only; not currency.
+
+Rates loading & caching:
+
+Use the existing helpers: getFxRates, convertFromBase, DEFAULT_CURRENCY, BASE_CURRENCY from @/lib/currency.
+
+Load rates once on app start (client) and re-use; add a 12h stale threshold.
+
+If API fails, gracefully fall back to BASE_CURRENCY with rate = 1.
+
+Server/Client consistency:
+
+SSR: Read entiz_currency and i18n_locale cookies in app/layout.tsx (server component) and pass as initial props to the provider to avoid hydration issues.
+
+CSR: LanguageCurrencySwitcher must dispatch two independent actions:
+
+setLocale(newLocale) (i18n only)
+
+setCurrency(newCurrency) (when the user explicitly chooses a currency)
+
+Changing locale must not call setCurrency anywhere.
+
+Price rendering (critical):
+
+Audit all components that show prices. They must derive displayed value at render using currency + rates. No memoization that ignores currency.
+
+Files to check and update:
+
+components/home/FeaturedSection.tsx
+
+components/home/HomeFeaturedDemo.tsx
+
+components/home/CategoriesRow.tsx (if it shows price chips)
+
+app/products/[slug]/page.tsx
+
+components/product/ProductCard.tsx
+
+components/product/ProductPrice.tsx
+
+components/cart/CartSummary.tsx
+
+components/cart/CartItemRow.tsx
+
+components/checkout/OrderSummary.tsx
+
+Any other formatPrice(...) usage
+
+Ensure:
+
+const { currency, rates } = useCurrency();
+const display = formatPrice(convertFromBase(priceInBase, currency, rates), currency);
+
+
+Recompute whenever currency changes.
+
+Search suggestions fix (header):
+
+Do not change header layout.
+
+Ensure the search input in components/layout/Header.tsx calls a single shared suggest hook or component.
+
+Expected API: GET /api/search/suggest?q=... (or whatever exists in the repo). If missing, create a simple route that returns top 8 matches from products by title LIKE $q%.
+
+Restore the dropdown list with keyboard navigation (↑/↓/Enter, Escape to close) without altering markup spacing. Use position: absolute panel inside the search wrapper, same dimensions as before.
+
+Concrete Tasks
+
+Provider setup
+
+If currency provider doesn’t exist, create components/currency/CurrencyProvider.tsx and wrap in app/layout.tsx.
+
+Persist/read entiz_currency cookie on set/get.
+
+LanguageCurrencySwitcher
+
+Split handlers:
+
+onLocaleChange(locale) → update i18n only; set cookie i18n_locale.
+
+onCurrencyChange(currency) → call setCurrency(currency); set cookie entiz_currency.
+
+Confirm there is no code path that changes currency when locale changes.
+
+SSR hydration parity
+
+In app/layout.tsx (server), read both cookies and pass {initialCurrency, initialLocale} into providers.
+
+Remove any client-side “auto-detect currency from locale” logic.
+
+Price usage audit
+
+Replace any precomputed or memoized price displays that don’t depend on currency.
+
+Ensure all price components pull from the currency context and recompute on change.
+
+Search suggestions
+
+Re-enable the suggest component used previously (check git history if needed).
+
+Confirm the dropdown renders under the input without shifting layout.
+
+Debounce input (200–300ms), cancel stale requests, handle empty query.
+
+Testing hooks
+
+Add a lightweight useCurrencyEffectDebug (development only) that logs re-renders when currency changes to easily spot stale components.
+
+Acceptance Tests (must pass)
+
+A. Language/Currency independence
+
+Set currency to USD. Switch language EN → FR → ZH → EN.
+
+✅ Currency stays USD; prices unchanged aside from number formatting.
+
+Set language to FR. Switch currency USD → EUR → CAD → JPY.
+
+✅ Prices update everywhere (Home, category, subcategory, product, cart, checkout).
+
+B. Persistence
+3. Select currency CAD, reload the page (hard refresh).
+
+✅ Still CAD; all pages show CAD prices without flicker/mismatch.
+
+Navigate across routes (Home → Category → Subcategory → Product → Cart → Checkout).
+
+✅ Currency remains consistent; amounts correct.
+
+C. Edge cases
+5. If FX API fails, fallback shows base currency with clear internal log (no UI error).
+6. Switching language never swaps currency to CNY (or anything else) unless user picks it.
+
+D. Search suggestions
+7. Typing in the header search shows the suggestions dropdown (previous styling, same placement).
+
+✅ Keyboard navigation and Enter to submit works.
+
+✅ No layout shift.
+
+Files Likely to Touch (logic only; DO NOT restyle)
+
+app/layout.tsx (read cookies, pass initial props)
+
+components/BrandProvider.tsx or components/currency/CurrencyProvider.tsx (create/store currency state)
+
+components/i18n/I18nProvider.tsx (ensure independent from currency)
+
+components/i18n/LanguageCurrencySwitcher.tsx (split handlers)
+
+@/lib/currency.ts (confirm helpers; no breaking changes)
+
+Price display components listed above
+
+components/layout/Header.tsx (wire search suggest only; keep markup)
+
+/api/search/suggest/route.ts (if missing or broken)
+
+Safeguards
+
+No CSS class changes, no new wrappers that affect spacing, no markup restructuring in header or navs.
+
+If you must add elements (e.g., for suggestion list), use absolutely positioned containers within existing wrappers, matching the previous z-index behavior.
+
+Keep all TypeScript types strict. No any.
+
+Dev Notes / Commands
+
+Run app and test: pnpm dev
+
+Optional quick grep to find raw text in JSX (avoid):
+grep -R --line-number --ignore-case -E ">[[:alpha:]][[:alnum:] ,&’'\\\-!?:;./()]+<" app components
+
+Commit with message:
+feat(currency,i18n,search): decouple locale/currency, global currency provider + SSR cookies, restore header suggestions
+
+Deliver when all acceptance tests pass. If something requires UI changes to function, STOP and open a note explaining why; otherwise do not alter visuals.

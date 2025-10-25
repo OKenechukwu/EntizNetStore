@@ -6,6 +6,9 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import ConversationList from './ConversationList'
 import ChatWindow from './ChatWindow'
 
+// ✅ Import our DeepL translate helper
+import { translate } from '@/lib/i18n/translate'
+
 interface MessageCenterProps {
   currentUserId: string
   userType: 'buyer' | 'seller'
@@ -18,10 +21,19 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseClient()
 
+  // Detect user's browser language as source language
+  const sourceLang =
+    (typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en') || 'en'
+
+  // Helper to get recipient's language
+  const getRecipientLang = (conv: any) => {
+    return conv?.partner_lang || conv?.otherUser?.lang || 'en'
+  }
+
   useEffect(() => {
     loadConversations()
-    
-    // Set up real-time subscription for new messages
+
+    // Realtime updates
     const channel = supabase.channel('conversations')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'conversations' },
@@ -58,19 +70,20 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
 
       if (error) throw error
 
-      // Process conversations to include latest message and unread count
-      const processedConversations = data?.map(conv => {
-        const latestMessage = conv.messages?.[conv.messages.length - 1]
-        const unreadCount = conv.messages?.filter(
-          (msg: any) => msg.sender_id !== currentUserId && !msg.is_read
-        ).length || 0
+      const processedConversations =
+        data?.map((conv) => {
+          const latestMessage = conv.messages?.[conv.messages.length - 1]
+          const unreadCount =
+            conv.messages?.filter(
+              (msg: any) => msg.sender_id !== currentUserId && !msg.is_read
+            ).length || 0
 
-        return {
-          ...conv,
-          latestMessage,
-          unreadCount
-        }
-      }) || []
+          return {
+            ...conv,
+            latestMessage,
+            unreadCount
+          }
+        }) || []
 
       setConversations(processedConversations)
     } catch (error) {
@@ -90,7 +103,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
 
       if (error) throw error
 
-      setActiveConversation(prev => ({
+      setActiveConversation((prev) => ({
         ...prev,
         messages: data || []
       }))
@@ -101,29 +114,44 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         .update({ is_read: true })
         .eq('conversation_id', conversationId)
         .neq('sender_id', currentUserId)
-
     } catch (error) {
       console.error('Error loading messages:', error)
     }
   }
 
+  // ✅ Updated sendMessage with DeepL translation
   const sendMessage = async (content: string, attachments: string[] = []) => {
     if (!activeConversation || !content.trim()) return
 
     try {
+      const targetLang = getRecipientLang(activeConversation)
+      let translatedText = content.trim()
+
+      // Translate only if languages differ
+      if (targetLang && targetLang !== sourceLang) {
+        try {
+          const res = await translate(content.trim(), targetLang, { sourceLang, formality: 'default' })
+          translatedText = res
+        } catch (err) {
+          console.error('Translation failed, fallback to original:', err)
+        }
+      }
+
       const { error } = await supabase
         .from('messages')
         .insert({
           conversation_id: activeConversation.id,
           sender_id: currentUserId,
-          content: content.trim(),
+          content: translatedText,
           attachments: attachments,
-          is_read: false
+          is_read: false,
+          original_text: content.trim(), // store original too if desired
+          source_lang: sourceLang,
+          target_lang: targetLang
         })
 
       if (error) throw error
 
-      // Update conversation last_message_at
       await supabase
         .from('conversations')
         .update({ 
@@ -132,9 +160,8 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         })
         .eq('id', activeConversation.id)
 
-      // Reload messages
       loadMessages(activeConversation.id)
-      
+
     } catch (error) {
       console.error('Error sending message:', error)
     }
@@ -158,7 +185,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
 
       await loadConversations()
       setActiveConversation(data)
-      
+
     } catch (error) {
       console.error('Error starting conversation:', error)
     }
@@ -166,13 +193,12 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: theme.colors.background }}>
-      {/* Sidebar - Conversation List */}
+      {/* Sidebar */}
       <div className="w-80 border-r flex flex-col" 
            style={{ 
              backgroundColor: theme.colors.surface,
              borderColor: theme.colors.glass.border 
            }}>
-        {/* Header */}
         <div className="p-4 border-b" style={{ borderColor: theme.colors.glass.border }}>
           <h1 className="text-xl font-bold" style={{ color: theme.colors.text.primary }}>
             {brand === 'primediscreet' ? 'Elite Messages' : 'Messages'}
@@ -185,7 +211,6 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
           </p>
         </div>
 
-        {/* Conversation List */}
         <div className="flex-1 overflow-y-auto">
           <ConversationList 
             conversations={conversations}
@@ -198,13 +223,9 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
           />
         </div>
 
-        {/* New Conversation Button */}
         <div className="p-4 border-t" style={{ borderColor: theme.colors.glass.border }}>
           <button
-            onClick={() => {
-              // This would open a modal to start new conversation
-              // For now, just placeholder
-            }}
+            onClick={() => {}}
             className="w-full px-4 py-2 rounded-lg font-medium transition-all"
             style={{
               backgroundColor: theme.colors.accent,
@@ -216,7 +237,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main Chat */}
       <div className="flex-1 flex flex-col">
         {activeConversation ? (
           <ChatWindow 
@@ -226,7 +247,6 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
             onSendMessage={sendMessage}
           />
         ) : (
-          /* Empty State */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="text-6xl mb-4" style={{ color: theme.colors.accent }}>

@@ -1,0 +1,40 @@
+{
+  "common": { "store": "Store" },
+  "nav": {
+    "home": "Startseite",
+    "premium": "Premium",
+    "luxury": "Luxus",
+    "collections": "Kollektionen",
+    "smartDevices": "Smart-Geräte",
+    "giftSets": "Geschenksets",
+    "stores": "Shops",
+    "brands": "Marken",
+    "live": "Live",
+    "onSale": "Angebote",
+    "learn": "Ratgeber",
+    "signIn": "Anmelden",
+    "profile": "Profil"
+  },
+  "home": {
+    "welcome": "Willkommen bei EntizNet",
+    "heroSubtitle": "Entdecken Sie Premium-Intimprodukte für Genuss und Wohlbefinden.",
+    "featuredBrands": "Empfohlene Marken",
+    "featuredProducts": "Empfohlene Produkte",
+    "bestSellingProducts": "Bestseller",
+    "topSellers": "Top-Verkäufer",
+    "fromNearbySellers": "Von Händlern in Ihrer Nähe"
+  },
+  "footer": { "copyright": "Alle Rechte vorbehalten." },
+  "loading": "Wird geladen…",
+  "description": "Beschreibung",
+  "specifications": "Spezifikationen",
+  "certification": "Zertifizierung",
+  "warranty": "Garantie",
+  "expiryOn": "Ablauf am",
+  "storePolicy": "Shop-Richtlinien",
+  "escrowPolicy": "Treuhandrichtlinie",
+  "productSpecifications": "Produktspezifikationen",
+  "certificationsSafety": "Zertifizierungen & Sicherheit",
+  "warrantyInformation": "Garantieinformationen",
+  "productExpiryInformation": "Informationen zum Ablaufdatum"
+}

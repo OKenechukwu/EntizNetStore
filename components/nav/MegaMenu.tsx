@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBrand } from "@/components/BrandProvider";
 import { CATEGORIES } from "@/data/categories";
+import { T } from "@/components/i18n/I18nProvider";
 
 // === Types (keep your original props) ===
 interface MenuSection {
@@ -58,7 +59,7 @@ function normalizeCategories(
 export default function MegaMenu({
   trigger,
   sections,
-  title = "Shop by Category",
+  title,
   className = "",
   isOpen = false,
   onToggle,
@@ -168,7 +169,7 @@ export default function MegaMenu({
         role="button"
         aria-haspopup="true"
         aria-expanded={isMenuOpen}
-        aria-label={`${title} menu`}
+        aria-label={`${title || "Shop by Category"} menu`}
       >
         {trigger}
       </div>
@@ -183,7 +184,7 @@ export default function MegaMenu({
             className={containerClass}
             style={surfaceStyle}
             role="menu"
-            aria-label={`${title} navigation menu`}
+            aria-label={`${title || "Shop by Category"} navigation menu`}
           >
             <div
               className="rounded-2xl border overflow-hidden backdrop-blur-sm"
@@ -198,7 +199,11 @@ export default function MegaMenu({
                   className="text-xl font-serif font-bold"
                   style={{ color: theme.colors.text.primary }}
                 >
-                  {title}
+                  {title ? (
+                    title
+                  ) : (
+                    <T k="common.shopByCategory" fallback="Shop by Category" />
+                  )}
                 </h3>
 
                 {isMobile && onToggle && (
@@ -228,10 +233,10 @@ export default function MegaMenu({
               {/* Content */}
               <div className="p-6">
                 {sections && sections.length > 0 ? (
-                  // === Card Grid Mode (your original prop-based layout) ===
+                  // === Card Grid Mode ===
                   <CardGrid sections={sections} />
                 ) : (
-                  // === Category → Subcategory Columns (auto-wired from /data/categories) ===
+                  // === Category → Subcategory Columns ===
                   <CategoryColumns />
                 )}
 
@@ -243,7 +248,9 @@ export default function MegaMenu({
                     role="menuitem"
                     aria-label="View all product categories"
                   >
-                    <span>View All Categories</span>
+                    <span>
+                      <T k="common.viewAllCategories" fallback="View All Categories" />
+                    </span>
                     <svg
                       className="w-5 h-5"
                       fill="none"
@@ -354,7 +361,9 @@ function CardGrid({ sections }: { sections: MenuSection[] }) {
               style={{ color: theme.colors.accent }}
               aria-hidden="true"
             >
-              <span>Explore</span>
+              <span>
+                <T k="common.explore" fallback="Explore" />
+              </span>
               <svg
                 className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1"
                 fill="none"

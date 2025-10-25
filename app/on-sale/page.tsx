@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import Link from 'next/link'
-import Price from '@/components/common/Price'
+import Price from '@/components/ui/Price' // ⬅️ unified Price (symbol + conversion)
 
 interface SaleProduct {
   id: string
@@ -20,12 +20,32 @@ interface SaleProduct {
   limited_stock?: boolean
 }
 
+type FxRates = Record<string, number> | null
+
 export default function OnSalePage() {
   const { theme, brand } = useBrand()
   const [products, setProducts] = useState<SaleProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('discount')
   const [filterCategory, setFilterCategory] = useState('all')
+  const [rates, setRates] = useState<FxRates>(null) // ⬅️ FX rates for Price
+
+  // Fetch FX rates once (client-side)
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        // Adjust if your endpoint differs. Expected: { base: "USD", rates: { EUR: 0.93, ... } }
+        const res = await fetch('/api/currency/rates?base=USD', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Failed to fetch rates')
+        const json = await res.json()
+        if (mounted) setRates(json?.rates ?? null)
+      } catch {
+        if (mounted) setRates(null) // Price will still show symbol without conversion
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
 
   useEffect(() => {
     loadSaleProducts()
@@ -229,14 +249,16 @@ export default function OnSalePage() {
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-lg" style={{ color: theme.colors.accent }}>
-              <Price amount={product.base_price} />
+              {/* Was: <Price amount={product.base_price} /> */}
+              <Price amountUSD={Number(product.base_price)} rates={rates ?? undefined} />
             </span>
             <span className="text-sm line-through" style={{ color: theme.colors.text.secondary }}>
-              <Price amount={product.compare_at_price} />
+              {/* Was: <Price amount={product.compare_at_price} /> */}
+              <Price amountUSD={Number(product.compare_at_price)} rates={rates ?? undefined} />
             </span>
           </div>
           <p className="text-xs font-medium text-green-600">
-            You save <Price amount={product.compare_at_price - product.base_price} />!
+            You save <Price amountUSD={Number(product.compare_at_price - product.base_price)} rates={rates ?? undefined} />!
           </p>
         </div>
 

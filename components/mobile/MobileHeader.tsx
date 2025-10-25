@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { useAuth } from '@/components/AuthProvider'
 import Link from 'next/link'
+import { T } from '@/components/i18n/I18nProvider'
 
 interface MobileHeaderProps {
   title?: string
@@ -25,11 +26,8 @@ export default function MobileHeader({
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   const handleBackClick = () => {
-    if (onBackClick) {
-      onBackClick()
-    } else {
-      window.history.back()
-    }
+    if (onBackClick) onBackClick()
+    else window.history.back()
   }
 
   const menuItems = [
@@ -54,12 +52,12 @@ export default function MobileHeader({
       <header 
         className={`sticky top-0 z-40 backdrop-blur-md border-b ${className}`}
         style={{
-          backgroundColor: `${theme.colors.surface}F0`, // 94% opacity
+          backgroundColor: `${theme.colors.surface}F0`,
           borderBottomColor: theme.colors.glass.border
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
-          
+
           {/* Left Section */}
           <div className="flex items-center gap-3">
             {showBack && (
@@ -67,11 +65,12 @@ export default function MobileHeader({
                 onClick={handleBackClick}
                 className="p-2 -ml-2 transition-colors active:scale-95"
                 style={{ color: theme.colors.text.primary }}
+                aria-label="Go back"
               >
                 <span className="text-xl">←</span>
               </button>
             )}
-            
+
             {/* Title or Logo */}
             {title ? (
               <h1 className="text-lg font-semibold truncate" style={{ color: theme.colors.text.primary }}>
@@ -105,6 +104,7 @@ export default function MobileHeader({
                 backgroundColor: theme.colors.background,
                 color: theme.colors.text.secondary 
               }}
+              aria-label="Toggle brand"
             >
               <span className="text-sm">
                 {brand === 'primediscreet' ? '💎' : '✨'}
@@ -117,6 +117,7 @@ export default function MobileHeader({
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="p-2 transition-colors active:scale-95"
                 style={{ color: theme.colors.text.primary }}
+                aria-label="Open menu"
               >
                 <span className="text-xl">☰</span>
               </button>
@@ -133,7 +134,7 @@ export default function MobileHeader({
             className="absolute inset-0 bg-black bg-opacity-50"
             onClick={() => setShowMobileMenu(false)}
           />
-          
+
           {/* Menu Panel */}
           <div 
             className="absolute top-0 right-0 h-full w-80 max-w-[85vw] border-l shadow-xl"
@@ -162,11 +163,12 @@ export default function MobileHeader({
                   </p>
                 </div>
               </div>
-              
+
               <button
                 onClick={() => setShowMobileMenu(false)}
                 className="p-2 transition-colors"
                 style={{ color: theme.colors.text.secondary }}
+                aria-label="Close menu"
               >
                 ✕
               </button>
@@ -190,7 +192,7 @@ export default function MobileHeader({
                     <span className="font-medium">{item.label}</span>
                   </Link>
                 ))}
-                
+
                 {/* Sign Out */}
                 {user && (
                   <button
@@ -202,7 +204,9 @@ export default function MobileHeader({
                     style={{ color: '#ef4444' }}
                   >
                     <span className="text-xl">🚪</span>
-                    <span className="font-medium">Sign Out</span>
+                    <span className="font-medium">
+                      <T k="auth.signOut" fallback="Sign Out" />
+                    </span>
                   </button>
                 )}
               </nav>

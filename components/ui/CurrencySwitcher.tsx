@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useBrand } from '@/components/BrandProvider'
+import { T } from '@/components/i18n/I18nProvider'
 
 interface Currency {
   code: string
@@ -60,21 +61,15 @@ export default function CurrencySwitcher({
   // Load exchange rates (mock implementation)
   const loadExchangeRates = async () => {
     setIsLoadingRates(true)
-    
-    // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Mock exchange rates (in a real app, this would come from an API like exchangerate-api.com)
     const mockRates = currencies.reduce((acc, currency) => {
-      acc[currency.code] = currency.rate + (Math.random() - 0.5) * 0.02 // Small random fluctuation
+      acc[currency.code] = currency.rate + (Math.random() - 0.5) * 0.02
       return acc
     }, {} as Record<string, number>)
-    
     setExchangeRates(mockRates)
     setIsLoadingRates(false)
   }
 
-  // Load rates when component mounts
   useEffect(() => {
     loadExchangeRates()
   }, [])
@@ -82,26 +77,14 @@ export default function CurrencySwitcher({
   const handleCurrencySelect = (currencyCode: string) => {
     setSelectedCurrency(currencyCode)
     setIsOpen(false)
-    
-    // Call external handler if provided
-    if (onCurrencyChange) {
-      onCurrencyChange(currencyCode)
-    }
-    
-    // Store in localStorage
+    onCurrencyChange?.(currencyCode)
     if (typeof window !== 'undefined') {
       localStorage.setItem('entiznet-currency', currencyCode)
     }
-    
-    console.log(`Currency changed to: ${currencyCode}`)
   }
 
   const formatExchangeRate = (rate: number) => {
-    if (rate >= 1) {
-      return rate.toFixed(2)
-    } else {
-      return rate.toFixed(4)
-    }
+    return rate >= 1 ? rate.toFixed(2) : rate.toFixed(4)
   }
 
   return (
@@ -155,7 +138,7 @@ export default function CurrencySwitcher({
                  style={{ borderColor: theme.colors.glass.border }}>
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold" style={{ color: theme.colors.text.primary }}>
-                  Select Currency
+                  <T k="common.selectCurrency" fallback="Select Currency" />
                 </h3>
                 <button
                   onClick={loadExchangeRates}
@@ -165,10 +148,10 @@ export default function CurrencySwitcher({
                   {isLoadingRates ? (
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
-                      <span>Updating</span>
+                      <span><T k="common.updating" fallback="Updating" /></span>
                     </div>
                   ) : (
-                    'Refresh Rates'
+                    <T k="common.refreshRates" fallback="Refresh Rates" />
                   )}
                 </button>
               </div>
@@ -191,7 +174,7 @@ export default function CurrencySwitcher({
                   >
                     {/* Flag */}
                     <span className="text-xl">{currency.flag}</span>
-                    
+
                     {/* Currency Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
@@ -227,7 +210,7 @@ export default function CurrencySwitcher({
             <div className="px-4 py-3 border-t text-center"
                  style={{ borderColor: theme.colors.glass.border }}>
               <p className="text-xs" style={{ color: theme.colors.text.secondary }}>
-                Rates updated in real-time • Powered by live exchange data
+                <T k="common.ratesPowered" fallback="Rates updated in real-time • Powered by live exchange data" />
               </p>
             </div>
           </motion.div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { getSupabaseClient } from '@/lib/supabase/client'
+import { T, useI18n } from '@/components/i18n/I18nProvider'
 
 interface AdvancedSearchProps {
   onResults?: (results: any[]) => void
@@ -11,13 +12,14 @@ interface AdvancedSearchProps {
   compact?: boolean
 }
 
-export default function AdvancedSearch({ 
-  onResults, 
-  onFiltersChange, 
-  initialQuery = '', 
-  compact = false 
+export default function AdvancedSearch({
+  onResults,
+  onFiltersChange,
+  initialQuery = '',
+  compact = false
 }: AdvancedSearchProps) {
   const { brand, theme } = useBrand()
+  const { t } = useI18n()
   const [query, setQuery] = useState(initialQuery)
   const [filters, setFilters] = useState({
     categories: [] as string[],
@@ -74,16 +76,18 @@ export default function AdvancedSearch({
       const staticCategories = [
         { id: '1', name: 'Vibrators', slug: 'vibrators' },
         { id: '2', name: 'Dildos & Toys', slug: 'dildos-toys' },
-        { id: '3', name: 'Men\'s Toys', slug: 'mens-toys' },
+        { id: '3', name: "Men's Toys", slug: 'mens-toys' },
         { id: '4', name: 'Anal Toys', slug: 'anal-toys' },
-        { id: '5', name: 'Couples\' Toys', slug: 'couples-toys' },
+        { id: '5', name: "Couples' Toys", slug: 'couples-toys' },
         { id: '6', name: 'BDSM & Fetish', slug: 'bdsm-fetish' },
         { id: '7', name: 'Lubes & Essentials', slug: 'lubes-essentials' },
         { id: '8', name: 'Lingerie & Apparel', slug: 'lingerie-apparel' },
-        ...(brand === 'primediscreet' ? [
-          { id: '9', name: 'Elite Collections', slug: 'elite-collections' },
-          { id: '10', name: 'Premium Artisan', slug: 'premium-artisan' }
-        ] : [])
+        ...(brand === 'primediscreet'
+          ? [
+              { id: '9', name: 'Elite Collections', slug: 'elite-collections' },
+              { id: '10', name: 'Premium Artisan', slug: 'premium-artisan' }
+            ]
+          : [])
       ]
       setCategories(staticCategories)
     } catch (error) {
@@ -99,10 +103,12 @@ export default function AdvancedSearch({
         { id: '2', name: 'We-Vibe', slug: 'we-vibe' },
         { id: '3', name: 'Satisfyer', slug: 'satisfyer' },
         { id: '4', name: 'CalExotics', slug: 'calexotics' },
-        ...(brand === 'primediscreet' ? [
-          { id: '5', name: 'Elite Artisan', slug: 'elite-artisan' },
-          { id: '6', name: 'Premium Select', slug: 'premium-select' }
-        ] : [])
+        ...(brand === 'primediscreet'
+          ? [
+              { id: '5', name: 'Elite Artisan', slug: 'elite-artisan' },
+              { id: '6', name: 'Premium Select', slug: 'premium-select' }
+            ]
+          : [])
       ]
       setAvailableBrands(staticBrands)
     } catch (error) {
@@ -112,7 +118,7 @@ export default function AdvancedSearch({
 
   const performSearch = async () => {
     setLoading(true)
-    
+
     try {
       const response = await fetch('/api/search/products', {
         method: 'POST',
@@ -125,7 +131,7 @@ export default function AdvancedSearch({
       })
 
       const data = await response.json()
-      
+
       if (data.error) {
         throw new Error(data.error)
       }
@@ -150,9 +156,9 @@ export default function AdvancedSearch({
       const response = await fetch('/api/search/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query, 
-          marketplace_brand: brand 
+        body: JSON.stringify({
+          query,
+          marketplace_brand: brand
         })
       })
 
@@ -174,14 +180,14 @@ export default function AdvancedSearch({
 
   const toggleCategoryFilter = (categoryId: string) => {
     const newCategories = filters.categories.includes(categoryId)
-      ? filters.categories.filter(id => id !== categoryId)
+      ? filters.categories.filter((id) => id !== categoryId)
       : [...filters.categories, categoryId]
     updateFilters('categories', newCategories)
   }
 
   const toggleRatingFilter = (rating: number) => {
     const newRatings = filters.ratings.includes(rating)
-      ? filters.ratings.filter(r => r !== rating)
+      ? filters.ratings.filter((r) => r !== rating)
       : [...filters.ratings, rating]
     updateFilters('ratings', newRatings)
   }
@@ -204,13 +210,13 @@ export default function AdvancedSearch({
     }
   }
 
-  const activeFiltersCount = 
-    filters.categories.length + 
-    filters.ratings.length + 
-    filters.brands.length + 
-    (filters.inStock ? 1 : 0) + 
-    (filters.freeShipping ? 1 : 0) + 
-    (filters.newArrivals ? 1 : 0) + 
+  const activeFiltersCount =
+    filters.categories.length +
+    filters.ratings.length +
+    filters.brands.length +
+    (filters.inStock ? 1 : 0) +
+    (filters.freeShipping ? 1 : 0) +
+    (filters.newArrivals ? 1 : 0) +
     (filters.onSale ? 1 : 0)
 
   return (
@@ -222,9 +228,8 @@ export default function AdvancedSearch({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={brand === 'primediscreet' 
-              ? 'Search elite collection...' 
-              : 'Search products...'
+            placeholder={
+              brand === 'primediscreet' ? 'Search elite collection...' : 'Search products...'
             }
             className="w-full px-4 py-3 pl-12 border rounded-lg focus:outline-none focus:ring-2 text-lg"
             style={{
@@ -234,29 +239,35 @@ export default function AdvancedSearch({
             }}
           />
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-            <span className="text-xl" style={{ color: theme.colors.accent }}>🔍</span>
+            <span className="text-xl" style={{ color: theme.colors.accent }}>
+              🔍
+            </span>
           </div>
           {loading && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full"
-                   style={{ color: theme.colors.accent }}></div>
+              <div
+                className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full"
+                style={{ color: theme.colors.accent }}
+              ></div>
             </div>
           )}
         </div>
 
         {/* Search Suggestions */}
         {suggestions.length > 0 && query.length >= 2 && (
-          <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-lg z-50"
-               style={{ 
-                 backgroundColor: theme.colors.surface,
-                 borderColor: theme.colors.glass.border 
-               }}>
+          <div
+            className="absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-lg z-50"
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.glass.border
+            }}
+          >
             {suggestions.map((suggestion, index) => (
               <button
                 key={index}
                 onClick={() => setQuery(suggestion)}
                 className="w-full px-4 py-2 text-left hover:bg-opacity-80 transition-colors"
-                style={{ 
+                style={{
                   backgroundColor: 'transparent',
                   color: theme.colors.text.primary
                 }}
@@ -279,13 +290,17 @@ export default function AdvancedSearch({
           }}
         >
           <span>🎛️</span>
-          <span>Filters</span>
+          <span>
+            <T k="common.filters" />
+          </span>
           {activeFiltersCount > 0 && (
-            <span className="px-2 py-1 rounded-full text-xs font-bold"
-                  style={{ 
-                    backgroundColor: theme.colors.accent,
-                    color: brand === 'primediscreet' ? theme.colors.background : 'white'
-                  }}>
+            <span
+              className="px-2 py-1 rounded-full text-xs font-bold"
+              style={{
+                backgroundColor: theme.colors.accent,
+                color: brand === 'primediscreet' ? theme.colors.background : 'white'
+              }}
+            >
               {activeFiltersCount}
             </span>
           )}
@@ -304,19 +319,20 @@ export default function AdvancedSearch({
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 border rounded-lg"
-             style={{ 
-               backgroundColor: theme.colors.surface,
-               borderColor: theme.colors.glass.border 
-             }}>
-          
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 border rounded-lg"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.glass.border
+          }}
+        >
           {/* Categories */}
           <div>
             <h3 className="font-semibold mb-3" style={{ color: theme.colors.text.primary }}>
               Categories
             </h3>
             <div className="space-y-2 max-h-40 overflow-y-auto">
-              {categories.map(category => (
+              {categories.map((category) => (
                 <label key={category.id} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -324,9 +340,7 @@ export default function AdvancedSearch({
                     onChange={() => toggleCategoryFilter(category.id)}
                     className="rounded"
                   />
-                  <span style={{ color: theme.colors.text.primary }}>
-                    {category.name}
-                  </span>
+                  <span style={{ color: theme.colors.text.primary }}>{category.name}</span>
                 </label>
               ))}
             </div>
@@ -342,10 +356,12 @@ export default function AdvancedSearch({
                 <input
                   type="number"
                   value={filters.priceRange.min}
-                  onChange={(e) => updateFilters('priceRange', {
-                    ...filters.priceRange,
-                    min: parseInt(e.target.value) || 0
-                  })}
+                  onChange={(e) =>
+                    updateFilters('priceRange', {
+                      ...filters.priceRange,
+                      min: parseInt(e.target.value) || 0
+                    })
+                  }
                   placeholder="Min"
                   className="w-20 px-2 py-1 border rounded text-sm"
                   style={{
@@ -354,14 +370,18 @@ export default function AdvancedSearch({
                     color: theme.colors.text.primary
                   }}
                 />
-                <span style={{ color: theme.colors.text.secondary }}>to</span>
+                <span style={{ color: theme.colors.text.secondary }}>
+                  <T k="common.to" />
+                </span>
                 <input
                   type="number"
                   value={filters.priceRange.max}
-                  onChange={(e) => updateFilters('priceRange', {
-                    ...filters.priceRange,
-                    max: parseInt(e.target.value) || 1000
-                  })}
+                  onChange={(e) =>
+                    updateFilters('priceRange', {
+                      ...filters.priceRange,
+                      max: parseInt(e.target.value) || 1000
+                    })
+                  }
                   placeholder="Max"
                   className="w-20 px-2 py-1 border rounded text-sm"
                   style={{
@@ -371,7 +391,7 @@ export default function AdvancedSearch({
                   }}
                 />
               </div>
-              
+
               {/* Quick Price Ranges */}
               <div className="flex flex-wrap gap-1">
                 {[
@@ -379,7 +399,7 @@ export default function AdvancedSearch({
                   { label: '$25-50', min: 25, max: 50 },
                   { label: '$50-100', min: 50, max: 100 },
                   { label: '$100+', min: 100, max: 1000 }
-                ].map(range => (
+                ].map((range) => (
                   <button
                     key={range.label}
                     onClick={() => updateFilters('priceRange', { min: range.min, max: range.max })}
@@ -402,7 +422,7 @@ export default function AdvancedSearch({
               Customer Rating
             </h3>
             <div className="space-y-2">
-              {[5, 4, 3, 2, 1].map(rating => (
+              {[5, 4, 3, 2, 1].map((rating) => (
                 <label key={rating} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -411,12 +431,13 @@ export default function AdvancedSearch({
                     className="rounded"
                   />
                   <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <span 
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
                         key={star}
                         className="text-sm"
-                        style={{ 
-                          color: star <= rating ? theme.colors.accent : theme.colors.text.secondary 
+                        style={{
+                          color:
+                            star <= rating ? theme.colors.accent : theme.colors.text.secondary
                         }}
                       >
                         ★
@@ -442,7 +463,7 @@ export default function AdvancedSearch({
                 { key: 'freeShipping', label: 'Free Shipping' },
                 { key: 'newArrivals', label: 'New Arrivals' },
                 { key: 'onSale', label: 'On Sale' }
-              ].map(filter => (
+              ].map((filter) => (
                 <label key={filter.key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -450,9 +471,7 @@ export default function AdvancedSearch({
                     onChange={(e) => updateFilters(filter.key, e.target.checked)}
                     className="rounded"
                   />
-                  <span style={{ color: theme.colors.text.primary }}>
-                    {filter.label}
-                  </span>
+                  <span style={{ color: theme.colors.text.primary }}>{filter.label}</span>
                 </label>
               ))}
             </div>
@@ -473,14 +492,14 @@ export default function AdvancedSearch({
                 color: theme.colors.text.primary
               }}
             >
-              <option value="relevance">Relevance</option>
-              <option value="newest">Newest First</option>
-              <option value="price_low">Price: Low to High</option>
-              <option value="price_high">Price: High to Low</option>
-              <option value="rating">Customer Rating</option>
-              <option value="popularity">Popularity</option>
+              <option value="relevance">{t('search.sort.relevance')}</option>
+              <option value="newest">{t('search.sort.newest')}</option>
+              <option value="price_low">{t('search.sort.price_low')}</option>
+              <option value="price_high">{t('search.sort.price_high')}</option>
+              <option value="rating">{t('search.sort.rating')}</option>
+              <option value="popularity">{t('search.sort.popularity')}</option>
               {brand === 'primediscreet' && (
-                <option value="elite_featured">Elite Featured</option>
+                <option value="elite_featured">{t('search.sort.elite_featured')}</option>
               )}
             </select>
           </div>

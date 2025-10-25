@@ -1,191 +1,182 @@
+// components/i18n/LanguageCurrencySwitcher.tsx
 "use client";
 
-import { useState } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { useRouter } from "next/navigation";
-import { useSettings } from "@/providers/SettingsProvider";
-import { SUPPORTED_CURRENCIES, CURRENCY_NAMES } from "@/lib/currency";
-import { useBrand } from "@/components/BrandProvider";
+import { useEffect, useMemo, useState } from "react";
 
-export default function LanguageCurrencySwitcher() {
-  const { theme } = useBrand();
-  const { state, setLocale, setCurrency } = useSettings();
+/** Persist helpers */
+function setCookie(k: string, v: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${k}=${encodeURIComponent(v)}; path=/; max-age=${
+    60 * 60 * 24 * 365
+  }`;
+}
+function getSupportedLocales(): string[] {
+  const raw =
+    (typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_SUPPORTED_LOCALES) ||
+    "en";
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Languages (code + native) — full list but we’ll filter by env */
+const ALL_LANGS: { code: string; native: string }[] = [
+  { code: "en", native: "English" },
+  { code: "de", native: "Deutsch" },
+  { code: "fr", native: "Français" },
+  { code: "es", native: "Español" },
+  { code: "it", native: "Italiano" },
+  { code: "ja", native: "日本語" },
+  { code: "ko", native: "한국어" },
+  { code: "zh", native: "中文" },
+  { code: "ru", native: "Русский" },
+  { code: "ar", native: "العربية" },
+  { code: "pt", native: "Português" },
+  { code: "vi", native: "Tiếng Việt" },
+  { code: "th", native: "ไทย" },
+  { code: "uk", native: "Українська" },
+  { code: "pl", native: "Polski" },
+  { code: "hi", native: "हिन्दी" },
+  { code: "id", native: "Bahasa Indonesia" },
+  { code: "tr", native: "Türkçe" },
+  { code: "nl", native: "Nederlands" },
+  { code: "sv", native: "Svenska" },
+  { code: "fi", native: "Suomi" },
+];
+
+/** Currencies (keep small; you can expand later) */
+const CURRENCIES = [
+  { code: "USD", label: "USD" },
+  { code: "EUR", label: "EUR" },
+  { code: "GBP", label: "GBP" },
+  { code: "JPY", label: "JPY" },
+  { code: "CNY", label: "CNY" },
+  { code: "PHP", label: "PHP" },
+];
+
+export default function LanguageCurrencySwitcher({
+  className,
+}: {
+  className?: string;
+}) {
+  // Your I18nProvider should expose locale/currency + setters
+  const { locale, currency, setLocale, setCurrency } = useI18n() as any;
   const router = useRouter();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const currentCurrencyInfo = CURRENCY_NAMES[state.currency] || {
-    name: state.currency,
-    symbol: state.currency,
+  // Hydration guard
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Only show locales you actually support (from env)
+  const SUPPORTED = useMemo(() => {
+    const allow = new Set(getSupportedLocales());
+    return ALL_LANGS.filter((l) => allow.has(l.code));
+  }, []);
+
+  const onLocale = (code: string) => {
+    const lc = code.split("-")[0].toLowerCase();
+    setLocale?.(lc);
+    setCookie("entiz_locale", lc);
+    try {
+      localStorage.setItem("entiz_locale", lc);
+    } catch {}
+    router.refresh(); // let SSR pick it up for hydration stability
   };
 
-  const LANGUAGES = [
-    { code: "en", name: "English", native: "English" },
-    { code: "zh", name: "Chinese", native: "中文" },
-    { code: "ja", name: "Japanese", native: "日本語" },
-    { code: "vi", name: "Vietnamese", native: "Tiếng Việt" },
-    { code: "th", name: "Thai", native: "ไทย" },
-  ];
+  const onCurrency = (code: string) => {
+    setCurrency?.(code);
+    setCookie("entiz_currency", code);
+    try {
+      localStorage.setItem("entiz_currency", code);
+    } catch {}
+    router.refresh();
+  };
 
   return (
-    <div className="relative">
-      {/* Trigger Button */}
-      <button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg border hover:opacity-80 transition-all"
-        style={{
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.glass.border,
-          color: theme.colors.text.primary,
-        }}
-        aria-label="Language and Currency Settings"
-      >
-        <div className="flex items-center gap-1 text-sm">
-          <span>🌐</span>
-          <span className="hidden sm:inline">{state.locale.toUpperCase()}</span>
-        </div>
-        <div className="flex items-center gap-1 text-sm">
-          <span>{currentCurrencyInfo.symbol}</span>
-          <span className="hidden sm:inline">{state.currency}</span>
-        </div>
-        <svg
-          className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
+    <div className={`flex items-center gap-2 ${className || ""}`}>
+      {/* Language */}
+      <div className="relative">
+        <details className="group">
+          <summary className="cursor-pointer select-none rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm uppercase shadow-sm hover:bg-white/10">
+            <span suppressHydrationWarning>
+              {mounted ? locale?.toUpperCase() || "EN" : ""}
+            </span>
+          </summary>
 
-      {/* Dropdown Menu */}
-      {isDropdownOpen && (
-        <div
-          className="absolute right-0 mt-2 w-80 rounded-lg border shadow-lg z-50"
-          style={{
-            backgroundColor: theme.colors.background,
-            borderColor: theme.colors.glass.border,
-          }}
-        >
-          <div className="p-4">
-            {/* Languages Section */}
-            <div className="mb-6">
-              <h3
-                className="text-sm font-semibold mb-3"
-                style={{ color: theme.colors.text.primary }}
-              >
-                🌐 Language
-              </h3>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => {
-                      setLocale(lang.code);
-                      router.refresh();
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`text-left px-3 py-2 text-xs rounded hover:opacity-80 transition-all ${
-                      state.locale === lang.code ? "font-semibold" : ""
-                    }`}
-                    style={{
-                      backgroundColor:
-                        state.locale === lang.code
-                          ? theme.colors.accent + "20"
-                          : theme.colors.surface,
-                      color:
-                        state.locale === lang.code
-                          ? theme.colors.accent
-                          : theme.colors.text.primary,
-                    }}
-                  >
-                    <div className="truncate">{lang.native}</div>
-                    <div className="text-xs opacity-70 truncate">
-                      {lang.name}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Currencies Section */}
-            <div>
-              <h3
-                className="text-sm font-semibold mb-3"
-                style={{ color: theme.colors.text.primary }}
-              >
-                💱 Currency
-              </h3>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                {SUPPORTED_CURRENCIES.map((curr) => {
-                  const info = CURRENCY_NAMES[curr] || {
-                    name: curr,
-                    symbol: curr,
-                  };
-                  return (
-                    <button
-                      key={curr}
-                      onClick={() => {
-                        setCurrency(curr as any);
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`text-left px-3 py-2 text-xs rounded hover:opacity-80 transition-all ${
-                        state.currency === curr ? "font-semibold" : ""
-                      }`}
-                      style={{
-                        backgroundColor:
-                          state.currency === curr
-                            ? theme.colors.accent + "20"
-                            : theme.colors.surface,
-                        color:
-                          state.currency === curr
-                            ? theme.colors.accent
-                            : theme.colors.text.primary,
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{info.symbol}</span>
-                        <span className="truncate">{curr}</span>
-                      </div>
-                      <div className="text-xs opacity-70 truncate">
-                        {info.name}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <div
-              className="mt-4 pt-3 border-t"
-              style={{ borderColor: theme.colors.glass.border }}
-            >
-              <button
-                onClick={() => setIsDropdownOpen(false)}
-                className="w-full py-2 text-sm rounded transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  color: theme.colors.text.secondary,
-                }}
-              >
-                Close
-              </button>
+          {/* Panel with low-opacity glassy background */}
+          <div
+            className="
+              absolute right-0 z-50 mt-2 w-[22rem]
+              rounded-xl border border-white/10
+              bg-black/60 backdrop-blur-md
+              shadow-xl ring-1 ring-black/20
+              p-2
+              max-h-[70vh] overflow-auto
+            "
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+              {SUPPORTED.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => onLocale(l.code)}
+                  className={`
+                    flex w-full items-center gap-2 rounded-lg
+                    px-3 py-2 text-left text-sm
+                    hover:bg-white/10 transition
+                    ${l.code === locale ? "font-semibold bg-white/10" : ""}
+                  `}
+                >
+                  <span className="inline-block rounded-md bg-white/10 px-2 py-0.5 text-xs uppercase">
+                    {l.code}
+                  </span>
+                  <span className="truncate">{l.native}</span>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        </details>
+      </div>
 
-      {/* Click outside to close */}
-      {isDropdownOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setIsDropdownOpen(false)}
-        />
-      )}
+      {/* Currency */}
+      <div className="relative">
+        <details className="group">
+          <summary className="cursor-pointer select-none rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm uppercase shadow-sm hover:bg-white/10">
+            <span suppressHydrationWarning>
+              {mounted ? currency || "USD" : ""}
+            </span>
+          </summary>
+
+          <div
+            className="
+              absolute right-0 z-50 mt-2 w-40
+              rounded-xl border border-white/10
+              bg-black/60 backdrop-blur-md
+              shadow-xl ring-1 ring-black/20
+              p-2
+            "
+          >
+            <div className="flex flex-col gap-1">
+              {CURRENCIES.map((c) => (
+                <button
+                  key={c.code}
+                  onClick={() => onCurrency(c.code)}
+                  className={`
+                    w-full rounded-lg px-3 py-2 text-left text-sm
+                    hover:bg-white/10 transition
+                    ${c.code === currency ? "font-semibold bg-white/10" : ""}
+                  `}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
   );
 }

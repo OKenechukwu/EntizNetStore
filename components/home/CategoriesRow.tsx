@@ -11,14 +11,13 @@ import {
   Star,
   Package,
   Flame,
-  Moon,
   Sun,
-  Gift,
   Wand2,
   Bath,
   Feather,
   Crown,
 } from "lucide-react";
+import { T } from "@/components/i18n/I18nProvider";
 
 const CATEGORIES = [
   { name: "Vibrators", icon: <Zap className="h-7 w-7" />, href: "/categories/vibrators" },
@@ -37,16 +36,20 @@ const CATEGORIES = [
   { name: "Supplements", icon: <Star className="h-7 w-7" />, href: "/categories/supplements-and-enhancers" },
   { name: "Candles", icon: <Flame className="h-7 w-7" />, href: "/categories/candles-and-atmosphere" },
   { name: "Education", icon: <Wand2 className="h-7 w-7" />, href: "/categories/education-and-accessories" },
-].slice(0, 16); // Ensure exactly 16 items for 2 rows of 8
+].slice(0, 16); // 2 rows of 8
 
 export default function CategoriesRow() {
   return (
     <section className="w-full px-4 md:px-6 py-6 md:py-8 bg-background">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-brand-secondary">Shop by Category</h2>
-        <p className="text-foreground/70 text-sm mt-1">Explore our curated collections</p>
+        <h2 className="text-2xl font-bold text-brand-secondary">
+          <T k="common.shopByCategory" fallback="Shop by Category" />
+        </h2>
+        <p className="text-foreground/70 text-sm mt-1">
+          <T k="common.exploreCurated" fallback="Explore our curated collections" />
+        </p>
       </div>
-      
+
       {/* Grid: 4 cols mobile, 6 cols tablet, 8 cols desktop → Creates 2 rows of 8 on desktop */}
       <div className="grid gap-3 md:gap-4 grid-cols-4 sm:grid-cols-6 md:grid-cols-8">
         {CATEGORIES.map((category) => (

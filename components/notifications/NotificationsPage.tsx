@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useBrand } from '@/components/BrandProvider'
 import { getBrandClasses } from '@/lib/brand-theme'
 import { useNotifications } from './NotificationProvider'
+import { T } from "@/components/i18n/I18nProvider";
 
 export default function NotificationsPage() {
   const { brand, theme } = useBrand()
@@ -71,7 +72,7 @@ export default function NotificationsPage() {
               Stay updated with your latest messages and alerts
             </p>
           </div>
-          
+
           {notifications.filter(n => !n.read).length > 0 && (
             <button
               onClick={markAllAsRead}
@@ -113,7 +114,7 @@ export default function NotificationsPage() {
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin w-8 h-8 border-2 border-opacity-20 border-current rounded-full border-t-current mx-auto mb-4"></div>
-              <p className="opacity-60">Loading notifications...</p>
+              <p className="opacity-60"><T k="common.loading" /></p>
             </div>
           ) : filteredNotifications.length === 0 ? (
             <div className="text-center py-12">
@@ -152,7 +153,7 @@ export default function NotificationsPage() {
                     <div className="text-2xl flex-shrink-0 mt-1">
                       {getNotificationIcon(notification.type)}
                     </div>
-                    
+
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -168,11 +169,11 @@ export default function NotificationsPage() {
                           </span>
                         </div>
                       </div>
-                      
+
                       <p className="mb-3 opacity-80">
                         {notification.message}
                       </p>
-                      
+
                       <div className="flex items-center gap-4">
                         {notification.action_url && (
                           <Link
@@ -183,7 +184,7 @@ export default function NotificationsPage() {
                             View Details →
                           </Link>
                         )}
-                        
+
                         {!notification.read && (
                           <button
                             onClick={() => markAsRead(notification.id)}
@@ -192,7 +193,7 @@ export default function NotificationsPage() {
                             Mark as read
                           </button>
                         )}
-                        
+
                         <button
                           onClick={() => deleteNotification(notification.id)}
                           className="text-sm opacity-40 hover:opacity-100 transition-opacity ml-auto"

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Header from "@/components/layout/Header";
 import { findSubcategoryBySlugs, getAllCategories } from "@/data/taxonomy";
 
 type Props = { params: { slug: string; subslug: string } };
@@ -34,8 +33,6 @@ export default function SubcategoryPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <Header />
-
       <section className="mx-auto max-w-screen-2xl px-4 py-6">
         {/* Breadcrumbs */}
         <nav className="mb-4 text-sm text-foreground/70">

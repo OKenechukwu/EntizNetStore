@@ -1,0 +1,321 @@
+🔧 Replit Agent Prompt — EntizNetStore Hotfix & Product Page Build (NO GLOBAL UI CHANGES)
+
+Project: EntizNetStore (Next.js App Router + Supabase + Tailwind + shadcn + Lucide)
+Hard rule: Do NOT change header/nav/brand styling, classes, spacing, or any global layout. Fix logic and build the product page within our current theme. Keep the site’s look exactly as it is now.
+
+Part A — i18n & Currency (must fix)
+Goals
+
+Decouple language & currency.
+
+Changing language never changes currency or price numbers.
+
+Changing currency updates prices everywhere: Home, Category, Subcategory, Product, Cart/Checkout.
+
+Global currency state with SSR + cookies so selection persists across routes & refresh.
+
+Restore header search suggestions (same placement/visual as before).
+
+Tasks
+
+Create/confirm a CurrencyProvider:
+
+components/currency/CurrencyProvider.tsx
+
+API:
+
+const { currency, setCurrency, rates, refreshRates } = useCurrency();
+
+
+Persist cookie entiz_currency. Read cookie in SSR.
+
+Load FX rates via existing @/lib/currency helpers with a 12h stale window.
+
+Never map locale → currency. Remove any code doing this.
+
+SSR parity:
+
+In app/layout.tsx (server): read entiz_currency + i18n_locale cookies and pass {initialCurrency, initialLocale} into providers to avoid hydration mismatch.
+
+LanguageCurrencySwitcher.tsx:
+
+Split handlers: onLocaleChange(locale) updates i18n only; onCurrencyChange(code) updates currency only (+cookies). Ensure no cross-updates.
+
+Price rendering audit (recompute on currency change):
+
+Update if needed:
+
+components/product/ProductCard.tsx
+
+components/product/ProductPrice.tsx
+
+app/products/[slug]/page.tsx
+
+components/cart/CartItemRow.tsx
+
+components/cart/CartSummary.tsx
+
+components/checkout/OrderSummary.tsx
+
+any formatPrice(...) usage
+
+Pattern:
+
+const amount = convertFromBase(basePrice, currency, rates);
+const display = formatPrice(amount, currency);
+
+
+Header search suggestions:
+
+Keep header markup unchanged.
+
+Wire a suggest component used before, or add /api/search/suggest to return top 8 product titles.
+
+Debounce 250ms, keyboard nav, Escape to close. Absolutely positioned dropdown inside input wrapper (no layout shift).
+
+Acceptance Tests (must pass)
+
+Switch EN → FR → ZH → EN: currency remains unchanged.
+
+Switch currency USD → EUR → CAD → JPY on any page: all prices update (Home → Category → Subcategory → Product → Cart → Checkout).
+
+Refresh with CAD chosen: still CAD, no flicker/mismatch.
+
+Header search shows dropdown suggestions, same placement & style as before.
+
+Part B — Product Detail Page (Lazada-style within our theme)
+
+Route: app/products/[slug]/page.tsx
+Design constraint: Use the current site theme; do not alter global header/nav. Page layout should follow the structure below (Lazada-like): left image gallery, right info panel, responsive so left/right remain side-by-side even on smaller widths (then stack gracefully below a defined breakpoint).
+
+Layout & Components (create these; logic + clean Tailwind within our design)
+
+components/product/ProductGallery.tsx
+
+Large main image with small thumbnail strip (horiz/vert), click to swap.
+
+Keyboard left/right, swipe on mobile.
+
+Aspect ratio consistent (“store standard product size”).
+
+components/product/ProductInfoPanel.tsx
+
+Brand (clickable to brand page), product title, rating, reviewCount, soldCount.
+
+Price block: current price, original price (strikethrough), discount %, voucher/coupon badge(s).
+
+Shipping origin: area/city/province, and state/country if overseas.
+
+Delivery options: Standard, Express, and ETA (compute “if bought today” using local TZ).
+
+Return & Warranty: collapsed line showing e.g.
+7 Days Free Return · 2 Months International Seller Warranty
+Clicking opens a dropdown/tooltip with full policy text (see default below).
+Default text if product doesn’t override:
+
+“7 Days Free Return
+Direct return to the merchant within 7 days: The seller must approve the return and refund. Once the seller accepts the return request, send the item back to the seller for a refund.”
+
+Variants:
+
+product type (e.g., “Standard”, “Upgrade+Pull Rope”, etc.)
+
+color
+
+pairing (if applicable)
+
+Stock remaining (“Almost sold out”, show exact remaining if provided).
+
+Quantity stepper (min 1, max stock).
+
+CTA row: Buy Now, Add to Cart, Share.
+
+Store actions row: Go to Store (seller page) and Chat Seller (opens our in-app chat thread to seller—see API below).
+
+Rows under main panel:
+
+components/product/SponsoredProductsRow.tsx — a carousel/grid of related sponsored products.
+
+components/product/MoreFromStoreRow.tsx — more products from the same store.
+
+Tabbed content:
+
+components/product/ProductTabs.tsx with tabs Reviews | Product Details | Recommendations in one line.
+
+Reviews: average rating, filters (All / with images/video / stars, etc.), list with pagination.
+
+Product Details: rich text/specs (see your screenshot structure).
+
+Recommendations: “You may also like these products” grid.
+
+Seller chat:
+
+components/product/ChatSellerButton.tsx — creates/opens a chat thread to seller (/messages/:threadId).
+
+Data Contracts (extend existing Product type; add missing fields)
+
+Update wherever your Product interface lives (@/types or inline), minimally:
+
+export interface Product {
+  id: string;
+  slug: string;
+  title: string;
+  brand?: { id: string; name: string; slug: string };
+  images: { url: string; alt?: string }[];
+  basePrice: number;             // in BASE_CURRENCY
+  originalBasePrice?: number;    // in BASE_CURRENCY
+  vouchers?: Array<{ id: string; label: string; discountType: "amount"|"percent"; value: number }>;
+  rating?: number;               // 0..5
+  reviewCount?: number;
+  soldCount?: number;
+
+  shippingOrigin?: {
+    area?: string; city?: string; province?: string;
+    state?: string; country?: string; isOverseas?: boolean;
+  };
+
+  deliveryOptions?: Array<{
+    type: "standard" | "express";
+    etaDaysMin: number; etaDaysMax: number; // for “if bought today”
+    feeBase?: number;
+  }>;
+
+  returnPolicy?: {
+    shortLabel?: string; // e.g., "7 Days Free Return · 2 Months International Seller Warranty"
+    fullText?: string;   // full dropdown text; fallback to default provided above
+    warrantyMonths?: number; // for composing short label
+  };
+
+  stockRemaining?: number;
+
+  variants?: Array<{
+    id: string;
+    name: string;                 // e.g., "Upgrade+Bluetooth+GT"
+    options?: {
+      color?: string[];
+      pairing?: string[];
+      type?: string[];           // if separate from name
+    };
+    priceDeltaBase?: number;      // BASE_CURRENCY delta to basePrice
+    stockRemaining?: number;
+  }>;
+
+  detailsHtml?: string;           // sanitized HTML for Product Details tab
+  recommendations?: string[];     // product ids/slugs
+  sponsored?: string[];           // product ids/slugs
+  store?: { id: string; name: string; slug: string };
+}
+
+API/Server (simple, minimal; use placeholders if needed)
+
+/api/search/suggest — top 8 titles (fix from Part A).
+
+/api/products/[slug] — ensure all fields above are returned (or resolved server-side in the page).
+
+/api/products/[slug]/recommendations — list by category/MLT fallback.
+
+/api/products/[slug]/sponsored — curated or by tag.
+
+/api/chat/start — body { sellerId, productId } → returns { threadId }.
+
+If your project already has equivalents, adapt to those routes—do not break existing clients.
+
+Currency on Product Page
+
+All prices shown (current, original, voucher previews, variant deltas, delivery fees) must convert from BASE_CURRENCY using useCurrency() + convertFromBase(...) and re-render on currency changes.
+
+Responsive Behavior
+
+Desktop/large: two columns (left gallery, right info).
+
+Tablet/smaller: still two columns until the defined breakpoint, then stack with gallery on top.
+
+Thumbnails remain small; main image large with consistent aspect.
+
+Acceptance Tests (Product Page)
+
+Open any product. Verify:
+
+Left gallery with small thumbnails swapping main image.
+
+Right info panel shows brand link, title, rating, reviewCount, soldCount.
+
+Price with discount (if originalBasePrice) and voucher badges (if any).
+
+Shipping origin shows area, city, province and state/country when overseas is true.
+
+Delivery options show Standard/Express and a human ETA range like “Oct 26–29” (compute from today).
+
+Return & Warranty collapsed line with dropdown exposing full text (default provided).
+
+Variants selectable; price updates for variant deltas; stock remaining reflects selection.
+
+Quantity stepper bounded by stock.
+
+Buy Now, Add to Cart, Share work.
+
+Go to Store navigates to seller page; Chat Seller opens/creates a thread.
+
+Below panel:
+
+Sponsored Products row shows relevant items.
+
+More from the same store shows seller catalog subset.
+
+Tabs:
+
+Reviews tab with filters (All, with images/video, stars).
+
+Product Details renders the provided HTML/spec section.
+
+Recommendations tab shows You may also like these products grid.
+
+Currency behavior on product page:
+
+Switch USD → EUR → CAD → JPY: all visible prices update (including variant deltas and delivery fees) without layout jump.
+
+No global design regressions:
+
+Header, nav bars, palettes, spacing unchanged across the site.
+
+Files to Touch (logic + new components only)
+
+app/layout.tsx (cookies → provider props; no header markup changes)
+
+components/currency/CurrencyProvider.tsx (new or confirm)
+
+components/i18n/LanguageCurrencySwitcher.tsx (split handlers; no style change)
+
+components/layout/Header.tsx (logic only for suggestions; keep markup)
+
+app/products/[slug]/page.tsx (compose page)
+
+components/product/ProductGallery.tsx
+
+components/product/ProductInfoPanel.tsx
+
+components/product/ProductTabs.tsx
+
+components/product/SponsoredProductsRow.tsx
+
+components/product/MoreFromStoreRow.tsx
+
+components/product/ChatSellerButton.tsx
+
+@/lib/currency.ts (no breaking change; ensure utilities exported)
+
+pages/api or app/api routes listed above (Next.js App Router preferred)
+
+Safeguards (repeat)
+
+❌ Do not change header/nav/brand/typography/spacing classes or structure.
+
+❌ Do not introduce wrappers that shift layout in shared components.
+
+✅ New elements on product page are fine, but must follow existing theme tokens.
+
+If any UI change is absolutely required, STOP and output a note explaining why.
+
+Commit Message
+
+feat(product,currency,i18n,search): add Lazada-style product page; decouple locale/currency with SSR cookies; restore header suggest; global price reactivity

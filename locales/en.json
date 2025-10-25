@@ -1,0 +1,44 @@
+{
+  "common": {
+    "store": "Store"
+  },
+  "nav": {
+    "home": "Home",
+    "premium": "Premium",
+    "luxury": "Luxury",
+    "collections": "Collections",
+    "smartDevices": "Smart Devices",
+    "giftSets": "Gift Sets",
+    "stores": "Stores",
+    "brands": "Brands",
+    "live": "Live",
+    "onSale": "On Sale",
+    "learn": "Learn",
+    "signIn": "Sign in",
+    "profile": "Profile"
+  },
+  "home": {
+    "welcome": "Welcome to EntizNet",
+    "heroSubtitle": "Discover premium intimate products designed for your pleasure and wellbeing.",
+    "featuredBrands": "Featured Brands",
+    "featuredProducts": "Featured Products",
+    "bestSellingProducts": "Best Selling Products",
+    "topSellers": "Top Sellers",
+    "fromNearbySellers": "From Nearby Sellers"
+  },
+  "footer": {
+    "copyright": "All rights reserved."
+  },
+  "loading": "Loading…",
+  "description": "Description",
+  "specifications": "Specifications",
+  "certification": "Certification",
+  "warranty": "Warranty",
+  "expiryOn": "Expiry On",
+  "storePolicy": "Store Policy",
+  "escrowPolicy": "Escrow Policy",
+  "productSpecifications": "Product Specifications",
+  "certificationsSafety": "Certifications & Safety",
+  "warrantyInformation": "Warranty Information",
+  "productExpiryInformation": "Product Expiry Information"
+}

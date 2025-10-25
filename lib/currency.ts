@@ -62,6 +62,30 @@ export const CURRENCY_NAMES: Record<
   THB: { name: "Thai Baht", symbol: "฿" },
 };
 
+/** Minor units (decimal places) for display & rounding */
+export const MINOR_UNITS: Record<SupportedCurrency, number> = {
+  USD: 2,
+  EUR: 2,
+  GBP: 2,
+  JPY: 0, // no minor unit
+  CNY: 2,
+  AUD: 2,
+  CAD: 2,
+  CHF: 2,
+  HKD: 2,
+  SGD: 2,
+  INR: 2,
+  KRW: 0, // usually displayed as whole won
+  MXN: 2,
+  BRL: 2,
+  ZAR: 2,
+  TRY: 2,
+  RUB: 2,
+  PHP: 2,
+  NGN: 2,
+  THB: 2,
+};
+
 /** ------------------------------------------------------------------
  * Fallback static FX rates (rough dev values).
  * DB prices are assumed to be stored in BASE_CURRENCY (USD).
@@ -162,15 +186,29 @@ export async function getFxRates(
  * Conversions
  * ------------------------------------------------------------------ */
 
+/**
+ * Convert FROM BASE (USD) TO target.
+ * (This is the most common direction in EntizNetStore.)
+ */
+export function convertBaseTo(
+  amountInBase: number,
+  targetCurrency: SupportedCurrency,
+  rates: Record<string, number>,
+): number {
+  const rate = rates[targetCurrency] ?? 1;
+  return roundToMinorUnits(amountInBase * rate, targetCurrency);
+}
+
+/** Generic: convert from base map perspective */
 export function convertFromBase(
   amount: number,
   targetCurrency: SupportedCurrency,
   rates: Record<string, number>,
 ): number {
-  const rate = rates[targetCurrency] ?? 1;
-  return round(amount * rate);
+  return convertBaseTo(amount, targetCurrency, rates);
 }
 
+/** Convert TO base (USD) FROM any supported currency */
 export function convertToBase(
   amount: number,
   sourceCurrency: SupportedCurrency,
@@ -178,142 +216,25 @@ export function convertToBase(
 ): number {
   const rate = rates[sourceCurrency] ?? 1;
   if (!rate || rate <= 0) return amount;
-  return round(amount / rate);
-}
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100;
+  // Round in BASE currency (USD uses 2 minor units)
+  return roundToMinorUnits(amount / rate, BASE_CURRENCY as SupportedCurrency);
 }
 
 /** ------------------------------------------------------------------
- * Detection helpers (locale/timezone → currency)
+ * Rounding / precision helpers
  * ------------------------------------------------------------------ */
 
-const LOCALE_TO_CURRENCY: Record<string, SupportedCurrency> = {
-  // Americas
-  "en-US": "USD",
-  "en-CA": "CAD",
-  "fr-CA": "CAD",
-  "es-MX": "MXN",
-  "pt-BR": "BRL",
-
-  // Europe
-  "en-GB": "GBP",
-  "de-DE": "EUR",
-  "fr-FR": "EUR",
-  "es-ES": "EUR",
-  "it-IT": "EUR",
-  "nl-NL": "EUR",
-  "pt-PT": "EUR",
-  "de-CH": "CHF",
-  "fr-CH": "CHF",
-  "it-CH": "CHF",
-  "tr-TR": "TRY",
-  "ru-RU": "RUB",
-
-  // Asia Pacific
-  "ja-JP": "JPY",
-  "ko-KR": "KRW",
-  "zh-CN": "CNY",
-  "en-AU": "AUD",
-  "en-HK": "HKD",
-  "en-SG": "SGD",
-  "zh-SG": "SGD",
-  "hi-IN": "INR",
-  "en-IN": "INR",
-  "th-TH": "THB",
-  "en-PH": "PHP",
-  "tl-PH": "PHP",
-  "fil-PH": "PHP",
-
-  // Africa
-  "en-NG": "NGN",
-  "ha-NG": "NGN",
-  "yo-NG": "NGN",
-  "en-ZA": "ZAR",
-};
-
-const TIMEZONE_TO_CURRENCY: Record<string, SupportedCurrency> = {
-  // Americas
-  "America/New_York": "USD",
-  "America/Chicago": "USD",
-  "America/Denver": "USD",
-  "America/Los_Angeles": "USD",
-  "America/Toronto": "CAD",
-  "America/Vancouver": "CAD",
-  "America/Mexico_City": "MXN",
-  "America/Sao_Paulo": "BRL",
-
-  // Europe
-  "Europe/London": "GBP",
-  "Europe/Berlin": "EUR",
-  "Europe/Paris": "EUR",
-  "Europe/Madrid": "EUR",
-  "Europe/Rome": "EUR",
-  "Europe/Amsterdam": "EUR",
-  "Europe/Zurich": "CHF",
-  "Europe/Istanbul": "TRY",
-  "Europe/Moscow": "RUB",
-
-  // Asia Pacific
-  "Asia/Tokyo": "JPY",
-  "Asia/Seoul": "KRW",
-  "Asia/Shanghai": "CNY",
-  "Asia/Hong_Kong": "HKD",
-  "Asia/Singapore": "SGD",
-  "Asia/Kolkata": "INR",
-  "Asia/Bangkok": "THB",
-  "Asia/Manila": "PHP",
-  "Australia/Sydney": "AUD",
-  "Australia/Melbourne": "AUD",
-
-  // Africa
-  "Africa/Lagos": "NGN",
-  "Africa/Johannesburg": "ZAR",
-};
-
-/** Detect likely currency from browser locale/timezone (client only). */
-export function detectUserCurrency(): SupportedCurrency {
-  if (typeof window === "undefined") return DEFAULT_CURRENCY;
-
-  try {
-    const locale = navigator.language || navigator.languages?.[0];
-
-    if (locale && LOCALE_TO_CURRENCY[locale]) {
-      const cur = LOCALE_TO_CURRENCY[locale];
-      if (SUPPORTED_CURRENCIES.includes(cur)) return cur;
-    }
-
-    if (locale) {
-      const base = locale.split("-")[0];
-      // try to match 'en-*' etc
-      for (const [k, cur] of Object.entries(LOCALE_TO_CURRENCY)) {
-        if (k.startsWith(`${base}-`) && SUPPORTED_CURRENCIES.includes(cur)) {
-          return cur;
-        }
-      }
-    }
-
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tz && TIMEZONE_TO_CURRENCY[tz]) {
-      const cur = TIMEZONE_TO_CURRENCY[tz];
-      if (SUPPORTED_CURRENCIES.includes(cur)) return cur;
-    }
-
-    if (tz) {
-      const region = tz.split("/")[0];
-      if (region === "America") return "USD";
-      if (region === "Europe") return "EUR";
-      if (region === "Asia") return "CNY";
-      if (region === "Australia") return "AUD";
-      if (region === "Africa") return "ZAR";
-    }
-  } catch {
-    // ignore
-  }
-
-  return DEFAULT_CURRENCY;
+function roundToMinorUnits(n: number, currency: SupportedCurrency): number {
+  const dp = MINOR_UNITS[currency] ?? 2;
+  const m = Math.pow(10, dp);
+  return Math.round(n * m) / m;
 }
+
+/** ------------------------------------------------------------------
+ * REMOVED: Locale/timezone → currency auto-detection
+ * Per spec: "Never map locale → currency. Remove any code doing this."
+ * Currency selection is now explicit via CurrencyProvider, decoupled from language.
+ * ------------------------------------------------------------------ */
 
 /** ------------------------------------------------------------------
  * Single money formatter (used everywhere in UI)
@@ -331,12 +252,31 @@ export function formatMoney(
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
+      maximumFractionDigits: MINOR_UNITS[currency] ?? 2,
+      minimumFractionDigits: MINOR_UNITS[currency] ?? 2,
     }).format(n);
   } catch {
     // Fallback if Intl rejects a combo; use symbol map.
     const symbol = CURRENCY_NAMES[currency]?.symbol ?? "$";
+    const dp = MINOR_UNITS[currency] ?? 2;
     const value =
-      typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : String(n);
+      typeof n === "number" && Number.isFinite(n) ? n.toFixed(dp) : String(n);
     return `${symbol}${value}`;
   }
+}
+
+/** Convenience: convert + format from BASE (USD) in one call */
+export function convertAndFormatFromBase(
+  amountInBase: number,
+  targetCurrency: SupportedCurrency,
+  locale = "en-US",
+  rates?: Record<string, number>,
+) {
+  const r = rates ?? STATIC_RATES_BY_BASE[BASE_CURRENCY] ?? {};
+  const converted = convertBaseTo(
+    amountInBase,
+    targetCurrency,
+    r as Record<string, number>,
+  );
+  return formatMoney(converted, targetCurrency, locale);
 }

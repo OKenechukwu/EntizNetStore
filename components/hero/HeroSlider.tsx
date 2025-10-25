@@ -7,6 +7,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import SafeVideo from "@/components/media/SafeVideo";
 import { useBrand } from "@/components/BrandProvider";
+import { T } from "@/components/i18n/I18nProvider";
 
 interface CTA {
   text: string;
@@ -380,7 +381,7 @@ export default function HeroSlider({
               className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
               aria-hidden="true"
             />
-            <span>VIDEO</span>
+            <span><T k="hero.videoLabel" /></span>
           </div>
         </div>
       )}

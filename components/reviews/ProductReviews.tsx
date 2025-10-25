@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import ReviewForm from './ReviewForm'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 interface ProductReviewsProps {
   productId: string
@@ -11,12 +12,13 @@ interface ProductReviewsProps {
   showWriteReview?: boolean
 }
 
-export default function ProductReviews({ 
-  productId, 
-  sellerId, 
-  showWriteReview = true 
+export default function ProductReviews({
+  productId,
+  sellerId,
+  showWriteReview = true
 }: ProductReviewsProps) {
   const { brand, theme } = useBrand()
+  const { t } = useI18n()
   const [reviews, setReviews] = useState<any[]>([])
   const [reviewStats, setReviewStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -34,10 +36,12 @@ export default function ProductReviews({
     try {
       let query = supabase
         .from('product_reviews')
-        .select(`
+        .select(
+          `
           *,
           buyer:profiles!buyer_id(username, avatar_url)
-        `)
+        `
+        )
         .eq('product_id', productId)
         .eq('status', 'approved')
 
@@ -99,10 +103,10 @@ export default function ProductReviews({
     })
   }
 
-  const StarDisplay = ({ rating, size = 'small' }: { rating: number, size?: 'small' | 'large' }) => (
+  const StarDisplay = ({ rating, size = 'small' }: { rating: number; size?: 'small' | 'large' }) => (
     <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map(star => (
-        <span 
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span
           key={star}
           className={size === 'large' ? 'text-xl' : 'text-sm'}
           style={{ color: star <= rating ? theme.colors.accent : theme.colors.text.secondary }}
@@ -126,18 +130,23 @@ export default function ProductReviews({
 
     return (
       <div className="space-y-2">
-        {[5, 4, 3, 2, 1].map(rating => (
+        {[5, 4, 3, 2, 1].map((rating) => (
           <div key={rating} className="flex items-center gap-3">
             <span className="text-sm w-6" style={{ color: theme.colors.text.primary }}>
               {rating}★
             </span>
-            <div className="flex-1 h-2 rounded-full overflow-hidden" 
-                 style={{ backgroundColor: theme.colors.background }}>
-              <div 
+            <div
+              className="flex-1 h-2 rounded-full overflow-hidden"
+              style={{ backgroundColor: theme.colors.background }}
+            >
+              <div
                 className="h-full rounded-full transition-all"
-                style={{ 
+                style={{
                   backgroundColor: theme.colors.accent,
-                  width: `${(ratingCounts[rating as keyof typeof ratingCounts] / reviewStats.total_reviews) * 100}%`
+                  width: `${
+                    (ratingCounts[rating as keyof typeof ratingCounts] / reviewStats.total_reviews) *
+                    100
+                  }%`
                 }}
               />
             </div>
@@ -155,8 +164,10 @@ export default function ProductReviews({
       {/* Review Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center"
-               style={{ backgroundColor: theme.colors.accent }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: theme.colors.accent }}
+          >
             <span className="text-white font-semibold">
               {review.buyer?.username?.[0]?.toUpperCase() || 'A'}
             </span>
@@ -178,17 +189,13 @@ export default function ProductReviews({
             )}
           </div>
         </div>
-        
-        {review.would_recommend && (
-          <div className="text-green-500 text-sm">✓ Recommends</div>
-        )}
+
+        {review.would_recommend && <div className="text-green-500 text-sm">✓ Recommends</div>}
       </div>
 
       {/* Review Content */}
       <div className="mb-4">
-        <p style={{ color: theme.colors.text.primary }}>
-          {review.content}
-        </p>
+        <p style={{ color: theme.colors.text.primary }}>{review.content}</p>
       </div>
 
       {/* Review Images */}
@@ -208,10 +215,13 @@ export default function ProductReviews({
 
       {/* Seller Rating */}
       {review.seller_rating && (
-        <div className="p-3 rounded border-l-4 mb-4" style={{ 
-          backgroundColor: theme.colors.background,
-          borderColor: theme.colors.accent
-        }}>
+        <div
+          className="p-3 rounded border-l-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.background,
+            borderColor: theme.colors.accent
+          }}
+        >
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
               Seller Service:
@@ -236,9 +246,7 @@ export default function ProductReviews({
         </button>
         <button className="flex items-center gap-1 hover:opacity-80 transition-opacity">
           <span>💬</span>
-          <span style={{ color: theme.colors.text.secondary }}>
-            Reply
-          </span>
+          <span style={{ color: theme.colors.text.secondary }}>Reply</span>
         </button>
       </div>
     </div>
@@ -247,8 +255,10 @@ export default function ProductReviews({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin w-8 h-8 border-4 border-current border-t-transparent rounded-full"
-             style={{ color: theme.colors.accent }}></div>
+        <div
+          className="animate-spin w-8 h-8 border-4 border-current border-t-transparent rounded-full"
+          style={{ color: theme.colors.accent }}
+        ></div>
       </div>
     )
   }
@@ -263,10 +273,11 @@ export default function ProductReviews({
           </div>
           <StarDisplay rating={Math.round(reviewStats?.average_rating || 0)} size="large" />
           <div className="text-sm mt-2" style={{ color: theme.colors.text.secondary }}>
-            Based on {reviewStats?.total_reviews || 0} {brand === 'primediscreet' ? 'elite reviews' : 'reviews'}
+            Based on {reviewStats?.total_reviews || 0}{' '}
+            {brand === 'primediscreet' ? 'elite reviews' : 'reviews'}
           </div>
         </div>
-        
+
         <div>
           <h4 className="font-medium mb-4" style={{ color: theme.colors.text.primary }}>
             Rating Breakdown
@@ -285,7 +296,10 @@ export default function ProductReviews({
                 className="px-6 py-3 rounded-lg font-semibold transition-all"
                 style={{
                   backgroundColor: theme.colors.accent,
-                  color: brand === 'primediscreet' ? theme.colors.background : theme.colors.text.primary
+                  color:
+                    brand === 'primediscreet'
+                      ? theme.colors.background
+                      : theme.colors.text.primary
                 }}
               >
                 {brand === 'primediscreet' ? 'Write Elite Review' : 'Write a Review'}
@@ -295,7 +309,7 @@ export default function ProductReviews({
             <ReviewForm
               productId={productId}
               sellerId={sellerId}
-              onSubmit={(review) => {
+              onSubmit={() => {
                 setShowReviewForm(false)
                 loadReviews()
                 loadReviewStats()
@@ -308,8 +322,10 @@ export default function ProductReviews({
 
       {/* Filter and Sort */}
       {reviews.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 pb-4 border-b"
-             style={{ borderColor: theme.colors.glass.border }}>
+        <div
+          className="flex flex-wrap items-center gap-4 pb-4 border-b"
+          style={{ borderColor: theme.colors.glass.border }}
+        >
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
               Sort by:
@@ -324,11 +340,11 @@ export default function ProductReviews({
                 color: theme.colors.text.primary
               }}
             >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="highest_rated">Highest Rated</option>
-              <option value="lowest_rated">Lowest Rated</option>
-              <option value="most_helpful">Most Helpful</option>
+              <option value="newest">{t('search.sort.newest_first')}</option>
+              <option value="oldest">{t('search.sort.oldest')}</option>
+              <option value="highest_rated">{t('search.sort.highest_rated')}</option>
+              <option value="lowest_rated">{t('search.sort.lowest_rated')}</option>
+              <option value="most_helpful">{t('search.sort.most_helpful')}</option>
             </select>
           </div>
 
@@ -346,7 +362,7 @@ export default function ProductReviews({
                 color: theme.colors.text.primary
               }}
             >
-              <option value="all">All Ratings</option>
+              <option value="all">{t('search.sort.all_ratings')}</option>
               <option value="5">5 Stars</option>
               <option value="4">4 Stars</option>
               <option value="3">3 Stars</option>
@@ -360,20 +376,19 @@ export default function ProductReviews({
       {/* Reviews List */}
       <div className="space-y-6">
         {reviews.length > 0 ? (
-          reviews.map(review => (
-            <ReviewCard key={review.id} review={review} />
-          ))
+          reviews.map((review) => <ReviewCard key={review.id} review={review} />)
         ) : (
           <div className="text-center py-12">
-            <div className="text-4xl mb-4" style={{ color: theme.colors.text.secondary }}>⭐</div>
+            <div className="text-4xl mb-4" style={{ color: theme.colors.text.secondary }}>
+              ⭐
+            </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
               No reviews yet
             </h3>
             <p style={{ color: theme.colors.text.secondary }}>
-              {brand === 'primediscreet' 
+              {brand === 'primediscreet'
                 ? 'Be the first to share your elite experience with this product'
-                : 'Be the first to review this product and help others make informed decisions'
-              }
+                : 'Be the first to review this product and help others make informed decisions'}
             </p>
           </div>
         )}

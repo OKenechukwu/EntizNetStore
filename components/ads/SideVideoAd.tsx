@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import SafeVideo from "@/components/media/SafeVideo";
-import { useBrand } from "@/components/BrandProvider";
+import { useState } from 'react';
+import Link from 'next/link';
+import SafeVideo from '@/components/media/SafeVideo';
+import { useBrand } from '@/components/BrandProvider';
 
 interface SideVideoAdProps {
   src: string;
-  type: "video" | "image";
+  type: 'video' | 'image';
   poster?: string;
   title: string;
   caption?: string;
@@ -28,15 +28,14 @@ export default function SideVideoAd({
   href,
   autoplay = true,
   duration = 15,
-  className = "",
+  className = '',
 }: SideVideoAdProps) {
   const { theme } = useBrand();
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   const handleCardClick = () => {
-    // Open ad target in a new tab
-    window.open(href, "_blank", "noopener,noreferrer");
+    window.open(href, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -51,7 +50,7 @@ export default function SideVideoAd({
       >
         {/* Media Container */}
         <div className="relative aspect-[4/5] overflow-hidden">
-          {type === "video" ? (
+          {type === 'video' ? (
             <>
               <SafeVideo
                 src={src}
@@ -84,7 +83,7 @@ export default function SideVideoAd({
           )}
 
           {/* Loading State (for images only) */}
-          {type === "image" && !isLoaded && !error && (
+          {type === 'image' && !isLoaded && !error && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse">
               <div
                 className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin"
@@ -94,7 +93,7 @@ export default function SideVideoAd({
           )}
 
           {/* Error State (image load error) */}
-          {type === "image" && error && (
+          {type === 'image' && error && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
               <div className="text-center p-4">
                 <div className="text-4xl mb-2">📺</div>
@@ -111,16 +110,13 @@ export default function SideVideoAd({
         <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
           <h3
             className="text-xl font-bold mb-2 group-hover:text-brandPink transition-colors duration-300"
-            style={{ textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}
+            style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
           >
             {title}
           </h3>
 
           {caption && (
-            <p
-              className="text-sm text-white/90 mb-4 line-clamp-2 leading-relaxed"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
-            >
+            <p className="text-sm text-white/90 mb-4 line-clamp-2 leading-relaxed" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
               {caption}
             </p>
           )}
@@ -132,18 +128,8 @@ export default function SideVideoAd({
             className="inline-flex items-center gap-2 px-4 py-2 bg-brandPink hover:bg-brandPink-600 text-white rounded-lg font-semibold text-sm transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
           >
             {ctaLabel}
-            <svg
-              className="w-4 h-4 transition-transform group-hover:translate-x-1"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
+            <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
         </div>

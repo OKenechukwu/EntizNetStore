@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
 import Price from "@/components/ui/Price";
+import { T } from "@/components/i18n/I18nProvider"; // ✅ translation support
 
 interface FeaturedProduct {
   id: string;
@@ -20,17 +21,26 @@ interface FeaturedSectionProps {
   viewAllHref?: string;
 }
 
-export default function FeaturedSection({ title, items, viewAllHref }: FeaturedSectionProps) {
+export default function FeaturedSection({
+  title,
+  items,
+  viewAllHref,
+}: FeaturedSectionProps) {
   return (
     <section className="w-full px-4 md:px-6 py-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
+        {/* ✅ Translated title */}
+        <h2 className="text-xl md:text-2xl font-bold text-foreground">
+          <T k="home.featuredProducts" fallback={title} />
+        </h2>
+
+        {/* ✅ Translated View All link */}
         {viewAllHref && (
           <Link
             href={viewAllHref}
             className="text-sm font-medium text-brand-secondary hover:underline"
           >
-            View All →
+            <T k="category.viewAll" fallback="View All →" />
           </Link>
         )}
       </div>
@@ -57,18 +67,21 @@ export default function FeaturedSection({ title, items, viewAllHref }: FeaturedS
                 </div>
               )}
             </div>
+
             <div className="flex flex-col gap-1">
               <h3 className="text-sm font-medium text-foreground line-clamp-2">
                 {item.title}
               </h3>
-              <div className="flex items-center gap-1">
-                {item.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-brand-secondary text-brand-secondary" />
-                    <span className="text-xs text-foreground/70">{item.rating}</span>
-                  </div>
-                )}
-              </div>
+
+              {item.rating && (
+                <div className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-brand-secondary text-brand-secondary" />
+                  <span className="text-xs text-foreground/70">
+                    {item.rating}
+                  </span>
+                </div>
+              )}
+
               <p className="text-sm font-bold text-brand-secondary">
                 <Price amount={item.price} />
               </p>

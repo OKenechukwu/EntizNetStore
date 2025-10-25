@@ -1,10 +1,7 @@
-"use client";
+'use client';
 
-import { useMemo, useState, useTransition } from "react";
-import {
-  previewTotals,
-  createQuotation,
-} from "@/app/dashboard/bsm/vendors/actions";
+import { useMemo, useState, useTransition } from 'react';
+import { previewTotals, createQuotation } from '@/app/dashboard/bsm/vendors/actions';
 
 type RFQItem = {
   id: string;
@@ -26,20 +23,20 @@ export default function QuoteForm({
       rfq_item_id: it.id,
       qty: it.quantity ?? 1,
       unit_price: 0,
-      note: "",
-      name: it.name ?? "",
-      spec: it.spec ?? "",
-      unit: it.unit ?? "",
+      note: '',
+      name: it.name ?? '',
+      spec: it.spec ?? '',
+      unit: it.unit ?? '',
     })),
   );
 
-  const [currency, setCurrency] = useState("EUR");
+  const [currency, setCurrency] = useState('EUR');
   const [shipping, setShipping] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
   const [deliveryDays, setDeliveryDays] = useState(7);
-  const [validUntil, setValidUntil] = useState<string>("");
-  const [notes, setNotes] = useState("");
+  const [validUntil, setValidUntil] = useState<string>('');
+  const [notes, setNotes] = useState('');
 
   const [calc, setCalc] = useState<null | {
     subtotal: number;
@@ -60,7 +57,7 @@ export default function QuoteForm({
       currency,
       items: rows.map((r) => ({
         rfq_item_id: r.rfq_item_id,
-        quantity: Number(r.qty) || undefined, // allow server to backfill if empty
+        quantity: Number(r.qty) || undefined,
         unit_price: Number(r.unit_price) || 0,
         note: r.note || undefined,
       })),
@@ -71,17 +68,7 @@ export default function QuoteForm({
       valid_until: validUntil ? new Date(validUntil).toISOString() : undefined,
       notes: notes || undefined,
     };
-  }, [
-    rfqId,
-    currency,
-    rows,
-    shipping,
-    discount,
-    tax,
-    deliveryDays,
-    validUntil,
-    notes,
-  ]);
+  }, [rfqId, currency, rows, shipping, discount, tax, deliveryDays, validUntil, notes]);
 
   const doPreview = () => {
     setError(null);
@@ -89,7 +76,7 @@ export default function QuoteForm({
     startTransition(async () => {
       try {
         const res = await previewTotals(payload as any);
-        if (!res?.ok) throw new Error("Preview failed");
+        if (!res?.ok) throw new Error('Preview failed');
         setCalc({
           subtotal: res.subtotal,
           tax_amount: res.tax_amount,
@@ -99,7 +86,7 @@ export default function QuoteForm({
           currency: res.currency,
         });
       } catch (e: any) {
-        setError(e?.message || "Failed to preview totals.");
+        setError(e?.message || 'Failed to preview totals.');
       }
     });
   };
@@ -110,12 +97,10 @@ export default function QuoteForm({
     startTransition(async () => {
       try {
         const res = await createQuotation(payload as any);
-        if (!res?.ok) throw new Error("Create quotation failed");
-        setOkMsg(
-          `Quotation sent. #${res.quotation_id} • Total ${res.currency} ${res.total}`,
-        );
+        if (!res?.ok) throw new Error('Create quotation failed');
+        setOkMsg(`Quotation sent. #${res.quotation_id} • Total ${res.currency} ${res.total}`);
       } catch (e: any) {
-        setError(e?.message || "Failed to create quotation.");
+        setError(e?.message || 'Failed to create quotation.');
       }
     });
   };
@@ -140,7 +125,7 @@ export default function QuoteForm({
               <tr key={r.rfq_item_id} className="border-t">
                 <td className="p-3">{r.name}</td>
                 <td className="p-3">{r.spec}</td>
-                <td className="p-3 text-right">{items[i]?.quantity ?? "-"}</td>
+                <td className="p-3 text-right">{items[i]?.quantity ?? '-'}</td>
                 <td className="p-3 text-right">
                   <input
                     type="number"
@@ -148,9 +133,7 @@ export default function QuoteForm({
                     value={r.qty}
                     onChange={(e) =>
                       setRows((arr) =>
-                        arr.map((x, idx) =>
-                          idx === i ? { ...x, qty: Number(e.target.value) } : x,
-                        ),
+                        arr.map((x, idx) => (idx === i ? { ...x, qty: Number(e.target.value) } : x)),
                       )
                     }
                     className="w-24 border rounded px-2 py-1 text-right"
@@ -164,11 +147,7 @@ export default function QuoteForm({
                     value={r.unit_price}
                     onChange={(e) =>
                       setRows((arr) =>
-                        arr.map((x, idx) =>
-                          idx === i
-                            ? { ...x, unit_price: Number(e.target.value) }
-                            : x,
-                        ),
+                        arr.map((x, idx) => (idx === i ? { ...x, unit_price: Number(e.target.value) } : x)),
                       )
                     }
                     className="w-28 border rounded px-2 py-1 text-right"
@@ -180,9 +159,7 @@ export default function QuoteForm({
                     value={r.note}
                     onChange={(e) =>
                       setRows((arr) =>
-                        arr.map((x, idx) =>
-                          idx === i ? { ...x, note: e.target.value } : x,
-                        ),
+                        arr.map((x, idx) => (idx === i ? { ...x, note: e.target.value } : x)),
                       )
                     }
                     className="w-full border rounded px-2 py-1"
@@ -273,19 +250,11 @@ export default function QuoteForm({
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={doPreview}
-          disabled={isPending}
-          className="px-4 py-2 rounded bg-muted hover:bg-muted/80"
-        >
-          {isPending ? "Calculating..." : "Preview totals"}
+        <button onClick={doPreview} disabled={isPending} className="px-4 py-2 rounded bg-muted hover:bg-muted/80">
+          {isPending ? 'Calculating...' : 'Preview totals'}
         </button>
-        <button
-          onClick={doSubmit}
-          disabled={isPending}
-          className="px-4 py-2 rounded bg-primary text-primary-foreground"
-        >
-          {isPending ? "Sending..." : "Send quotation"}
+        <button onClick={doSubmit} disabled={isPending} className="px-4 py-2 rounded bg-primary text-primary-foreground">
+          {isPending ? 'Sending...' : 'Send quotation'}
         </button>
       </div>
 
@@ -294,21 +263,11 @@ export default function QuoteForm({
         <div className="border rounded p-4">
           <h3 className="font-medium mb-2">Preview</h3>
           <ul className="text-sm space-y-1">
-            <li>
-              Subtotal: {calc.currency} {calc.subtotal.toFixed(2)}
-            </li>
-            <li>
-              Tax: {calc.currency} {calc.tax_amount.toFixed(2)}
-            </li>
-            <li>
-              Discount: {calc.currency} {calc.discount_amount.toFixed(2)}
-            </li>
-            <li>
-              Shipping: {calc.currency} {calc.shipping_cost.toFixed(2)}
-            </li>
-            <li className="font-semibold">
-              Total: {calc.currency} {calc.total.toFixed(2)}
-            </li>
+            <li>Subtotal: {calc.currency} {calc.subtotal.toFixed(2)}</li>
+            <li>Tax: {calc.currency} {calc.tax_amount.toFixed(2)}</li>
+            <li>Discount: {calc.currency} {calc.discount_amount.toFixed(2)}</li>
+            <li>Shipping: {calc.currency} {calc.shipping_cost.toFixed(2)}</li>
+            <li className="font-semibold">Total: {calc.currency} {calc.total.toFixed(2)}</li>
           </ul>
         </div>
       )}

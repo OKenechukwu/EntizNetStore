@@ -17,7 +17,7 @@ export default function ProfileIconClient() {
     setIsChecking(true);
     try {
       const { data } = await supabase.auth.getUser();
-      
+
       if (!data.user) {
         router.push("/auth?mode=signin");
       } else {
@@ -33,13 +33,13 @@ export default function ProfileIconClient() {
   };
 
   return (
-    <button
+    <div
       onClick={handleClick}
-      className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
+      role="button"
       aria-label="Account"
-      disabled={isChecking}
+      className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary cursor-pointer"
     >
       <User className="h-5 w-5" />
-    </button>
+    </div>
   );
 }

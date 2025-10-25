@@ -5,6 +5,7 @@ import { useBrand } from '@/components/BrandProvider'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import CategoryManager from './CategoryManager'
 import FeaturedProductsManager from './FeaturedProductsManager'
+import { T, useI18n } from '@/components/i18n/I18nProvider'
 
 interface DashboardStats {
   totalRevenue: number
@@ -27,6 +28,7 @@ interface RecentActivity {
 
 export default function AdminDashboard() {
   const { theme, brand } = useBrand()
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState('overview')
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
@@ -75,18 +77,26 @@ export default function AdminDashboard() {
   const formatCurrency = (amount: number) => `$${amount.toLocaleString()}`
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`
 
-  const StatCard = ({ title, value, change, icon, trend }: {
+  const StatCard = ({
+    title,
+    value,
+    change,
+    icon,
+    trend
+  }: {
     title: string
     value: string | number
     change?: string
     icon: string
     trend?: 'up' | 'down' | 'neutral'
   }) => (
-    <div className="p-6 border rounded-lg"
-         style={{ 
-           backgroundColor: theme.colors.surface,
-           borderColor: theme.colors.glass.border 
-         }}>
+    <div
+      className="p-6 border rounded-lg"
+      style={{
+        backgroundColor: theme.colors.surface,
+        borderColor: theme.colors.glass.border
+      }}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
@@ -96,11 +106,11 @@ export default function AdminDashboard() {
             {value}
           </p>
           {change && (
-            <p className={`text-sm mt-1 flex items-center gap-1 ${
-              trend === 'up' ? 'text-green-600' : 
-              trend === 'down' ? 'text-red-600' : 
-              'text-gray-600'
-            }`}>
+            <p
+              className={`text-sm mt-1 flex items-center gap-1 ${
+                trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-600'
+              }`}
+            >
               {trend === 'up' ? '↗️' : trend === 'down' ? '↘️' : '↔️'}
               {change}
             </p>
@@ -112,13 +122,12 @@ export default function AdminDashboard() {
   )
 
   const ActivityItem = ({ activity }: { activity: RecentActivity }) => (
-    <div className="flex items-center gap-3 p-3 border rounded-lg"
-         style={{ borderColor: theme.colors.glass.border }}>
+    <div
+      className="flex items-center gap-3 p-3 border rounded-lg"
+      style={{ borderColor: theme.colors.glass.border }}
+    >
       <div className="text-2xl">
-        {activity.type === 'order' ? '🛒' :
-         activity.type === 'user' ? '👤' :
-         activity.type === 'product' ? '📦' : 
-         '⭐'}
+        {activity.type === 'order' ? '🛒' : activity.type === 'user' ? '👤' : activity.type === 'product' ? '📦' : '⭐'}
       </div>
       <div className="flex-1">
         <p className="font-medium" style={{ color: theme.colors.text.primary }}>
@@ -129,11 +138,15 @@ export default function AdminDashboard() {
         </p>
       </div>
       {activity.status && (
-        <span className={`px-2 py-1 text-xs rounded-full ${
-          activity.status === 'completed' ? 'bg-green-100 text-green-800' :
-          activity.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-red-100 text-red-800'
-        }`}>
+        <span
+          className={`px-2 py-1 text-xs rounded-full ${
+            activity.status === 'completed'
+              ? 'bg-green-100 text-green-800'
+              : activity.status === 'pending'
+              ? 'bg-yellow-100 text-yellow-800'
+              : 'bg-red-100 text-red-800'
+          }`}
+        >
           {activity.status}
         </span>
       )}
@@ -171,21 +184,20 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
       <div className="container mx-auto px-4 py-8">
-        
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold" style={{ color: theme.colors.text.primary }}>
               {brand === 'primediscreet' ? 'Elite Admin Dashboard' : 'Admin Dashboard'}
             </h1>
-            <p style={{ color: theme.colors.text.secondary }}>
-              Marketplace management and analytics
-            </p>
+            <p style={{ color: theme.colors.text.secondary }}>Marketplace management and analytics</p>
           </div>
 
           {/* Time Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: theme.colors.text.secondary }}>Period:</span>
+            <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+              <T k="admin.period" />
+            </span>
             <select
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
@@ -196,25 +208,25 @@ export default function AdminDashboard() {
                 color: theme.colors.text.primary
               }}
             >
-              <option value="1d">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
+              <option value="1d">{t('admin.last24h')}</option>
+              <option value="7d">{t('admin.last7d')}</option>
+              <option value="30d">{t('admin.last30d')}</option>
+              <option value="90d">{t('admin.last90d')}</option>
             </select>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 mb-8 border-b"
-             style={{ borderColor: theme.colors.glass.border }}>
-          {tabs.map(tab => (
+        <div
+          className="flex items-center gap-1 mb-8 border-b"
+          style={{ borderColor: theme.colors.glass.border }}
+        >
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors ${
-                activeTab === tab.id 
-                  ? 'border-b-2' 
-                  : 'hover:bg-opacity-80'
+                activeTab === tab.id ? 'border-b-2' : 'hover:bg-opacity-80'
               }`}
               style={{
                 borderBottomColor: activeTab === tab.id ? theme.colors.accent : 'transparent',
@@ -230,75 +242,31 @@ export default function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Total Revenue"
-                value={formatCurrency(stats.totalRevenue)}
-                change="+12.5% from last period"
-                icon="💰"
-                trend="up"
-              />
-              <StatCard
-                title="Total Orders"
-                value={stats.totalOrders.toLocaleString()}
-                change="+8.3% from last period"
-                icon="🛒"
-                trend="up"
-              />
-              <StatCard
-                title="Active Users"
-                value={stats.activeUsers.toLocaleString()}
-                change="+15.2% from last period"
-                icon="👥"
-                trend="up"
-              />
-              <StatCard
-                title="Conversion Rate"
-                value={formatPercentage(stats.conversionRate)}
-                change="-0.5% from last period"
-                icon="📊"
-                trend="down"
-              />
+              <StatCard title="Total Revenue" value={formatCurrency(stats.totalRevenue)} change="+12.5% from last period" icon="💰" trend="up" />
+              <StatCard title="Total Orders" value={stats.totalOrders.toLocaleString()} change="+8.3% from last period" icon="🛒" trend="up" />
+              <StatCard title="Active Users" value={stats.activeUsers.toLocaleString()} change="+15.2% from last period" icon="👥" trend="up" />
+              <StatCard title="Conversion Rate" value={formatPercentage(stats.conversionRate)} change="-0.5% from last period" icon="📊" trend="down" />
             </div>
 
             {/* Secondary Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Total Products"
-                value={stats.totalProducts.toLocaleString()}
-                icon="📦"
-              />
-              <StatCard
-                title="Pending Orders"
-                value={stats.pendingOrders.toLocaleString()}
-                icon="⏳"
-              />
-              <StatCard
-                title="Avg Order Value"
-                value={formatCurrency(stats.avgOrderValue)}
-                change="+5.8% from last period"
-                icon="💳"
-                trend="up"
-              />
-              <StatCard
-                title="Total Users"
-                value={stats.totalUsers.toLocaleString()}
-                icon="🌟"
-              />
+              <StatCard title="Total Products" value={stats.totalProducts.toLocaleString()} icon="📦" />
+              <StatCard title="Pending Orders" value={stats.pendingOrders.toLocaleString()} icon="⏳" />
+              <StatCard title="Avg Order Value" value={formatCurrency(stats.avgOrderValue)} change="+5.8% from last period" icon="💳" trend="up" />
+              <StatCard title="Total Users" value={stats.totalUsers.toLocaleString()} icon="🌟" />
             </div>
 
             {/* Recent Activity & Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
               {/* Recent Activity */}
               <div className="space-y-4">
                 <h3 className="text-xl font-semibold" style={{ color: theme.colors.text.primary }}>
                   Recent Activity
                 </h3>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {recentActivity.map(activity => (
+                  {recentActivity.map((activity) => (
                     <ActivityItem key={activity.id} activity={activity} />
                   ))}
                 </div>
@@ -317,7 +285,7 @@ export default function AdminDashboard() {
                     { label: 'View Analytics', icon: '📊', action: 'analytics' },
                     { label: 'Moderate Reviews', icon: '⭐', action: 'reviews' },
                     { label: 'System Settings', icon: '⚙️', action: 'settings' }
-                  ].map(action => (
+                  ].map((action) => (
                     <button
                       key={action.action}
                       onClick={() => setActiveTab(action.action === 'add-product' ? 'products' : action.action)}
@@ -338,21 +306,20 @@ export default function AdminDashboard() {
             </div>
 
             {/* Performance Chart Placeholder */}
-            <div className="border rounded-lg p-6"
-                 style={{ 
-                   backgroundColor: theme.colors.surface,
-                   borderColor: theme.colors.glass.border 
-                 }}>
+            <div
+              className="border rounded-lg p-6"
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.glass.border
+              }}
+            >
               <h3 className="text-xl font-semibold mb-4" style={{ color: theme.colors.text.primary }}>
                 Revenue Trend
               </h3>
-              <div className="h-64 flex items-center justify-center"
-                   style={{ backgroundColor: theme.colors.background }}>
+              <div className="h-64 flex items-center justify-center" style={{ backgroundColor: theme.colors.background }}>
                 <div className="text-center space-y-2">
                   <div className="text-4xl">📈</div>
-                  <p style={{ color: theme.colors.text.secondary }}>
-                    Revenue chart would be displayed here
-                  </p>
+                  <p style={{ color: theme.colors.text.secondary }}>Revenue chart would be displayed here</p>
                   <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
                     Integration with charting library coming soon
                   </p>
@@ -370,26 +337,30 @@ export default function AdminDashboard() {
                 Order Management
               </h2>
               <div className="flex items-center gap-3">
-                <select className="px-3 py-2 border rounded-lg"
-                        style={{
-                          backgroundColor: theme.colors.surface,
-                          borderColor: theme.colors.glass.border,
-                          color: theme.colors.text.primary
-                        }}>
-                  <option>All Orders</option>
-                  <option>Pending</option>
-                  <option>Processing</option>
-                  <option>Shipped</option>
-                  <option>Delivered</option>
+                <select
+                  className="px-3 py-2 border rounded-lg"
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.glass.border,
+                    color: theme.colors.text.primary
+                  }}
+                >
+                  <option>{t('admin.orders_all')}</option>
+                  <option>{t('admin.orders_pending')}</option>
+                  <option>{t('admin.orders_processing')}</option>
+                  <option>{t('admin.orders_shipped')}</option>
+                  <option>{t('admin.orders_delivered')}</option>
                 </select>
               </div>
             </div>
-            
-            <div className="border rounded-lg p-6 text-center"
-                 style={{ 
-                   backgroundColor: theme.colors.surface,
-                   borderColor: theme.colors.glass.border 
-                 }}>
+
+            <div
+              className="border rounded-lg p-6 text-center"
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.glass.border
+              }}
+            >
               <div className="text-4xl mb-4">🛒</div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
                 Order Management Interface
@@ -418,12 +389,14 @@ export default function AdminDashboard() {
                 Add New Product
               </button>
             </div>
-            
-            <div className="border rounded-lg p-6 text-center"
-                 style={{ 
-                   backgroundColor: theme.colors.surface,
-                   borderColor: theme.colors.glass.border 
-                 }}>
+
+            <div
+              className="border rounded-lg p-6 text-center"
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.glass.border
+              }}
+            >
               <div className="text-4xl mb-4">📦</div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
                 Product Management Interface
@@ -443,22 +416,24 @@ export default function AdminDashboard() {
 
         {/* Other tabs placeholder */}
         {['users', 'analytics', 'settings'].includes(activeTab) && (
-          <div className="border rounded-lg p-6 text-center"
-               style={{ 
-                 backgroundColor: theme.colors.surface,
-                 borderColor: theme.colors.glass.border 
-               }}>
-            <div className="text-4xl mb-4">
-              {activeTab === 'users' ? '👥' : 
-               activeTab === 'analytics' ? '📈' : '⚙️'}
-            </div>
+          <div
+            className="border rounded-lg p-6 text-center"
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.glass.border
+            }}
+          >
+            <div className="text-4xl mb-4">{activeTab === 'users' ? '👥' : activeTab === 'analytics' ? '📈' : '⚙️'}</div>
             <h3 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
-              {activeTab === 'users' ? 'User Management' : 
-               activeTab === 'analytics' ? 'Advanced Analytics' : 'System Settings'}
+              {activeTab === 'users' ? 'User Management' : activeTab === 'analytics' ? 'Advanced Analytics' : 'System Settings'}
             </h3>
             <p style={{ color: theme.colors.text.secondary }}>
-              {activeTab === 'users' ? 'User management and verification system' : 
-               activeTab === 'analytics' ? 'Detailed analytics and reporting dashboard' : 'System configuration and settings'} coming soon
+              {activeTab === 'users'
+                ? 'User management and verification system'
+                : activeTab === 'analytics'
+                ? 'Detailed analytics and reporting dashboard'
+                : 'System configuration and settings'}{' '}
+              coming soon
             </p>
           </div>
         )}

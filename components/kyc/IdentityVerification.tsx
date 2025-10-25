@@ -10,11 +10,11 @@ interface IdentityVerificationProps {
   verificationLevel: 'standard' | 'elite'
 }
 
-export default function IdentityVerification({ 
-  sellerId, 
-  kycData, 
-  onComplete, 
-  verificationLevel 
+export default function IdentityVerification({
+  sellerId,
+  kycData,
+  onComplete,
+  verificationLevel,
 }: IdentityVerificationProps) {
   const { brand, theme } = useBrand()
   const [formData, setFormData] = useState({
@@ -30,48 +30,32 @@ export default function IdentityVerification({
       city: '',
       state: '',
       zipCode: '',
-      country: 'US'
+      country: 'US',
     },
     bankAccountInfo: {
       accountHolderName: '',
       bankName: '',
       accountType: 'checking',
       routingNumber: '',
-      accountNumber: ''
+      accountNumber: '',
     },
     additionalInfo: {
       yearsInBusiness: '',
       expectedMonthlyVolume: '',
-      productCategories: [],
+      productCategories: [] as string[],
       hasBusinessLicense: false,
       agreeToTerms: false,
-      agreeToBackgroundCheck: false
-    }
+      agreeToBackgroundCheck: false,
+    },
   })
   const [currentSection, setCurrentSection] = useState(1)
   const [submitting, setSubmitting] = useState(false)
 
   const sections = [
-    {
-      id: 1,
-      title: 'Personal Information',
-      icon: '👤'
-    },
-    {
-      id: 2,
-      title: 'Business Information',
-      icon: '🏢'
-    },
-    {
-      id: 3,
-      title: 'Banking Information',
-      icon: '🏦'
-    },
-    {
-      id: 4,
-      title: 'Additional Details',
-      icon: '📋'
-    }
+    { id: 1, title: 'Personal Information', icon: '👤' },
+    { id: 2, title: 'Business Information', icon: '🏢' },
+    { id: 3, title: 'Banking Information', icon: '🏦' },
+    { id: 4, title: 'Additional Details', icon: '📋' },
   ]
 
   const productCategories = [
@@ -79,34 +63,27 @@ export default function IdentityVerification({
     'Lingerie & Intimate Apparel',
     'Wellness & Health Products',
     'Educational Materials',
-    'Couples\' Products',
+    "Couples' Products",
     'Premium Collections',
-    ...(verificationLevel === 'elite' ? [
-      'Luxury Artisan Products',
-      'Custom/Bespoke Items',
-      'Exclusive Collections'
-    ] : [])
+    ...(verificationLevel === 'elite'
+      ? ['Luxury Artisan Products', 'Custom/Bespoke Items', 'Exclusive Collections']
+      : []),
   ]
 
   const updateFormData = (section: string, field: string, value: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [section]: {
-        ...prev[section as keyof typeof prev],
-        [field]: value
-      }
+        ...(prev as any)[section],
+        [field]: value,
+      },
     }))
   }
 
   const handleCategoryToggle = (category: string) => {
-    const currentCategories = formData.additionalInfo.productCategories
-    const isSelected = currentCategories.includes(category)
-    
-    updateFormData('additionalInfo', 'productCategories', 
-      isSelected 
-        ? currentCategories.filter(c => c !== category)
-        : [...currentCategories, category]
-    )
+    const current = formData.additionalInfo.productCategories
+    const next = current.includes(category) ? current.filter((c) => c !== category) : [...current, category]
+    updateFormData('additionalInfo', 'productCategories', next)
   }
 
   const validateSection = (sectionId: number) => {
@@ -129,34 +106,30 @@ export default function IdentityVerification({
       alert('Please complete all required fields and accept the terms')
       return
     }
-
     setSubmitting(true)
-    
     try {
-      // Simulate identity verification API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      await new Promise((r) => setTimeout(r, 2000))
       onComplete({
         personalInfo: {
           firstName: formData.firstName,
           lastName: formData.lastName,
           dateOfBirth: formData.dateOfBirth,
           nationality: formData.nationality,
-          phoneNumber: formData.phoneNumber
+          phoneNumber: formData.phoneNumber,
         },
         businessInfo: {
           businessName: formData.businessName,
           businessType: formData.businessType,
-          businessAddress: formData.businessAddress
+          businessAddress: formData.businessAddress,
         },
         bankingInfo: {
           accountHolderName: formData.bankAccountInfo.accountHolderName,
           bankName: formData.bankAccountInfo.bankName,
-          accountType: formData.bankAccountInfo.accountType
+          accountType: formData.bankAccountInfo.accountType,
         },
         additionalInfo: formData.additionalInfo,
         verificationLevel,
-        completedAt: new Date().toISOString()
+        completedAt: new Date().toISOString(),
       })
     } catch (error) {
       console.error('Identity verification error:', error)
@@ -173,17 +146,16 @@ export default function IdentityVerification({
           {brand === 'primediscreet' ? 'Elite Identity Verification' : 'Identity Verification'}
         </h2>
         <p style={{ color: theme.colors.text.secondary }}>
-          {brand === 'primediscreet' 
+          {brand === 'primediscreet'
             ? 'Complete your elite seller profile with enhanced verification'
-            : 'Complete your seller profile and business information'
-          }
+            : 'Complete your seller profile and business information'}
         </p>
       </div>
 
       {/* Section Navigation */}
       <div className="flex justify-center">
         <div className="flex space-x-4">
-          {sections.map(section => (
+          {sections.map((section) => (
             <button
               key={section.id}
               onClick={() => setCurrentSection(section.id)}
@@ -193,14 +165,12 @@ export default function IdentityVerification({
               style={{
                 borderColor: currentSection === section.id ? theme.colors.accent : theme.colors.glass.border,
                 backgroundColor: currentSection === section.id ? theme.colors.surface : 'transparent',
-                color: theme.colors.text.primary
+                color: theme.colors.text.primary,
               }}
             >
               <span>{section.icon}</span>
               <span className="text-sm font-medium">{section.title}</span>
-              {validateSection(section.id) && (
-                <span className="text-green-500">✓</span>
-              )}
+              {validateSection(section.id) && <span className="text-green-500">✓</span>}
             </button>
           ))}
         </div>
@@ -208,13 +178,12 @@ export default function IdentityVerification({
 
       {/* Section Content */}
       <div className="max-w-2xl mx-auto">
-        {/* Personal Information */}
         {currentSection === 1 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
               Personal Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -223,17 +192,17 @@ export default function IdentityVerification({
                 <input
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Last Name *
@@ -241,17 +210,17 @@ export default function IdentityVerification({
                 <input
                   type="text"
                   value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Date of Birth *
@@ -259,29 +228,29 @@ export default function IdentityVerification({
                 <input
                   type="date"
                   value={formData.dateOfBirth}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, dateOfBirth: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Nationality *
                 </label>
                 <select
                   value={formData.nationality}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nationality: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, nationality: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   required
                 >
@@ -295,7 +264,7 @@ export default function IdentityVerification({
                   <option value="other">Other</option>
                 </select>
               </div>
-              
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Phone Number
@@ -303,12 +272,12 @@ export default function IdentityVerification({
                 <input
                   type="tel"
                   value={formData.phoneNumber}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, phoneNumber: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   placeholder="+1 (555) 123-4567"
                 />
@@ -317,13 +286,12 @@ export default function IdentityVerification({
           </div>
         )}
 
-        {/* Business Information */}
         {currentSection === 2 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
               Business Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -332,29 +300,29 @@ export default function IdentityVerification({
                 <input
                   type="text"
                   value={formData.businessName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   placeholder="Your business or personal name"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Business Type
                 </label>
                 <select
                   value={formData.businessType}
-                  onChange={(e) => setFormData(prev => ({ ...prev, businessType: e.target.value }))}
+                  onChange={(e) => setFormData((p) => ({ ...p, businessType: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                 >
                   <option value="">Select business type</option>
@@ -365,7 +333,7 @@ export default function IdentityVerification({
                   <option value="individual">Individual Seller</option>
                 </select>
               </div>
-              
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Business Address *
@@ -378,12 +346,12 @@ export default function IdentityVerification({
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   placeholder="Street address"
                   required
                 />
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   <input
                     type="text"
@@ -393,7 +361,7 @@ export default function IdentityVerification({
                     style={{
                       backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.glass.border,
-                      color: theme.colors.text.primary
+                      color: theme.colors.text.primary,
                     }}
                     placeholder="City"
                     required
@@ -406,7 +374,7 @@ export default function IdentityVerification({
                     style={{
                       backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.glass.border,
-                      color: theme.colors.text.primary
+                      color: theme.colors.text.primary,
                     }}
                     placeholder="State"
                     required
@@ -419,7 +387,7 @@ export default function IdentityVerification({
                     style={{
                       backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.glass.border,
-                      color: theme.colors.text.primary
+                      color: theme.colors.text.primary,
                     }}
                     placeholder="ZIP Code"
                   />
@@ -429,7 +397,6 @@ export default function IdentityVerification({
           </div>
         )}
 
-        {/* Banking Information */}
         {currentSection === 3 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
@@ -438,7 +405,7 @@ export default function IdentityVerification({
             <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
               Required for seller payouts and tax reporting
             </p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -452,13 +419,13 @@ export default function IdentityVerification({
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   placeholder="Full name as it appears on bank account"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Bank Name *
@@ -471,13 +438,13 @@ export default function IdentityVerification({
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                   placeholder="Bank name"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                   Account Type
@@ -489,7 +456,7 @@ export default function IdentityVerification({
                   style={{
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.glass.border,
-                    color: theme.colors.text.primary
+                    color: theme.colors.text.primary,
                   }}
                 >
                   <option value="checking">Checking</option>
@@ -501,20 +468,18 @@ export default function IdentityVerification({
           </div>
         )}
 
-        {/* Additional Details */}
         {currentSection === 4 && (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
               Additional Details
             </h3>
-            
-            {/* Product Categories */}
+
             <div>
               <label className="block text-sm font-medium mb-3" style={{ color: theme.colors.text.primary }}>
                 Product Categories (select all that apply)
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {productCategories.map(category => (
+                {productCategories.map((category) => (
                   <label key={category} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -528,7 +493,6 @@ export default function IdentityVerification({
               </div>
             </div>
 
-            {/* Terms and Agreements */}
             <div className="space-y-4 pt-4 border-t" style={{ borderColor: theme.colors.glass.border }}>
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
@@ -539,10 +503,12 @@ export default function IdentityVerification({
                   required
                 />
                 <span style={{ color: theme.colors.text.primary }}>
-                  I agree to the{' '}
-                  <span style={{ color: theme.colors.accent }}>Seller Terms of Service</span>
+                  I agree to the <span style={{ color: theme.colors.accent }}>Seller Terms of Service</span>
                   {brand === 'primediscreet' && (
-                    <> and <span style={{ color: theme.colors.accent }}>Elite Marketplace Agreement</span></>
+                    <>
+                      {' '}
+                      and <span style={{ color: theme.colors.accent }}>Elite Marketplace Agreement</span>
+                    </>
                   )}
                   *
                 </span>
@@ -558,8 +524,7 @@ export default function IdentityVerification({
                 />
                 <span style={{ color: theme.colors.text.primary }}>
                   I consent to background verification checks and identity validation
-                  {brand === 'primediscreet' && ' including enhanced elite verification procedures'}
-                  *
+                  {brand === 'primediscreet' && ' including enhanced elite verification procedures'} *
                 </span>
               </label>
             </div>
@@ -573,10 +538,7 @@ export default function IdentityVerification({
           onClick={() => setCurrentSection(Math.max(1, currentSection - 1))}
           disabled={currentSection === 1}
           className="px-6 py-2 border rounded-lg font-medium transition-all disabled:opacity-50"
-          style={{
-            borderColor: theme.colors.glass.border,
-            color: theme.colors.text.secondary
-          }}
+          style={{ borderColor: theme.colors.glass.border, color: theme.colors.text.secondary }}
         >
           Previous
         </button>
@@ -588,9 +550,11 @@ export default function IdentityVerification({
             className="px-6 py-2 rounded-lg font-medium transition-all disabled:opacity-50"
             style={{
               backgroundColor: validateSection(currentSection) ? theme.colors.accent : theme.colors.background,
-              color: validateSection(currentSection) 
-                ? (brand === 'primediscreet' ? theme.colors.background : theme.colors.text.primary)
-                : theme.colors.text.secondary
+              color: validateSection(currentSection)
+                ? brand === 'primediscreet'
+                  ? theme.colors.background
+                  : theme.colors.text.primary
+                : theme.colors.text.secondary,
             }}
           >
             Next
@@ -602,13 +566,14 @@ export default function IdentityVerification({
             className="px-8 py-2 rounded-lg font-semibold transition-all disabled:opacity-50"
             style={{
               backgroundColor: validateSection(4) ? theme.colors.accent : theme.colors.background,
-              color: validateSection(4) 
-                ? (brand === 'primediscreet' ? theme.colors.background : theme.colors.text.primary)
-                : theme.colors.text.secondary
+              color: validateSection(4)
+                ? brand === 'primediscreet'
+                  ? theme.colors.background
+                  : theme.colors.text.primary
+                : theme.colors.text.secondary,
             }}
           >
-            {submitting ? 'Submitting...' : 
-             (brand === 'primediscreet' ? 'Complete Elite Verification' : 'Complete Verification')}
+            {submitting ? 'Submitting...' : brand === 'primediscreet' ? 'Complete Elite Verification' : 'Complete Verification'}
           </button>
         )}
       </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useBrand } from '@/components/BrandProvider'
 import { usePWA } from '@/hooks/usePWA'
+import { T } from '@/components/i18n/I18nProvider'
 
 export default function PWAInstallPrompt() {
   const { theme, brand } = useBrand()
@@ -12,7 +13,6 @@ export default function PWAInstallPrompt() {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    // Show install prompt after a delay if installable and not dismissed
     if (isInstallable && !dismissed) {
       const timer = setTimeout(() => {
         setShowInstallPrompt(true)
@@ -22,37 +22,27 @@ export default function PWAInstallPrompt() {
   }, [isInstallable, dismissed])
 
   useEffect(() => {
-    if (updateAvailable) {
-      setShowUpdatePrompt(true)
-    }
+    if (updateAvailable) setShowUpdatePrompt(true)
   }, [updateAvailable])
 
   const handleInstall = async () => {
     const success = await installPWA()
-    if (success) {
-      setShowInstallPrompt(false)
-    }
+    if (success) setShowInstallPrompt(false)
   }
 
   const handleDismiss = () => {
     setShowInstallPrompt(false)
     setDismissed(true)
-    // Remember dismissal for 24 hours
     localStorage.setItem('pwa-install-dismissed', Date.now().toString())
   }
 
-  const handleUpdate = () => {
-    reloadApp()
-  }
+  const handleUpdate = () => reloadApp()
 
-  // Check if dismissal has expired
   useEffect(() => {
     const dismissedTime = localStorage.getItem('pwa-install-dismissed')
     if (dismissedTime) {
       const dayInMs = 24 * 60 * 60 * 1000
-      if (Date.now() - parseInt(dismissedTime) < dayInMs) {
-        setDismissed(true)
-      }
+      if (Date.now() - parseInt(dismissedTime) < dayInMs) setDismissed(true)
     }
   }, [])
 
@@ -72,7 +62,7 @@ export default function PWAInstallPrompt() {
               <div className="flex-shrink-0 text-2xl">📱</div>
               <div className="flex-1">
                 <h4 className="font-semibold mb-1" style={{ color: theme.colors.text.primary }}>
-                  Install {brand === 'primediscreet' ? 'Elite' : 'EntizNet'} App
+                  {brand === 'primediscreet' ? 'Install Elite App' : 'Install EntizNet App'}
                 </h4>
                 <p className="text-sm mb-3" style={{ color: theme.colors.text.secondary }}>
                   {brand === 'primediscreet' 
@@ -161,7 +151,9 @@ export default function PWAInstallPrompt() {
             }}
           >
             <span className="text-sm">📡</span>
-            <span className="text-sm font-medium">You're offline</span>
+            <span className="text-sm font-medium">
+              <T k="common.offline" fallback="You're offline" />
+            </span>
           </div>
         </div>
       )}

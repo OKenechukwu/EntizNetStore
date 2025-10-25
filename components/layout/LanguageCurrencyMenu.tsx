@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Globe, DollarSign, ChevronDown } from "lucide-react";
 import { usePrefs } from "@/hooks/usePrefs";
+import { T } from "@/components/i18n/I18nProvider";
 
 // Lists (keep or replace with your own)
 const LANGUAGES = [
@@ -33,7 +34,7 @@ export default function LanguageCurrencyMenu({
 }) {
   const { lang, currency, setLang, setCurrency } = usePrefs();
 
-  // Hydration guard (prevents “Server: USD / Client: EUR”)
+  // Hydration guard
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -70,18 +71,10 @@ export default function LanguageCurrencyMenu({
         className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-white/10"
       >
         <Globe className="h-3.5 w-3.5 opacity-80" />
-        {mounted ? (
-          <span>{langShort}</span>
-        ) : (
-          <span className="invisible">EN</span>
-        )}
+        {mounted ? <span>{langShort}</span> : <span className="invisible">EN</span>}
         <span className="opacity-60">/</span>
         <DollarSign className="h-3.5 w-3.5 opacity-80" />
-        {mounted ? (
-          <span>{curShort}</span>
-        ) : (
-          <span className="invisible">USD</span>
-        )}
+        {mounted ? <span>{curShort}</span> : <span className="invisible">USD</span>}
         <ChevronDown className="ml-0.5 h-3.5 w-3.5 opacity-70" />
       </button>
 
@@ -94,10 +87,12 @@ export default function LanguageCurrencyMenu({
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <Globe className="h-4 w-4 opacity-80" />
-              <span>Language</span>
+              <span><T k="common.language" fallback="Language" /></span>
             </div>
             <label className="block">
-              <span className="sr-only">Select language</span>
+              <span className="sr-only">
+                <T k="common.selectLanguage" fallback="Select language" />
+              </span>
               <select
                 aria-label="Language"
                 className="w-full rounded-md border border-white/15 bg-white text-black px-2 py-2 text-sm outline-none"
@@ -117,14 +112,16 @@ export default function LanguageCurrencyMenu({
           <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <DollarSign className="h-4 w-4 opacity-80" />
-              <span>Currency</span>
+              <span><T k="common.currency" fallback="Currency" /></span>
             </div>
             <label className="block">
-              <span className="sr-only">Select currency</span>
+              <span className="sr-only">
+                <T k="common.selectCurrency" fallback="Select currency" />
+              </span>
               <select
                 aria-label="Currency"
                 className="w-full rounded-md border border-white/15 bg-white text-black px-2 py-2 text-sm outline-none"
-                value={mounted ? currency?.toUpperCase() || "USD" : "USD"}
+                value={mounted ? (currency?.toUpperCase() || "USD") : "USD"}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
               >
                 {CURRENCIES.map((c) => (

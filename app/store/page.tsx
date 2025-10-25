@@ -1,15 +1,19 @@
 // app/store/page.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { T, useI18n } from "@/components/i18n/I18nProvider";
 
-import Header from "@/components/layout/Header";
-import HeroSlider from "@/components/home/HeroSlider";
 import CategoriesRow from "@/components/home/CategoriesRow";
 import { CATEGORIES } from "@/data/categories";
+
+import {
+  getFxRates,
+  convertAndFormatFromBase,
+  type SupportedCurrency,
+} from "@/lib/currency";
 
 /* -------------------------------------------
    Royal Desire helpers (semantic + surface)
@@ -87,10 +91,13 @@ function CategoryQuickRow() {
 }
 
 function FeaturedBrands() {
+  const { t } = useI18n();
   const brands = ["LUMINA", "AURAE", "VELVET", "NOVA", "CRESCEN", "SIREN"];
   return (
     <section className="w-full px-4 md:px-8 lg:px-12 py-6">
-      <h3 className={titleH3}>Featured Brands</h3>
+      <h3 className={titleH3}>
+        {t("home.featuredBrands") ?? "Featured Brands"}
+      </h3>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6" role="list">
         {brands.map((b, i) => (
           <div
@@ -107,15 +114,27 @@ function FeaturedBrands() {
   );
 }
 
+/* -------------------------------------------
+   Product item type (store prices in USD, number)
+-------------------------------------------- */
 type Item = {
   id: string;
   title: string;
   img: string;
-  price: string;
-  currency: string;
+  priceUSD: number; // ✅ numeric USD base
 };
 
-function ProductGrid({ title, items }: { title: string; items: Item[] }) {
+function ProductGrid({
+  title,
+  items,
+  rates,
+}: {
+  title: string;
+  items: Item[];
+  rates: Record<string, number> | null;
+}) {
+  const { t, locale, currency } = useI18n();
+
   return (
     <section className="w-full px-4 md:px-8 lg:px-12 py-6" aria-label={title}>
       <h3 className={titleH3}>{title}</h3>
@@ -123,50 +142,59 @@ function ProductGrid({ title, items }: { title: string; items: Item[] }) {
         className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
         role="list"
       >
-        {items.map((p) => (
-          <Link
-            key={p.id}
-            href={`/p/${p.id}`}
-            className={cardBase}
-            role="listitem"
-          >
-            <div className="relative aspect-[4/3]">
-              <Image
-                src={p.img}
-                alt={p.title}
-                fill
-                sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 18vw"
-                className="object-cover"
-              />
-            </div>
-            <div className="p-3">
-              <div className="line-clamp-2 text-[13.5px] font-bold">
-                {p.title}
+        {items.map((p) => {
+          const displayPrice = rates
+            ? convertAndFormatFromBase(
+                p.priceUSD,
+                currency as SupportedCurrency,
+                locale,
+                rates,
+              )
+            : ""; // avoid flicker until rates load
+
+          return (
+            <Link
+              key={p.id}
+              href={`/p/${p.id}`}
+              className={cardBase}
+              role="listitem"
+            >
+              <div className="relative aspect-[4/3]">
+                <Image
+                  src={p.img}
+                  alt={p.title}
+                  fill
+                  sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 18vw"
+                  className="object-cover"
+                />
               </div>
-              <div
-                className={`${grad} bg-clip-text font-extrabold text-transparent`}
-              >
-                {p.price}{" "}
-                <span className="ml-1 text-xs opacity-80">{p.currency}</span>
+              <div className="p-3">
+                <div className="line-clamp-2 text-[13.5px] font-bold">
+                  {p.title}
+                </div>
+                <div
+                  className={`${grad} bg-clip-text font-extrabold text-transparent`}
+                >
+                  {displayPrice || t("loading") || "…"}
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
 }
 
 /* -------------------------------------------
-   Demo data
+   Demo data (now numeric USD, NOT strings)
 -------------------------------------------- */
 const demo = (prefix: string, n: number): Item[] =>
   Array.from({ length: n }).map((_, i) => ({
     id: `${prefix}-${i}`,
     title: `Lumina Velvet Oil ${100 + i}ml`,
     img: `/demo/products/p${(i % 6) + 1}.jpg`,
-    price: `€${(19 + i).toFixed(2)}`,
-    currency: "EUR",
+    priceUSD: 19 + i, // ✅ base in USD as number
   }));
 
 /* -------------------------------------------
@@ -174,16 +202,31 @@ const demo = (prefix: string, n: number): Item[] =>
 -------------------------------------------- */
 export default function StoreHome() {
   const { t } = useI18n();
+
   const featured = useMemo(() => demo("feat", 10), []);
   const best = useMemo(() => demo("best", 10), []);
   const top = useMemo(() => demo("top", 10), []);
   const near = useMemo(() => demo("near", 10), []);
 
+  // Fetch FX rates on mount (client page)
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await getFxRates("USD");
+        if (mounted) setRates(r);
+      } catch {
+        // leave null; UI shows loading ellipsis
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen w-full bg-background text-foreground">
-      {/* Sticky header */}
-      <Header />
-
       {/* Hero (dark + gradient) */}
       <section className="relative mx-auto w-full max-w-screen-2xl px-4 pt-6">
         <div className="relative overflow-hidden rounded-2xl border border-white/10">
@@ -194,8 +237,7 @@ export default function StoreHome() {
               <T k="home.welcome" />
             </h1>
             <p className="mt-1 max-w-xl text-sm text-white/80">
-              Premium markethub where buyers meet sellers, brands, suppliers &
-              manufacturers.
+              <T k="home.heroSubtitle" />
             </p>
           </div>
         </div>
@@ -209,16 +251,33 @@ export default function StoreHome() {
       <FeaturedBrands />
 
       {/* Product Sections */}
-      <ProductGrid title={t("home.featuredProducts")} items={featured} />
-      <ProductGrid title={t("home.bestSellingProducts")} items={best} />
-      <ProductGrid title="Top Sellers" items={top} />
-      <ProductGrid title="From Nearby Sellers" items={near} />
+      <ProductGrid
+        title={t("home.featuredProducts")}
+        items={featured}
+        rates={rates}
+      />
+      <ProductGrid
+        title={t("home.bestSellingProducts")}
+        items={best}
+        rates={rates}
+      />
+      <ProductGrid
+        title={t("home.topSellers") ?? "Top Sellers"}
+        items={top}
+        rates={rates}
+      />
+      <ProductGrid
+        title={t("home.fromNearbySellers") ?? "From Nearby Sellers"}
+        items={near}
+        rates={rates}
+      />
 
       {/* Footer */}
       <footer className="mt-16 w-full bg-[var(--brand-primary,#5B0060)] py-10 text-white">
         <div className="px-4 text-center md:px-8 lg:px-12">
           <p className="text-sm opacity-70">
-            © {new Date().getFullYear()} EntizNetStore — <T k="footer.copyright" />
+            © {new Date().getFullYear()} EntizNetStore —{" "}
+            <T k="footer.copyright" />
           </p>
         </div>
       </footer>

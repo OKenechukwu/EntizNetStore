@@ -94,11 +94,11 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="glass-card p-8 w-full max-w-md text-center">
-          <div className="text-accent-gold mb-4">
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="mx-auto w-full max-w-md rounded-xl border border-black/10 bg-white/95 text-black shadow-2xl backdrop-blur p-8 text-center">
+          <div className="mb-4">
             <svg
-              className="w-16 h-16 mx-auto"
+              className="w-16 h-16 mx-auto text-black/80"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -111,10 +111,8 @@ export default function SignUpPage() {
               />
             </svg>
           </div>
-          <h1 className="font-serif text-2xl font-bold text-accent-gold mb-4">
-            Account Created!
-          </h1>
-          <p className="opacity-80 mb-6">
+          <h1 className="text-2xl font-bold mb-4">Account Created!</h1>
+          <p className="mb-6 text-black/80">
             Please check your email to verify your account before signing in.
           </p>
           <Link href="/auth/sign-in" className="luxury-button px-6 py-3">
@@ -126,51 +124,49 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="glass-card p-8 w-full max-w-md">
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="mx-auto w-full max-w-md rounded-xl border border-black/10 bg-white/95 text-black shadow-2xl backdrop-blur p-8">
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
-            Join EntizNet
-          </h1>
-          <p className="opacity-80">
+          <h1 className="text-3xl font-bold mb-2">Join EntizNet</h1>
+          <p className="text-black/70">
             Create your {role === "seller" ? "seller" : "buyer"} account
           </p>
         </div>
 
         {/* Role Selection */}
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-3">Account Type</label>
+          <label className="block text-sm font-medium mb-3 text-black">Account Type</label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setRole("buyer")}
               className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
                 role === "buyer"
-                  ? "border-accent-gold bg-accent-gold/10 text-accent-gold"
-                  : "border-accent-gold/30 hover:border-accent-gold/50"
+                  ? "border-black/60 bg-black/5 text-black"
+                  : "border-black/20 hover:border-black/40 text-black"
               }`}
             >
               <div className="font-semibold">Buyer</div>
-              <div className="text-xs opacity-70">Shop premium products</div>
+              <div className="text-xs text-black/70">Shop premium products</div>
             </button>
             <button
               type="button"
               onClick={() => setRole("seller")}
               className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
                 role === "seller"
-                  ? "border-accent-gold bg-accent-gold/10 text-accent-gold"
-                  : "border-accent-gold/30 hover:border-accent-gold/50"
+                  ? "border-black/60 bg-black/5 text-black"
+                  : "border-black/20 hover:border-black/40 text-black"
               }`}
             >
               <div className="font-semibold">Seller</div>
-              <div className="text-xs opacity-70">Create your store</div>
+              <div className="text-xs text-black/70">Create your store</div>
             </button>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2">
+            <label htmlFor="email" className="block text-sm font-medium mb-2 text-black">
               Email Address
             </label>
             <input
@@ -179,16 +175,13 @@ export default function SignUpPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none transition-colors"
+              className="w-full px-4 py-3 rounded-lg bg-white border border-black/20 text-black placeholder-black/60 focus:border-black focus:outline-none transition-colors"
               placeholder="your@email.com"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium mb-2"
-            >
+            <label htmlFor="password" className="block text-sm font-medium mb-2 text-black">
               Password
             </label>
             <input
@@ -197,16 +190,13 @@ export default function SignUpPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none transition-colors"
+              className="w-full px-4 py-3 rounded-lg bg-white border border-black/20 text-black placeholder-black/60 focus:border-black focus:outline-none transition-colors"
               placeholder="Choose a secure password"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="confirm-password"
-              className="block text-sm font-medium mb-2"
-            >
+            <label htmlFor="confirm-password" className="block text-sm font-medium mb-2 text-black">
               Confirm Password
             </label>
             <input
@@ -215,13 +205,13 @@ export default function SignUpPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none transition-colors"
+              className="w-full px-4 py-3 rounded-lg bg-white border border-black/20 text-black placeholder-black/60 focus:border-black focus:outline-none transition-colors"
               placeholder="Confirm your password"
             />
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-600/20 border border-red-600/30 text-red-400 text-sm">
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
               {error}
             </div>
           )}
@@ -234,30 +224,22 @@ export default function SignUpPage() {
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 w-4 h-4 text-accent-gold border-accent-gold/30 rounded focus:ring-accent-gold focus:ring-offset-0"
+                className="mt-1 w-4 h-4 text-black border-black/40 rounded focus:ring-black focus:ring-offset-0"
               />
-              <label htmlFor="terms" className="text-sm">
+              <label htmlFor="terms" className="text-sm text-black">
                 I confirm I am 18+ years old and agree to the{" "}
-                <Link
-                  href="/terms"
-                  className="text-accent-gold hover:underline"
-                  target="_blank"
-                >
+                <Link href="/terms" className="text-[var(--brand-secondary,#D1B000)] hover:underline" target="_blank">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link
-                  href="/privacy"
-                  className="text-accent-gold hover:underline"
-                  target="_blank"
-                >
+                <Link href="/privacy" className="text-[var(--brand-secondary,#D1B000)] hover:underline" target="_blank">
                   Privacy Policy
                 </Link>
                 . I understand all content is for adults only.
               </label>
             </div>
 
-            <div className="text-xs opacity-70 p-3 bg-accent-gold/10 rounded-lg">
+            <div className="text-xs text-black/80 p-3 bg-black/[0.04] rounded-lg">
               <strong>Privacy Notice:</strong> We protect your data with
               enterprise-grade security. Your information is never shared with
               third parties. Discreet billing and shipping guaranteed.
@@ -276,11 +258,8 @@ export default function SignUpPage() {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm opacity-80 mb-3">Already have an account?</p>
-          <Link
-            href="/auth/sign-in"
-            className="luxury-button-outline px-6 py-2"
-          >
+          <p className="text-sm text-black/80 mb-3">Already have an account?</p>
+          <Link href="/auth/sign-in" className="luxury-button-outline px-6 py-2">
             Sign In
           </Link>
         </div>
