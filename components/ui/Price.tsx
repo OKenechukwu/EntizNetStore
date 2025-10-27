@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { useCurrency } from "@/components/currency/CurrencyProvider";
 
 type FxRates = Record<string, number> | null | undefined;
 
@@ -68,25 +69,27 @@ export default function Price({
   minimumFractionDigits,
   maximumFractionDigits,
 }: Props) {
-  const { currency, locale } = useI18n();
-  const code = normalizeCode(currency);
+  const { locale } = useI18n();
+  const { currency: currencyFromProvider, rates: currencyRates } = useCurrency();
+  
+  const code = normalizeCode(currencyFromProvider);
   const base = toNumberUSD(amountUSD ?? amount);
 
   const [autoRates, setAutoRates] = useState<Record<string, number> | null>(
     cachedRates,
   );
 
-  // Auto-fetch only once per session if no rates provided
+  // Auto-fetch only once per session if no rates provided from CurrencyProvider
   useEffect(() => {
-    if (!rates && !autoRates) {
+    if (!rates && !currencyRates && !autoRates) {
       loadRatesOnce().then((r) => {
         if (r) setAutoRates(r);
       });
     }
-  }, [rates, autoRates]);
+  }, [rates, currencyRates, autoRates]);
 
-  // Use passed rates → or cached auto → or fallback
-  const effectiveRates = rates ?? autoRates ?? { USD: 1 };
+  // Use passed rates → CurrencyProvider rates → cached auto → fallback
+  const effectiveRates = rates ?? currencyRates ?? autoRates ?? { USD: 1 };
 
   const rawRate = code === "USD" ? 1 : effectiveRates?.[code];
   const rate =

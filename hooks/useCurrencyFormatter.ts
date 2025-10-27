@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { useBrand } from "@/components/BrandProvider";
+import { useCurrency } from "@/components/currency/CurrencyProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { convertFromBase } from "@/lib/currency";
 
 export function useCurrencyFormatter() {
-  const { currency, locale } = useBrand();
+  const { currency, rates } = useCurrency();
+  const { locale } = useI18n();
 
   const fmt = useMemo(() => {
     try {
@@ -22,7 +25,11 @@ export function useCurrencyFormatter() {
     }
   }, [currency, locale]);
 
-  const formatPrice = (amount: number) => fmt.format(amount);
+  const formatPrice = (amountInBase: number) => {
+    // Convert from BASE_CURRENCY (USD) to target currency using current rates
+    const converted = convertFromBase(amountInBase, currency, rates);
+    return fmt.format(converted);
+  };
 
   return { currency, locale, formatPrice };
 }

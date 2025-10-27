@@ -8,6 +8,7 @@ import { ShoppingCart, Bell, Menu, X } from "lucide-react";
 import { T, useI18n } from "@/components/i18n/I18nProvider";
 import LanguageCurrencySwitcher from "@/components/i18n/LanguageCurrencySwitcher";
 import ProfileIconClient from "./ProfileIconClient";
+import SearchSuggestions from "@/components/layout/SearchSuggestions";
 import GlobalSearch from "@/components/search/GlobalSearch";
 
 /**
@@ -101,7 +102,7 @@ export default function Header() {
 
           {/* Search */}
           <div className="hidden md:flex flex-1 max-w-[520px] lg:max-w-[520px]">
-            <GlobalSearch />
+            <SearchSuggestions />
           </div>
 
           {/* Right Icons */}
