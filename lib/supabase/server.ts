@@ -12,7 +12,7 @@ export function createServerSupabase() {
           return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: any) {
-          // @ts-ignore - Next’s cookies API
+          // @ts-ignore - Next's cookies API
           cookieStore.set({ name, value, ...options });
         },
         remove(name: string, options: any) {
@@ -23,3 +23,6 @@ export function createServerSupabase() {
     },
   );
 }
+
+// Alias for compatibility
+export const createClient = createServerSupabase;

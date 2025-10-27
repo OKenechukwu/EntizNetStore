@@ -35,7 +35,29 @@ export const translations = {
     // General
     loading: "Loading",
     productNotFound: "Product Not Found",
-    browseProducts: "Browse Products"
+    browseProducts: "Browse Products",
+    
+    // Footer
+    "footer.shop": "Shop",
+    "footer.categories": "Categories",
+    "footer.brands": "Brands",
+    "footer.popular": "Popular",
+    "footer.sale": "Sale",
+    "footer.support": "Support",
+    "footer.helpCenter": "Help Center",
+    "footer.privacy": "Privacy Policy",
+    "footer.terms": "Terms & Conditions",
+    "footer.contact": "Contact Us",
+    "footer.sellers": "For Sellers",
+    "footer.becomeSeller": "Become a Seller",
+    "footer.sellerDashboard": "Seller Dashboard",
+    "footer.sellerResources": "Seller Resources",
+    "footer.bsm": "Brand Success Manager",
+    "footer.sellAsBsm": "Sell as BSM",
+    "footer.bsmDashboard": "BSM Dashboard",
+    "footer.bsmResources": "BSM Resources",
+    "footer.ageRestriction": "This site contains adult content. You must be 18 or older to access.",
+    "footer.copyright": "All rights reserved."
   },
   
   es: {
@@ -72,7 +94,29 @@ export const translations = {
     // General
     loading: "Cargando",
     productNotFound: "Producto No Encontrado",
-    browseProducts: "Explorar Productos"
+    browseProducts: "Explorar Productos",
+    
+    // Footer
+    "footer.shop": "Tienda",
+    "footer.categories": "Categorías",
+    "footer.brands": "Marcas",
+    "footer.popular": "Popular",
+    "footer.sale": "Ofertas",
+    "footer.support": "Soporte",
+    "footer.helpCenter": "Centro de Ayuda",
+    "footer.privacy": "Política de Privacidad",
+    "footer.terms": "Términos y Condiciones",
+    "footer.contact": "Contáctanos",
+    "footer.sellers": "Para Vendedores",
+    "footer.becomeSeller": "Ser Vendedor",
+    "footer.sellerDashboard": "Panel del Vendedor",
+    "footer.sellerResources": "Recursos del Vendedor",
+    "footer.bsm": "Gerente de Éxito de Marca",
+    "footer.sellAsBsm": "Vender como BSM",
+    "footer.bsmDashboard": "Panel BSM",
+    "footer.bsmResources": "Recursos BSM",
+    "footer.ageRestriction": "Este sitio contiene contenido para adultos. Debes tener 18 años o más para acceder.",
+    "footer.copyright": "Todos los derechos reservados."
   },
   
   fr: {
@@ -109,7 +153,29 @@ export const translations = {
     // General
     loading: "Chargement",
     productNotFound: "Produit Introuvable",
-    browseProducts: "Parcourir les Produits"
+    browseProducts: "Parcourir les Produits",
+    
+    // Footer
+    "footer.shop": "Boutique",
+    "footer.categories": "Catégories",
+    "footer.brands": "Marques",
+    "footer.popular": "Populaire",
+    "footer.sale": "Soldes",
+    "footer.support": "Support",
+    "footer.helpCenter": "Centre d'Aide",
+    "footer.privacy": "Politique de Confidentialité",
+    "footer.terms": "Termes et Conditions",
+    "footer.contact": "Nous Contacter",
+    "footer.sellers": "Pour les Vendeurs",
+    "footer.becomeSeller": "Devenir Vendeur",
+    "footer.sellerDashboard": "Tableau de Bord Vendeur",
+    "footer.sellerResources": "Ressources Vendeur",
+    "footer.bsm": "Gestionnaire de Succès de Marque",
+    "footer.sellAsBsm": "Vendre en tant que BSM",
+    "footer.bsmDashboard": "Tableau de Bord BSM",
+    "footer.bsmResources": "Ressources BSM",
+    "footer.ageRestriction": "Ce site contient du contenu pour adultes. Vous devez avoir 18 ans ou plus pour y accéder.",
+    "footer.copyright": "Tous droits réservés."
   },
 
   de: {
@@ -146,7 +212,29 @@ export const translations = {
     // General
     loading: "Laden",
     productNotFound: "Produkt nicht gefunden",
-    browseProducts: "Produkte durchsuchen"
+    browseProducts: "Produkte durchsuchen",
+    
+    // Footer
+    "footer.shop": "Shop",
+    "footer.categories": "Kategorien",
+    "footer.brands": "Marken",
+    "footer.popular": "Beliebt",
+    "footer.sale": "Angebote",
+    "footer.support": "Support",
+    "footer.helpCenter": "Hilfezentrum",
+    "footer.privacy": "Datenschutzrichtlinie",
+    "footer.terms": "Allgemeine Geschäftsbedingungen",
+    "footer.contact": "Kontaktieren Sie uns",
+    "footer.sellers": "Für Verkäufer",
+    "footer.becomeSeller": "Verkäufer werden",
+    "footer.sellerDashboard": "Verkäufer-Dashboard",
+    "footer.sellerResources": "Verkäufer-Ressourcen",
+    "footer.bsm": "Brand Success Manager",
+    "footer.sellAsBsm": "Als BSM verkaufen",
+    "footer.bsmDashboard": "BSM-Dashboard",
+    "footer.bsmResources": "BSM-Ressourcen",
+    "footer.ageRestriction": "Diese Website enthält Inhalte für Erwachsene. Sie müssen 18 Jahre oder älter sein, um darauf zugreifen zu können.",
+    "footer.copyright": "Alle Rechte vorbehalten."
   },
 
   th: {
@@ -183,7 +271,29 @@ export const translations = {
     // General
     loading: "กำลังโหลด",
     productNotFound: "ไม่พบสินค้า",
-    browseProducts: "เรียกดูสินค้า"
+    browseProducts: "เรียกดูสินค้า",
+    
+    // Footer
+    "footer.shop": "ร้านค้า",
+    "footer.categories": "หมวดหมู่",
+    "footer.brands": "แบรนด์",
+    "footer.popular": "ยอดนิยม",
+    "footer.sale": "ลดราคา",
+    "footer.support": "ช่วยเหลือ",
+    "footer.helpCenter": "ศูนย์ช่วยเหลือ",
+    "footer.privacy": "นโยบายความเป็นส่วนตัว",
+    "footer.terms": "ข้อกำหนดและเงื่อนไข",
+    "footer.contact": "ติดต่อเรา",
+    "footer.sellers": "สำหรับผู้ขาย",
+    "footer.becomeSeller": "เป็นผู้ขาย",
+    "footer.sellerDashboard": "แดชบอร์ดผู้ขาย",
+    "footer.sellerResources": "ทรัพยากรผู้ขาย",
+    "footer.bsm": "ผู้จัดการความสำเร็จแบรนด์",
+    "footer.sellAsBsm": "ขายในฐานะ BSM",
+    "footer.bsmDashboard": "แดชบอร์ด BSM",
+    "footer.bsmResources": "ทรัพยากร BSM",
+    "footer.ageRestriction": "เว็บไซต์นี้มีเนื้อหาสำหรับผู้ใหญ่ คุณต้องอายุ 18 ปีขึ้นไปจึงจะเข้าถึงได้",
+    "footer.copyright": "สงวนลิขสิทธิ์"
   },
 
   ja: {
@@ -220,7 +330,29 @@ export const translations = {
     // General
     loading: "読み込み中",
     productNotFound: "商品が見つかりません",
-    browseProducts: "商品を閲覧"
+    browseProducts: "商品を閲覧",
+    
+    // Footer
+    "footer.shop": "ショップ",
+    "footer.categories": "カテゴリー",
+    "footer.brands": "ブランド",
+    "footer.popular": "人気",
+    "footer.sale": "セール",
+    "footer.support": "サポート",
+    "footer.helpCenter": "ヘルプセンター",
+    "footer.privacy": "プライバシーポリシー",
+    "footer.terms": "利用規約",
+    "footer.contact": "お問い合わせ",
+    "footer.sellers": "出品者向け",
+    "footer.becomeSeller": "出品者になる",
+    "footer.sellerDashboard": "出品者ダッシュボード",
+    "footer.sellerResources": "出品者リソース",
+    "footer.bsm": "ブランドサクセスマネージャー",
+    "footer.sellAsBsm": "BSMとして販売",
+    "footer.bsmDashboard": "BSMダッシュボード",
+    "footer.bsmResources": "BSMリソース",
+    "footer.ageRestriction": "このサイトには成人向けコンテンツが含まれています。18歳以上の方のみアクセスできます。",
+    "footer.copyright": "無断複写・転載を禁じます。"
   },
 
   fil: {
@@ -257,7 +389,29 @@ export const translations = {
     // General
     loading: "Naglo-load",
     productNotFound: "Hindi Nahanap ang Produkto",
-    browseProducts: "I-browse ang mga Produkto"
+    browseProducts: "I-browse ang mga Produkto",
+    
+    // Footer
+    "footer.shop": "Tindahan",
+    "footer.categories": "Mga Kategorya",
+    "footer.brands": "Mga Tatak",
+    "footer.popular": "Sikat",
+    "footer.sale": "Sale",
+    "footer.support": "Suporta",
+    "footer.helpCenter": "Help Center",
+    "footer.privacy": "Patakaran sa Privacy",
+    "footer.terms": "Mga Tuntunin at Kondisyon",
+    "footer.contact": "Kontakin Kami",
+    "footer.sellers": "Para sa mga Nagbebenta",
+    "footer.becomeSeller": "Maging Nagbebenta",
+    "footer.sellerDashboard": "Seller Dashboard",
+    "footer.sellerResources": "Seller Resources",
+    "footer.bsm": "Brand Success Manager",
+    "footer.sellAsBsm": "Magbenta bilang BSM",
+    "footer.bsmDashboard": "BSM Dashboard",
+    "footer.bsmResources": "BSM Resources",
+    "footer.ageRestriction": "Ang site na ito ay naglalaman ng adult content. Dapat ikaw ay 18 taong gulang o mas matanda upang ma-access.",
+    "footer.copyright": "Lahat ng karapatan ay nakalaan."
   }
 }
 

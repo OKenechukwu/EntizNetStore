@@ -1,0 +1,89 @@
+🔧 AGENT PROMPT: Fix EntizNetStore Issues (Critical Bugs & UI/UX Errors)
+
+You're working on a live, production-ready storefront for EntizNetStore, and the current version has major functional and visual issues that must be fixed immediately. These are not optional UI changes — they are blockers for consumer use.
+
+✅ SECTION 1 — FOOTER TRANSLATION & STRUCTURE ISSUES
+
+Fix All Footer Labels: The entire footer currently displays translation keys like footer.support, footer.terms, etc. These must display correct human-readable text using the i18n system (e.g., "Support", "Terms & Conditions").
+
+Fix Lower Footer Bar:
+
+The copyright currently shows: footer.copyright
+
+It must display correctly as: © 2025 EntizNet Store. All rights reserved.
+
+💱 SECTION 2 — PRICE COLOR & CURRENCY INCONSISTENCY
+
+Fix Price Color:
+
+Some products show white text on dark backgrounds (e.g., #FFFFFF), which makes prices barely visible.
+
+All prices must use a consistent color (like text-brand-gold or text-foreground/80) for readability across all sections.
+
+Fix Currency Consistency:
+
+Currently, product sections are displaying mixed currencies (€, $, ¥, ₱) even when USD is selected in the top bar.
+
+Currency must update dynamically and consistently across all sections based on the active selected currency from the dropdown.
+
+❌ SECTION 3 — PRODUCT DETAILS PAGE 404 ERROR
+
+Fix Broken Product Details Route:
+
+Clicking a product (e.g., from homepage, featured section, etc.) leads to 404 page not found.
+
+The correct route (/products/[slug]) must resolve properly and load product data using slug.
+
+Resolve Supabase Error:
+
+Current error:
+
+createClient is not a function  
+from _lib_supabase_server__WEBPACK_IMPORTED_MODULE...
+
+
+Likely caused by incorrect import or outdated Supabase helper.
+
+Replace with the correct import:
+
+import { createServerClient } from "@supabase/auth-helpers-nextjs"
+
+🧩 SECTION 4 — SUBCATEGORY GRID ERRORS
+
+Fix Subcategory Product Display:
+
+When viewing product subcategories (e.g., under “Gift Sets” or “Smart Devices”), the following issues occur:
+
+Price is not displayed or is invisible
+
+Product images are broken or not loading
+
+Fix logic to ensure:
+
+Product image thumbnails load correctly (with fallback if missing)
+
+Product prices show clearly and use the global currency
+
+If no image exists, show a placeholder
+
+🧪 SECTION 5 — TESTING & VISUAL CONSISTENCY
+
+Retest Entire Product Flow:
+
+From homepage → product grid → product detail → add to cart → cart page → checkout.
+
+All pages must work without breaking.
+
+Match Price Format Across All Sections:
+
+Format prices like: $99.00, €75.99, ₱200.50
+
+Remove inconsistencies where some prices are shown as 20.00 with no currency symbol.
+
+🟡 REMINDER:
+
+This site is being prepared for real consumer launch.
+
+Fixes must not break design but restore original intended logic.
+
+You are not creating new UI — just fixing broken pieces, restoring functionality, and ensuring visual consistency.
