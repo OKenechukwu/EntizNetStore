@@ -155,7 +155,7 @@ function ProductGrid({
           return (
             <Link
               key={p.id}
-              href={`/p/${p.id}`}
+              href={`/products/${p.id}`}
               className={cardBase}
               role="listitem"
             >

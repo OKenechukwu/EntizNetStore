@@ -553,7 +553,7 @@ export default function ProductDetailsTabs({
             {product.bundleDeals.items.map((b) => (
               <Link
                 key={b.id}
-                href={`/p/${b.slug}`}
+                href={`/products/${b.slug}`}
                 className="rounded border p-2 hover:bg-white/5"
                 style={{ borderColor: theme.colors.glass.border }}
               >
@@ -618,7 +618,7 @@ export default function ProductDetailsTabs({
             {product.related.map((rel) => (
               <Link
                 key={rel.id}
-                href={`/p/${rel.slug}`}
+                href={`/products/${rel.slug}`}
                 className="rounded border p-2 hover:bg-white/5"
                 style={{ borderColor: theme.colors.glass.border }}
               >
