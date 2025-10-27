@@ -6,6 +6,22 @@ EntizNet is a Next.js 14 marketplace application built with TypeScript and App R
 
 ## Recent Changes
 
+### October 2025 - Currency/Locale Decoupling + Lazada-Style Product Page
+- **Full Currency/Locale Independence**: Completely decoupled language and currency selection - changing language never changes currency
+- **CurrencyProvider System**: New SSR-compatible CurrencyProvider with entiz_currency/entiz_locale cookies for persistence
+- **12h FX Rate Caching**: Implemented /api/fx endpoint with 12-hour localStorage caching for exchange rates (USD base currency)
+- **Price Component Refactor**: Updated all Price components (ui/Price.tsx, common/Price.tsx) and useCurrencyFormatter to use CurrencyProvider rates instead of locale-based mapping
+- **Comprehensive Product Type**: Created detailed Product type with variants, shipping, delivery, warranty, and return policy fields
+- **Lazada-Style Product Page**: Built complete product detail page at /products/[slug] with:
+  - ProductGallery component with keyboard navigation, touch swipe, and thumbnail preview
+  - ProductInfoPanel with brand, variants, quantity selector, shipping/delivery info, and return policy accordion
+  - ProductTabs component with Reviews (with filters), Product Details, and Recommendations tabs
+  - SponsoredProductsRow and MoreFromStoreRow with horizontal scroll navigation
+  - ChatSellerButton with /api/chat/start integration for seller messaging
+- **Server/Client Separation**: Properly separated server and client components for optimal Next.js performance
+- **Search Suggestions**: Added SearchSuggestions component to header with debounce and keyboard navigation
+- **No Global UI Changes**: All changes localized to product page and currency logic - header, nav, and brand styling unchanged
+
 ### October 2025 - Category Routing & Navigation Fix
 - **Category Taxonomy Update**: Added Vibrators and Dildos as top-level categories with full subcategory support
 - **Routing Consistency**: Updated CategoriesRow to use correct slugs matching taxonomy (16 categories total)
