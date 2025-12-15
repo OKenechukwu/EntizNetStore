@@ -66,7 +66,7 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* TopBar Links */}
+          {/* TopBar Links (desktop) */}
           <nav className="hidden lg:flex items-center gap-1">
             <Link
               href="/stores"
@@ -100,13 +100,34 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Search */}
+          {/* Search (desktop) */}
           <div className="hidden md:flex flex-1 max-w-[520px] lg:max-w-[520px]">
             <SearchSuggestions />
           </div>
 
-          {/* Right Icons */}
+          {/* Small-screen Language/Currency switcher (visible even when menu is closed) */}
+          <div className="ml-auto md:hidden">
+            <span suppressHydrationWarning>
+              <LanguageCurrencySwitcher className="rounded-md bg-white/5 px-2 py-1" />
+            </span>
+          </div>
+
+          {/* Mobile Toggle */}
+          <button
+            className="rounded-lg p-2 text-foreground md:hidden"
+            aria-label="Toggle menu"
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+
+          {/* Right Icons (desktop) */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
+            {/* Desktop Language/Currency switcher */}
             <span suppressHydrationWarning>
               <LanguageCurrencySwitcher className="ml-2" />
             </span>
@@ -118,7 +139,7 @@ export default function Header() {
               <T k="nav.signIn" fallback="Sign in" />
             </Link>
 
-            {/* ✅ FIXED: Profile icon wrapped in <div> instead of <button> */}
+            {/* Profile icon (not nested in a button) */}
             <div
               onClick={goProfile}
               role="button"
@@ -143,23 +164,10 @@ export default function Header() {
               <Bell className="h-5 w-5" />
             </Link>
           </div>
-
-          {/* Mobile Toggle */}
-          <button
-            className="ml-auto rounded-lg p-2 text-foreground md:hidden"
-            aria-label="Toggle menu"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
         </div>
       </div>
 
-      {/* Nav Tabs */}
+      {/* Nav Tabs (desktop) */}
       <div className="hidden md:flex w-full items-center justify-center gap-6 border-t border-white/10 bg-background/70 px-4 py-2.5">
         {[
           ["nav.home", "Home", "/"],
@@ -219,6 +227,7 @@ export default function Header() {
             </div>
 
             <div className="flex items-center gap-2 pt-2">
+              {/* Keep a second instance inside the drawer so users can change it there too */}
               <span suppressHydrationWarning>
                 <LanguageCurrencySwitcher className="ml-2" />
               </span>

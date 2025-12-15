@@ -6,13 +6,15 @@ import Header from "@/components/layout/Header";
 import { LayoutContent } from "./layout-content";
 import SessionWatcher from "@/components/SessionWatcher";
 import ClientBoot from "./ClientBoot";
-import { BrandProvider } from "@/components/BrandProvider";
-// ✅ FIX: default import, not named
+
+// ✅ Correct path to the provider we created
+import { BrandProvider } from "@/components/providers/BrandProvider";
+
+// ✅ I18n default export
 import I18nProvider from "@/components/i18n/I18nProvider";
-import { CurrencyProvider } from "@/components/currency/CurrencyProvider";
 
 import { cookies } from "next/headers";
-import { DEFAULT_CURRENCY, SupportedCurrency } from "@/lib/currency";
+import { DEFAULT_CURRENCY, type CurrencyCode } from "@/lib/currency";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 
 export const metadata: Metadata = {
@@ -46,13 +48,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     "en";
 
   const cookieCurrencyRaw =
-    (c.get("entiz_currency")?.value as SupportedCurrency) ||
-    (c.get("currency")?.value as SupportedCurrency) ||
+    (c.get("entiz_currency")?.value as CurrencyCode) ||
+    (c.get("currency")?.value as CurrencyCode) ||
     DEFAULT_CURRENCY;
 
   const supported = readSupportedLocales();
   const initialLocale = clampLocale(cookieLocaleRaw, supported);
-  const initialCurrency = (cookieCurrencyRaw || DEFAULT_CURRENCY) as SupportedCurrency;
+  const initialCurrency = (cookieCurrencyRaw || DEFAULT_CURRENCY) as CurrencyCode;
 
   return (
     <html
@@ -64,11 +66,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-screen w-full bg-background text-foreground antialiased overflow-x-hidden">
         <SettingsProvider initialLocale={initialLocale} initialCurrency={initialCurrency}>
-          <CurrencyProvider initialCurrency={initialCurrency}>
-            <BrandProvider>
-              {/* ✅ I18nProvider must exist and be a real component (default import above) */}
-              <I18nProvider initialLocale={initialLocale} initialCurrency={initialCurrency}>
-                <SessionWatcher />
+          <BrandProvider>
+            <I18nProvider initialLocale={initialLocale} initialCurrency={initialCurrency}>
+              <SessionWatcher />
 
               {/* Skip link for accessibility */}
               <a
@@ -78,7 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Skip to content
               </a>
 
-              {/* Header on every page (only here; no duplicates elsewhere) */}
+              {/* Header on every page */}
               <Header />
 
               <ClientBoot>
@@ -90,7 +90,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </ClientBoot>
             </I18nProvider>
           </BrandProvider>
-        </CurrencyProvider>
         </SettingsProvider>
       </body>
     </html>

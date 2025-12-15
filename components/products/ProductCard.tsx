@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Price from "@/components/ui/Price";
 import I18nText from "@/components/i18n/I18nText";
+import { useBrand } from "@/components/providers/BrandProvider";
+import { convertFromBase, formatPrice } from "@/lib/currency";
 
 export type ProductCardData = {
   id: string | number;
@@ -12,27 +13,30 @@ export type ProductCardData = {
   name: string;          // product title
   brand?: string;        // optional brand
   image?: string;        // optional public path or URL
-  price: number;         // USD base (number)
+  price: number;         // BASE currency number (USD by default)
   badge?: string;        // optional tag like "New" or "-20%"
-  description?: string;  // OPTIONAL: short blurb (shown as 2-line preview)
+  description?: string;  // OPTIONAL short blurb (2-line preview)
 };
 
 type Props = {
   product: ProductCardData;
-  rates: Record<string, number>;
+  /** legacy prop (no longer used) kept optional so old callers don't break */
+  rates?: Record<string, number>;
 };
 
 /**
  * ROUTE_BASE:
  * We standardize product pages to `/products/[slug]`.
- * If your app still uses `/p/[slug]`, either:
- *  - create `app/products/[slug]/page.tsx`, OR
- *  - change ROUTE_BASE to "/p".
  */
 const ROUTE_BASE = "/products";
 
-export default function ProductCard({ product, rates }: Props) {
+export default function ProductCard({ product }: Props) {
   const { id, slug, name, brand, image, price, badge, description } = product;
+
+  // Currency & formatting (new single source of truth)
+  const { currency, fx } = useBrand();
+  const priceInActive = convertFromBase(Number(price || 0), currency, fx);
+  const formattedPrice = formatPrice(priceInActive, currency);
 
   // Defensive: if slug is missing, fall back to id
   const safeKey = (slug && String(slug).trim()) || String(id);
@@ -82,9 +86,9 @@ export default function ProductCard({ product, rates }: Props) {
           </p>
         ) : null}
 
-        {/* Price — localized & currency-formatted via reusable component */}
-        <div className="mt-2 bg-clip-text text-base font-extrabold text-transparent [background:linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))]">
-          <Price amountUSD={Number(price)} rates={rates} />
+        {/* Price — gold, localized & currency-formatted */}
+        <div className="mt-2 text-base font-extrabold text-[#D4AF37]">
+          {formattedPrice}
         </div>
       </div>
     </article>
