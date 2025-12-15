@@ -9,8 +9,24 @@ import {
   type FxRates,
 } from "@/lib/currency";
 
-const DEMO_IMAGE =
-  "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg";
+const DEMO_IMAGES = [
+  "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg",
+  "/attached_assets/stock_images/luxury_adult_product_0363025f.jpg",
+  "/attached_assets/stock_images/luxury_adult_product_51dd235d.jpg",
+  "/attached_assets/stock_images/luxury_adult_product_68b78495.jpg",
+  "/attached_assets/stock_images/luxury_adult_product_f6c14bc7.jpg",
+  "/attached_assets/stock_images/luxury_premium_packa_3bc8b8c3.jpg",
+  "/attached_assets/stock_images/luxury_premium_packa_ec0efde5.jpg",
+  "/attached_assets/stock_images/luxury_gold_black_el_19189da1.jpg",
+  "/attached_assets/stock_images/luxury_gold_black_el_974d8dcb.jpg",
+  "/attached_assets/stock_images/luxury_black_elegant_401ac9ba.jpg",
+  "/attached_assets/stock_images/wellness_massage_lux_22faf4b7.jpg",
+  "/attached_assets/stock_images/wellness_massage_lux_ffb40755.jpg",
+  "/attached_assets/stock_images/elegant_luxury_welln_4fcd4aed.jpg",
+  "/attached_assets/stock_images/elegant_luxury_welln_9df1c862.jpg",
+  "/attached_assets/stock_images/luxury_spa_wellness__048f1b75.jpg",
+  "/attached_assets/stock_images/luxury_spa_wellness__6e5f722d.jpg",
+];
 
 // Demo items use USD as base; FeaturedSection handles conversion/formatting
 const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
@@ -19,7 +35,7 @@ const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
   priceUSD: Number((Math.random() * 100 + 20).toFixed(2)),
   rating: parseFloat((Math.random() * 2 + 3).toFixed(1)),
   href: `/products/demo-${i + 1}`,
-  image: DEMO_IMAGE,
+  image: DEMO_IMAGES[i % DEMO_IMAGES.length],
 }));
 
 function defaultRates(): FxRates {

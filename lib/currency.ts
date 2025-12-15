@@ -273,3 +273,8 @@ function currencySymbol(c: CurrencyCode): string {
       return "";
   }
 }
+
+/**
+ * Alias for formatPrice - used by SettingsProvider
+ */
+export const formatMoney = formatPrice;
