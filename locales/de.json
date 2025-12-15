@@ -1,5 +1,9 @@
 {
-  "common": { "store": "Store" },
+  "common": {
+    "store": "Store",
+    "language": "Sprache",
+    "currency": "Währung"
+  },
   "nav": {
     "home": "Startseite",
     "premium": "Premium",
@@ -24,7 +28,28 @@
     "topSellers": "Top-Verkäufer",
     "fromNearbySellers": "Von Händlern in Ihrer Nähe"
   },
-  "footer": { "copyright": "Alle Rechte vorbehalten." },
+  "footer": {
+    "copyright": "Alle Rechte vorbehalten.",
+    "shop": "Shop",
+    "categories": "Kategorien",
+    "brands": "Marken",
+    "popular": "Beliebt",
+    "sale": "Angebote",
+    "support": "Support",
+    "helpCenter": "Hilfezentrum",
+    "privacy": "Datenschutzrichtlinie",
+    "terms": "Allgemeine Geschäftsbedingungen",
+    "contact": "Kontaktieren Sie uns",
+    "sellers": "Für Verkäufer",
+    "becomeSeller": "Verkäufer werden",
+    "sellerDashboard": "Verkäufer-Dashboard",
+    "sellerResources": "Verkäufer-Ressourcen",
+    "bsm": "Brand Success Manager",
+    "sellAsBsm": "Als BSM verkaufen",
+    "bsmDashboard": "BSM-Dashboard",
+    "bsmResources": "BSM-Ressourcen",
+    "ageRestriction": "Diese Website enthält Inhalte für Erwachsene. Sie müssen 18 Jahre oder älter sein, um darauf zugreifen zu können."
+  },
   "loading": "Wird geladen…",
   "description": "Beschreibung",
   "specifications": "Spezifikationen",
@@ -36,5 +61,16 @@
   "productSpecifications": "Produktspezifikationen",
   "certificationsSafety": "Zertifizierungen & Sicherheit",
   "warrantyInformation": "Garantieinformationen",
-  "productExpiryInformation": "Informationen zum Ablaufdatum"
+  "productExpiryInformation": "Informationen zum Ablaufdatum",
+  "addToCart": "In den Warenkorb",
+  "addedToCart": "Zum Warenkorb hinzugefügt!",
+  "quantity": "Menge:",
+  "continueShopping": "Weiter Einkaufen",
+  "youSave": "Sie sparen",
+  "cart": "Warenkorb",
+  "removeFromCart": "Aus Warenkorb entfernen",
+  "checkout": "Zur Kasse",
+  "total": "Gesamt",
+  "productNotFound": "Produkt nicht gefunden",
+  "browseProducts": "Produkte durchsuchen"
 }

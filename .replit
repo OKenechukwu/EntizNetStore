@@ -48,3 +48,8 @@ externalPort = 3003
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_SUPPORTED_LOCALES = "en,es,fr,de,pt,ja,zh,th,ar,id,ru,hi"

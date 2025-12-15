@@ -1,6 +1,8 @@
 {
   "common": {
-    "store": "Store"
+    "store": "Store",
+    "language": "Language",
+    "currency": "Currency"
   },
   "nav": {
     "home": "Home",
