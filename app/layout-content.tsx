@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/components/notifications/NotificationPro
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import AgeGate from "@/components/AgeGate";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { AdminChatWidget } from "@/components/messaging/AdminChatWidget";
 import { routeByRole } from "@/lib/auth/routeByRole";
 
@@ -154,7 +155,7 @@ function Navigation() {
 
 function Footer() {
   const { config } = useBrand();
-  const { t } = useTranslation();
+  const { t } = useI18n();
 
   return (
     <footer className="border-t border-opacity-20 mt-20">

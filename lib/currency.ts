@@ -57,7 +57,7 @@ export type FxRates = Record<CurrencyCode, number> & {
 
 // Safe fallback table (1 BASE -> target).
 // Keep these reasonable; they’re only used if nothing else is available.
-const FALLBACK_RATES: FxRates = {
+export const FALLBACK_RATES: FxRates = {
   USD: 1,
   EUR: 0.92,
   GBP: 0.78,

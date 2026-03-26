@@ -29,17 +29,13 @@ export default function CheckoutClient() {
     // Initial load
     updateCart();
 
-    // Listen for cart changes via storage events
     window.addEventListener("storage", updateCart);
-    
-    // Also update periodically in case cart changes from same tab
-    const interval = setInterval(updateCart, 1000);
+    window.addEventListener("cartUpdate", updateCart);
 
-    // Read currency from cookie
-    const cookieValue = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("currency="))
-      ?.split("=")[1];
+    const cookies = document.cookie.split("; ");
+    const entizCurrency = cookies.find((row) => row.startsWith("entiz_currency="))?.split("=")[1];
+    const legacyCurrency = cookies.find((row) => row.startsWith("currency="))?.split("=")[1];
+    const cookieValue = entizCurrency || legacyCurrency;
 
     if (cookieValue) {
       setUserCurrency(cookieValue.toUpperCase());
@@ -47,7 +43,7 @@ export default function CheckoutClient() {
 
     return () => {
       window.removeEventListener("storage", updateCart);
-      clearInterval(interval);
+      window.removeEventListener("cartUpdate", updateCart);
     };
   }, []);
 

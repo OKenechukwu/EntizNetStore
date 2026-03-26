@@ -8,21 +8,16 @@ export default function CartLink() {
   const [itemCount, setItemCount] = useState(0);
 
   useEffect(() => {
-    // Update count on mount
     setItemCount(countItems());
 
-    // Listen for cart changes via custom events or storage events
     const updateCount = () => setItemCount(countItems());
     
-    // Update when localStorage changes (from other tabs/windows)
     window.addEventListener("storage", updateCount);
-    
-    // Also update periodically in case cart changes from same tab
-    const interval = setInterval(updateCount, 1000);
+    window.addEventListener("cartUpdate", updateCount);
 
     return () => {
       window.removeEventListener("storage", updateCount);
-      clearInterval(interval);
+      window.removeEventListener("cartUpdate", updateCount);
     };
   }, []);
 

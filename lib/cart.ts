@@ -35,6 +35,7 @@ export function setCart(items: CartItem[]): void {
   
   try {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
+    window.dispatchEvent(new CustomEvent("cartUpdate", { detail: { items } }));
   } catch {
     // Silent fail in case localStorage is not available
   }
@@ -79,6 +80,7 @@ export function clearCart(): void {
   
   try {
     localStorage.removeItem(CART_KEY);
+    window.dispatchEvent(new CustomEvent("cartUpdate", { detail: { items: [] } }));
   } catch {
     // Silent fail
   }

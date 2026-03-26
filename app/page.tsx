@@ -28,12 +28,14 @@ const DEMO_IMAGES = [
   "/attached_assets/stock_images/luxury_spa_wellness__6e5f722d.jpg",
 ];
 
-// Demo items use USD as base; FeaturedSection handles conversion/formatting
+const DEMO_PRICES = [49.99, 79.50, 34.95, 129.00, 59.99, 89.95];
+const DEMO_RATINGS = [4.5, 4.8, 4.2, 4.9, 4.3, 4.7];
+
 const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
   id: `product-${i + 1}`,
   title: `Premium Product ${i + 1}`,
-  price: Number((Math.random() * 100 + 20).toFixed(2)),
-  rating: parseFloat((Math.random() * 2 + 3).toFixed(1)),
+  price: DEMO_PRICES[i],
+  rating: DEMO_RATINGS[i],
   href: `/products/demo-${i + 1}`,
   image: DEMO_IMAGES[i % DEMO_IMAGES.length],
 }));

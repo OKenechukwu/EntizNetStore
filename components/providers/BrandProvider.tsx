@@ -7,6 +7,7 @@ import {
   setActiveCurrency,
   getFxRates,
   saveFxRates,
+  FALLBACK_RATES,
   type CurrencyCode,
   type FxRates,
   DEFAULT_CURRENCY,
@@ -14,11 +15,11 @@ import {
 } from "@/lib/currency";
 
 type BrandContextType = {
-  // existing brand fields can stay here (theme, colors, etc.)
   currency: CurrencyCode;
   setCurrency: (c: CurrencyCode) => void;
   baseCurrency: CurrencyCode;
-  fx: FxRates | null;
+  fx: FxRates;
+  rates: FxRates;
   refreshFx: () => Promise<void>;
 };
 
@@ -26,7 +27,7 @@ const BrandContext = createContext<BrandContextType | undefined>(undefined);
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
-  const [fx, setFx] = useState<FxRates | null>(null);
+  const [fx, setFx] = useState<FxRates>(FALLBACK_RATES);
 
   // Initialize on mount
   useEffect(() => {
@@ -59,6 +60,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       setCurrency,
       baseCurrency: BASE_CURRENCY,
       fx,
+      rates: fx,
       refreshFx,
     }),
     [currency, fx]
