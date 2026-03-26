@@ -23,9 +23,9 @@ export function CurrencyProvider({ children }: PropsWithChildren) {
 }
 
 // Legacy hook reimplemented to read from BrandProvider.
-export function useCurrency(): CurrencyContextValue {
+export function useCurrency(): CurrencyContextValue & { rates: FxRates | null } {
   const { currency, setCurrency, fx, refreshFx } = useBrand();
-  return { currency, setCurrency, fx, refreshFx };
+  return { currency, setCurrency, fx, refreshFx, rates: fx };
 }
 
 export default CurrencyProvider;

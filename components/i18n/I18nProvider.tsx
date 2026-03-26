@@ -115,7 +115,6 @@ export default function I18nProvider({
 
   const setLocale = (l: string) => {
     const next = l.toLowerCase();
-    if (supported.size && !supported.has(next)) return;
     setLocaleState(next);
     try {
       if (mounted) localStorage.setItem('entiz_locale', next);

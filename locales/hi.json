@@ -2,7 +2,9 @@
   "common": {
     "store": "स्टोर",
     "language": "भाषा",
-    "currency": "मुद्रा"
+    "currency": "मुद्रा",
+    "selectLanguage": "भाषा चुनें",
+    "selectCurrency": "मुद्रा चुनें"
   },
   "nav": {
     "home": "होम",
@@ -25,8 +27,53 @@
     "featuredBrands": "फीचर्ड ब्रांड्स",
     "featuredProducts": "फीचर्ड प्रोडक्ट्स",
     "bestSellingProducts": "बेस्ट सेलिंग प्रोडक्ट्स",
+    "bestSellersBeauty": "ब्यूटी और पर्सनल केयर में बेस्ट सेलर्स",
+    "localTopSellers": "स्थानीय टॉप सेलर्स",
     "topSellers": "टॉप सेलर्स",
+    "topSellersDildos": "आपके लिए डिल्डो में टॉप सेलर्स",
+    "topCategoriesVibrator": "वाइब्रेटर में टॉप कैटेगरीज",
+    "internationalTopSellersDolls": "डॉल्स में इंटरनेशनल टॉप सेलर्स",
+    "popularEssentials": "एसेंशियल्स में लोकप्रिय उत्पाद अंतरराष्ट्रीय स्तर पर",
+    "internationalTopSellers": "इंटरनेशनल टॉप सेलर्स",
     "fromNearbySellers": "आसपास के विक्रेताओं से"
+  },
+  "category": {
+    "viewAll": "सभी देखें →"
+  },
+  "cart": {
+    "title": "शॉपिंग कार्ट",
+    "loadingCart": "कार्ट लोड हो रहा है...",
+    "continueShopping": "खरीदारी जारी रखें",
+    "empty": "आपका कार्ट खाली है",
+    "emptyDescriptionEntiznet": "हमारे प्रीमियम उत्पादों को देखें और अपने कार्ट में जोड़ें।",
+    "emptyDescriptionPrimediscreet": "हमारे चुनिंदा डिस्क्रीट उत्पादों की खोज करें।",
+    "startShopping": "खरीदारी शुरू करें",
+    "each": "प्रत्येक",
+    "quantity": "मात्रा:",
+    "remove": "हटाएं",
+    "clearAll": "कार्ट खाली करें",
+    "orderSummary": "ऑर्डर सारांश",
+    "items": "आइटम",
+    "shipping": "शिपिंग",
+    "free": "मुफ़्त",
+    "total": "कुल",
+    "proceedToCheckout": "चेकआउट करें",
+    "secureCheckout": "सुरक्षित चेकआउट",
+    "discreetPackaging": "गोपनीय पैकेजिंग",
+    "returns": "30 दिन की वापसी"
+  },
+  "checkout": {
+    "title": "चेकआउट",
+    "continueShopping": "खरीदारी जारी रखें",
+    "emptyCart": "आपका कार्ट खाली है",
+    "emptyDescription": "चेकआउट से पहले अपने कार्ट में आइटम जोड़ें।",
+    "each": "प्रत्येक",
+    "total": "कुल",
+    "placeOrder": "ऑर्डर दें",
+    "placingOrder": "ऑर्डर दिया जा रहा है...",
+    "remove": "हटाएं",
+    "orderSuccess": "ऑर्डर सफलतापूर्वक दिया गया!",
+    "orderFailure": "ऑर्डर देने में विफल। कृपया पुनः प्रयास करें।"
   },
   "footer": {
     "copyright": "सर्वाधिकार सुरक्षित।",
@@ -65,12 +112,6 @@
   "addToCart": "कार्ट में जोड़ें",
   "addedToCart": "कार्ट में जोड़ा गया!",
   "quantity": "मात्रा:",
-  "continueShopping": "खरीदारी जारी रखें",
-  "youSave": "आप बचाते हैं",
-  "cart": "कार्ट",
-  "removeFromCart": "कार्ट से हटाएं",
-  "checkout": "चेकआउट",
-  "total": "कुल",
-  "productNotFound": "उत्पाद नहीं मिला",
-  "browseProducts": "उत्पाद देखें"
+  "browseProducts": "उत्पाद देखें",
+  "productNotFound": "उत्पाद नहीं मिला"
 }

@@ -2,7 +2,9 @@
   "common": {
     "store": "商店",
     "language": "语言",
-    "currency": "货币"
+    "currency": "货币",
+    "selectLanguage": "选择语言",
+    "selectCurrency": "选择货币"
   },
   "nav": {
     "home": "首页",
@@ -25,8 +27,53 @@
     "featuredBrands": "精选品牌",
     "featuredProducts": "精选产品",
     "bestSellingProducts": "畅销产品",
+    "bestSellersBeauty": "美容与个人护理畅销品",
+    "localTopSellers": "本地畅销品",
     "topSellers": "顶级卖家",
+    "topSellersDildos": "为你推荐的假阳具畅销品",
+    "topCategoriesVibrator": "振动器热门分类",
+    "internationalTopSellersDolls": "国际热销人偶",
+    "popularEssentials": "国际热门必备品",
+    "internationalTopSellers": "国际畅销品",
     "fromNearbySellers": "来自附近卖家"
+  },
+  "category": {
+    "viewAll": "查看全部 →"
+  },
+  "cart": {
+    "title": "购物车",
+    "loadingCart": "正在加载购物车...",
+    "continueShopping": "继续购物",
+    "empty": "购物车是空的",
+    "emptyDescriptionEntiznet": "开始探索我们的优质产品，将商品加入购物车。",
+    "emptyDescriptionPrimediscreet": "发现我们精选的隐私产品。",
+    "startShopping": "开始购物",
+    "each": "每件",
+    "quantity": "数量：",
+    "remove": "删除",
+    "clearAll": "清空购物车",
+    "orderSummary": "订单摘要",
+    "items": "商品",
+    "shipping": "运费",
+    "free": "免费",
+    "total": "总计",
+    "proceedToCheckout": "去结账",
+    "secureCheckout": "安全结账",
+    "discreetPackaging": "隐私包装",
+    "returns": "30天退换"
+  },
+  "checkout": {
+    "title": "结账",
+    "continueShopping": "继续购物",
+    "emptyCart": "购物车是空的",
+    "emptyDescription": "结账前请先添加商品到购物车。",
+    "each": "每件",
+    "total": "总计",
+    "placeOrder": "提交订单",
+    "placingOrder": "正在提交订单...",
+    "remove": "删除",
+    "orderSuccess": "订单已成功提交！",
+    "orderFailure": "下单失败，请重试。"
   },
   "footer": {
     "copyright": "版权所有。",
@@ -65,12 +112,6 @@
   "addToCart": "加入购物车",
   "addedToCart": "已加入购物车！",
   "quantity": "数量：",
-  "continueShopping": "继续购物",
-  "youSave": "您节省",
-  "cart": "购物车",
-  "removeFromCart": "从购物车移除",
-  "checkout": "结账",
-  "total": "总计",
-  "productNotFound": "未找到产品",
-  "browseProducts": "浏览产品"
+  "browseProducts": "浏览产品",
+  "productNotFound": "未找到产品"
 }

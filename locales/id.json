@@ -2,7 +2,9 @@
   "common": {
     "store": "Toko",
     "language": "Bahasa",
-    "currency": "Mata Uang"
+    "currency": "Mata Uang",
+    "selectLanguage": "Pilih bahasa",
+    "selectCurrency": "Pilih mata uang"
   },
   "nav": {
     "home": "Beranda",
@@ -25,8 +27,53 @@
     "featuredBrands": "Merek Unggulan",
     "featuredProducts": "Produk Unggulan",
     "bestSellingProducts": "Produk Terlaris",
+    "bestSellersBeauty": "Terlaris di Kecantikan & Perawatan Pribadi",
+    "localTopSellers": "Terlaris Lokal",
     "topSellers": "Penjual Teratas",
+    "topSellersDildos": "Terlaris dalam Dildo untuk Anda",
+    "topCategoriesVibrator": "Kategori Teratas di Vibrator",
+    "internationalTopSellersDolls": "Terlaris Internasional dalam Boneka",
+    "popularEssentials": "Produk Populer dalam Esensial Internasional",
+    "internationalTopSellers": "Terlaris Internasional",
     "fromNearbySellers": "Dari Penjual Terdekat"
+  },
+  "category": {
+    "viewAll": "Lihat Semua →"
+  },
+  "cart": {
+    "title": "Keranjang Belanja",
+    "loadingCart": "Memuat keranjang Anda...",
+    "continueShopping": "Lanjutkan Belanja",
+    "empty": "Keranjang Anda kosong",
+    "emptyDescriptionEntiznet": "Mulai jelajahi produk premium kami dan tambahkan item ke keranjang.",
+    "emptyDescriptionPrimediscreet": "Temukan pilihan produk diskret kami.",
+    "startShopping": "Mulai Belanja",
+    "each": "masing-masing",
+    "quantity": "Jml:",
+    "remove": "Hapus",
+    "clearAll": "Kosongkan Keranjang",
+    "orderSummary": "Ringkasan Pesanan",
+    "items": "Item",
+    "shipping": "Pengiriman",
+    "free": "Gratis",
+    "total": "Total",
+    "proceedToCheckout": "Lanjut ke Pembayaran",
+    "secureCheckout": "Pembayaran Aman",
+    "discreetPackaging": "Kemasan Diskret",
+    "returns": "Pengembalian 30 Hari"
+  },
+  "checkout": {
+    "title": "Pembayaran",
+    "continueShopping": "Lanjutkan Belanja",
+    "emptyCart": "Keranjang Anda kosong",
+    "emptyDescription": "Tambahkan item ke keranjang sebelum checkout.",
+    "each": "masing-masing",
+    "total": "Total",
+    "placeOrder": "Buat Pesanan",
+    "placingOrder": "Memproses Pesanan...",
+    "remove": "Hapus",
+    "orderSuccess": "Pesanan berhasil dibuat!",
+    "orderFailure": "Gagal membuat pesanan. Silakan coba lagi."
   },
   "footer": {
     "copyright": "Hak cipta dilindungi.",
@@ -65,12 +112,6 @@
   "addToCart": "Tambah ke Keranjang",
   "addedToCart": "Ditambahkan ke Keranjang!",
   "quantity": "Jumlah:",
-  "continueShopping": "Lanjutkan Belanja",
-  "youSave": "Anda hemat",
-  "cart": "Keranjang",
-  "removeFromCart": "Hapus dari Keranjang",
-  "checkout": "Checkout",
-  "total": "Total",
-  "productNotFound": "Produk Tidak Ditemukan",
-  "browseProducts": "Jelajahi Produk"
+  "browseProducts": "Jelajahi Produk",
+  "productNotFound": "Produk Tidak Ditemukan"
 }

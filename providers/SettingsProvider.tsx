@@ -97,7 +97,7 @@ export function SettingsProvider({
 
   const t = (key: string) => state.dict[key] ?? key;
   const money = (n: number | string) =>
-    formatMoney(n, state.currency, state.locale);
+    formatMoney(typeof n === "string" ? parseFloat(n) || 0 : n, state.currency, state.locale);
 
   const value = useMemo(
     () => ({ state, setLocale, setCurrency, t, money }),

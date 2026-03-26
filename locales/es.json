@@ -2,7 +2,9 @@
   "common": {
     "store": "Tienda",
     "language": "Idioma",
-    "currency": "Moneda"
+    "currency": "Moneda",
+    "selectLanguage": "Seleccionar idioma",
+    "selectCurrency": "Seleccionar moneda"
   },
   "nav": {
     "home": "Inicio",
@@ -25,8 +27,53 @@
     "featuredBrands": "Marcas Destacadas",
     "featuredProducts": "Productos Destacados",
     "bestSellingProducts": "Productos Más Vendidos",
+    "bestSellersBeauty": "Los Más Vendidos en Belleza y Cuidado Personal",
+    "localTopSellers": "Los Más Vendidos Locales",
     "topSellers": "Mejores Vendedores",
+    "topSellersDildos": "Los Más Vendidos en Consoladores para ti",
+    "topCategoriesVibrator": "Categorías Principales en Vibradores",
+    "internationalTopSellersDolls": "Los Más Vendidos Internacionales en Muñecas",
+    "popularEssentials": "Productos Populares en Esenciales Internacionalmente",
+    "internationalTopSellers": "Los Más Vendidos Internacionales",
     "fromNearbySellers": "De Vendedores Cercanos"
+  },
+  "category": {
+    "viewAll": "Ver Todo →"
+  },
+  "cart": {
+    "title": "Carrito de Compras",
+    "loadingCart": "Cargando tu carrito...",
+    "continueShopping": "Continuar Comprando",
+    "empty": "Tu carrito está vacío",
+    "emptyDescriptionEntiznet": "Comienza a explorar nuestros productos premium y agrega artículos a tu carrito.",
+    "emptyDescriptionPrimediscreet": "Descubre nuestra selección curada de productos discretos.",
+    "startShopping": "Comenzar a Comprar",
+    "each": "c/u",
+    "quantity": "Cant:",
+    "remove": "Eliminar",
+    "clearAll": "Vaciar Carrito",
+    "orderSummary": "Resumen del Pedido",
+    "items": "Artículos",
+    "shipping": "Envío",
+    "free": "Gratis",
+    "total": "Total",
+    "proceedToCheckout": "Proceder al Pago",
+    "secureCheckout": "Pago Seguro",
+    "discreetPackaging": "Embalaje Discreto",
+    "returns": "Devoluciones en 30 Días"
+  },
+  "checkout": {
+    "title": "Pago",
+    "continueShopping": "Continuar Comprando",
+    "emptyCart": "Tu carrito está vacío",
+    "emptyDescription": "Agrega artículos a tu carrito antes de pagar.",
+    "each": "c/u",
+    "total": "Total",
+    "placeOrder": "Realizar Pedido",
+    "placingOrder": "Realizando Pedido...",
+    "remove": "Eliminar",
+    "orderSuccess": "¡Pedido realizado con éxito!",
+    "orderFailure": "Error al realizar el pedido. Por favor, inténtalo de nuevo."
   },
   "footer": {
     "copyright": "Todos los derechos reservados.",
@@ -65,12 +112,6 @@
   "addToCart": "Añadir al Carrito",
   "addedToCart": "¡Añadido al Carrito!",
   "quantity": "Cantidad:",
-  "continueShopping": "Continuar Comprando",
-  "youSave": "Ahorras",
-  "cart": "Carrito",
-  "removeFromCart": "Quitar del Carrito",
-  "checkout": "Finalizar Compra",
-  "total": "Total",
-  "productNotFound": "Producto No Encontrado",
-  "browseProducts": "Explorar Productos"
+  "browseProducts": "Explorar Productos",
+  "productNotFound": "Producto No Encontrado"
 }

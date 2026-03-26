@@ -1,8 +1,10 @@
 {
   "common": {
-    "store": "Store",
+    "store": "Shop",
     "language": "Sprache",
-    "currency": "Währung"
+    "currency": "Währung",
+    "selectLanguage": "Sprache wählen",
+    "selectCurrency": "Währung wählen"
   },
   "nav": {
     "home": "Startseite",
@@ -25,8 +27,53 @@
     "featuredBrands": "Empfohlene Marken",
     "featuredProducts": "Empfohlene Produkte",
     "bestSellingProducts": "Bestseller",
+    "bestSellersBeauty": "Bestseller in Schönheit & Körperpflege",
+    "localTopSellers": "Lokale Bestseller",
     "topSellers": "Top-Verkäufer",
+    "topSellersDildos": "Bestseller in Dildos für Sie",
+    "topCategoriesVibrator": "Top-Kategorien bei Vibratoren",
+    "internationalTopSellersDolls": "Internationale Bestseller bei Puppen",
+    "popularEssentials": "Beliebte Produkte in Essentials International",
+    "internationalTopSellers": "Internationale Bestseller",
     "fromNearbySellers": "Von Händlern in Ihrer Nähe"
+  },
+  "category": {
+    "viewAll": "Alle anzeigen →"
+  },
+  "cart": {
+    "title": "Warenkorb",
+    "loadingCart": "Warenkorb wird geladen...",
+    "continueShopping": "Weiter Einkaufen",
+    "empty": "Ihr Warenkorb ist leer",
+    "emptyDescriptionEntiznet": "Erkunden Sie unsere Premium-Produkte und fügen Sie Artikel zu Ihrem Warenkorb hinzu.",
+    "emptyDescriptionPrimediscreet": "Entdecken Sie unsere kuratierte Auswahl an diskreten Produkten.",
+    "startShopping": "Einkaufen Starten",
+    "each": "Stück",
+    "quantity": "Menge:",
+    "remove": "Entfernen",
+    "clearAll": "Warenkorb leeren",
+    "orderSummary": "Bestellübersicht",
+    "items": "Artikel",
+    "shipping": "Versand",
+    "free": "Kostenlos",
+    "total": "Gesamt",
+    "proceedToCheckout": "Zur Kasse",
+    "secureCheckout": "Sicherer Checkout",
+    "discreetPackaging": "Diskrete Verpackung",
+    "returns": "30-Tage Rückgabe"
+  },
+  "checkout": {
+    "title": "Kasse",
+    "continueShopping": "Weiter Einkaufen",
+    "emptyCart": "Ihr Warenkorb ist leer",
+    "emptyDescription": "Fügen Sie Artikel zu Ihrem Warenkorb hinzu, bevor Sie zur Kasse gehen.",
+    "each": "Stück",
+    "total": "Gesamt",
+    "placeOrder": "Bestellung aufgeben",
+    "placingOrder": "Bestellung wird aufgegeben...",
+    "remove": "Entfernen",
+    "orderSuccess": "Bestellung erfolgreich aufgegeben!",
+    "orderFailure": "Bestellung fehlgeschlagen. Bitte versuchen Sie es erneut."
   },
   "footer": {
     "copyright": "Alle Rechte vorbehalten.",
@@ -48,7 +95,7 @@
     "sellAsBsm": "Als BSM verkaufen",
     "bsmDashboard": "BSM-Dashboard",
     "bsmResources": "BSM-Ressourcen",
-    "ageRestriction": "Diese Website enthält Inhalte für Erwachsene. Sie müssen 18 Jahre oder älter sein, um darauf zugreifen zu können."
+    "ageRestriction": "Diese Website enthält Inhalte für Erwachsene. Sie müssen 18 Jahre oder älter sein."
   },
   "loading": "Wird geladen…",
   "description": "Beschreibung",
@@ -65,12 +112,6 @@
   "addToCart": "In den Warenkorb",
   "addedToCart": "Zum Warenkorb hinzugefügt!",
   "quantity": "Menge:",
-  "continueShopping": "Weiter Einkaufen",
-  "youSave": "Sie sparen",
-  "cart": "Warenkorb",
-  "removeFromCart": "Aus Warenkorb entfernen",
-  "checkout": "Zur Kasse",
-  "total": "Gesamt",
-  "productNotFound": "Produkt nicht gefunden",
-  "browseProducts": "Produkte durchsuchen"
+  "browseProducts": "Produkte durchsuchen",
+  "productNotFound": "Produkt nicht gefunden"
 }

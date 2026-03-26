@@ -2,7 +2,9 @@
   "common": {
     "store": "ร้านค้า",
     "language": "ภาษา",
-    "currency": "สกุลเงิน"
+    "currency": "สกุลเงิน",
+    "selectLanguage": "เลือกภาษา",
+    "selectCurrency": "เลือกสกุลเงิน"
   },
   "nav": {
     "home": "หน้าแรก",
@@ -25,8 +27,53 @@
     "featuredBrands": "แบรนด์แนะนำ",
     "featuredProducts": "สินค้าแนะนำ",
     "bestSellingProducts": "สินค้าขายดี",
+    "bestSellersBeauty": "ขายดีที่สุดในความงามและการดูแลส่วนตัว",
+    "localTopSellers": "สินค้าขายดีในท้องถิ่น",
     "topSellers": "ผู้ขายยอดนิยม",
+    "topSellersDildos": "สินค้าขายดีในดิลโด้สำหรับคุณ",
+    "topCategoriesVibrator": "หมวดหมู่ยอดนิยมในไวเบรเตอร์",
+    "internationalTopSellersDolls": "สินค้าขายดีระดับสากลในตุ๊กตา",
+    "popularEssentials": "สินค้ายอดนิยมในของจำเป็นระดับสากล",
+    "internationalTopSellers": "สินค้าขายดีระดับสากล",
     "fromNearbySellers": "จากผู้ขายใกล้คุณ"
+  },
+  "category": {
+    "viewAll": "ดูทั้งหมด →"
+  },
+  "cart": {
+    "title": "ตะกร้าสินค้า",
+    "loadingCart": "กำลังโหลดตะกร้าของคุณ...",
+    "continueShopping": "ซื้อต่อ",
+    "empty": "ตะกร้าของคุณว่างเปล่า",
+    "emptyDescriptionEntiznet": "เริ่มสำรวจสินค้าพรีเมียมและเพิ่มสินค้าลงตะกร้า",
+    "emptyDescriptionPrimediscreet": "ค้นพบสินค้าที่คัดสรรมาอย่างดี",
+    "startShopping": "เริ่มช้อปปิ้ง",
+    "each": "ต่อชิ้น",
+    "quantity": "จำนวน:",
+    "remove": "ลบ",
+    "clearAll": "ล้างตะกร้า",
+    "orderSummary": "สรุปคำสั่งซื้อ",
+    "items": "สินค้า",
+    "shipping": "การจัดส่ง",
+    "free": "ฟรี",
+    "total": "รวม",
+    "proceedToCheckout": "ดำเนินการชำระเงิน",
+    "secureCheckout": "ชำระเงินอย่างปลอดภัย",
+    "discreetPackaging": "บรรจุภัณฑ์ปกปิด",
+    "returns": "คืนสินค้าภายใน 30 วัน"
+  },
+  "checkout": {
+    "title": "ชำระเงิน",
+    "continueShopping": "ซื้อต่อ",
+    "emptyCart": "ตะกร้าของคุณว่างเปล่า",
+    "emptyDescription": "เพิ่มสินค้าลงตะกร้าก่อนชำระเงิน",
+    "each": "ต่อชิ้น",
+    "total": "รวม",
+    "placeOrder": "สั่งซื้อ",
+    "placingOrder": "กำลังสั่งซื้อ...",
+    "remove": "ลบ",
+    "orderSuccess": "สั่งซื้อสำเร็จ!",
+    "orderFailure": "สั่งซื้อไม่สำเร็จ กรุณาลองใหม่"
   },
   "footer": {
     "copyright": "สงวนลิขสิทธิ์",
@@ -65,12 +112,6 @@
   "addToCart": "เพิ่มลงตะกร้า",
   "addedToCart": "เพิ่มลงตะกร้าแล้ว!",
   "quantity": "จำนวน:",
-  "continueShopping": "ซื้อต่อ",
-  "youSave": "คุณประหยัด",
-  "cart": "ตะกร้า",
-  "removeFromCart": "ลบจากตะกร้า",
-  "checkout": "ชำระเงิน",
-  "total": "รวม",
-  "productNotFound": "ไม่พบสินค้า",
-  "browseProducts": "เรียกดูสินค้า"
+  "browseProducts": "เรียกดูสินค้า",
+  "productNotFound": "ไม่พบสินค้า"
 }

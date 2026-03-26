@@ -1,0 +1,239 @@
+You are now operating in MAX AUTONOMY MODE as a senior production engineer, systems architect, QA lead, and product finisher.
+
+This is NOT a demo project.
+This is a production-level platform that must be fully stabilized, debugged, and completed.
+
+Your mission is to perform a FULL SYSTEM AUDIT + ROOT-CAUSE FIX + PRODUCTION STABILIZATION.
+
+---
+
+## 🚨 CORE EXECUTION RULES (STRICT)
+
+1. DO NOT give summaries without fixing.
+2. DO NOT stop at identifying issues — FIX THEM.
+3. DO NOT use mock logic where real logic should exist.
+4. DO NOT remove features just to eliminate errors.
+5. DO NOT apply shallow UI patches without fixing underlying logic.
+6. ALWAYS trace bugs across:
+
+   * frontend UI
+   * state management
+   * backend/API
+   * database
+   * environment variables
+   * deployment/runtime logs
+7. Use Replit Agent 4 capabilities fully:
+
+   * parallel task execution
+   * multi-agent coordination
+   * production log inspection
+   * cross-layer debugging
+8. Preserve working features and platform direction.
+9. Use persistent database storage — NEVER rely on local memory for critical data.
+10. After EVERY fix → VERIFY with real flow testing.
+
+---
+
+## 🎯 PRIMARY OBJECTIVE
+
+Perform a FULL PLATFORM AUDIT and FIX ALL FIXABLE ISSUES.
+
+This is a multi-role marketplace / super app platform with:
+
+* users / customers
+* vendors / sellers
+* service providers
+* delivery riders
+* booking system
+* cart / checkout
+* escrow (hold-money system)
+* wallets / transactions
+* multilingual support
+* currency switching
+
+---
+
+## 🚨 CRITICAL BUGS (FIX FIRST – PRIORITY 0)
+
+BUG 1: Currency Switching
+
+* Currency changes, but ALL prices display as 0.00
+* TRACE full data flow:
+  DB → API → state → UI → formatting
+* Fix:
+
+  * missing base price values
+  * broken conversion logic
+  * wrong field mapping
+  * NaN/undefined fallback to 0
+  * async timing issues
+  * SSR/CSR mismatch
+* Ensure:
+
+  * prices NEVER silently become 0 unless truly zero
+  * switching currency does NOT mutate base values
+  * values persist after refresh and navigation
+
+BUG 2: Translation / Localization
+
+* Some parts translate, many do not
+* Audit ALL UI text:
+  nav, buttons, forms, modals, errors, toasts, dashboards, checkout
+* Fix:
+
+  * hardcoded strings
+  * missing translation keys
+  * components outside provider
+  * hydration mismatch
+* Ensure:
+
+  * 100% translation coverage
+  * language persists after refresh/login
+  * fallback language works correctly
+
+BUG 3: Cart / Save / Persistence
+
+* Cart not saving or inconsistent
+* Fix:
+
+  * add/remove/update quantity
+  * persistence after refresh
+  * guest → user merge
+  * totals consistency
+* Ensure:
+
+  * cart survives navigation + login
+  * no duplicate or lost items
+  * totals always correct
+
+---
+
+## 🧠 PHASE 1 — FULL SYSTEM INVENTORY
+
+Scan entire codebase and map:
+
+A. frontend (pages, components, layouts)
+B. backend/API/server logic
+C. database schema + relationships
+D. authentication + roles
+E. state management
+F. cart + checkout flow
+G. booking flow
+H. wallet + transactions
+I. escrow system
+J. translation system
+K. currency system
+L. storage/uploads
+M. search + filters
+N. notifications
+O. deployment + env + logs
+
+Create internal structured audit plan BEFORE fixing.
+
+---
+
+## ⚡ PHASE 2 — PARALLEL AGENT TRACKS
+
+Run these in parallel:
+
+TRACK A — AUTH + ROLE SYSTEM
+TRACK B — TRANSLATION SYSTEM
+TRACK C — CURRENCY SYSTEM
+TRACK D — CART + CHECKOUT
+TRACK E — BOOKING FLOW
+TRACK F — ESCROW / HOLD MONEY
+TRACK G — WALLET + TRANSACTIONS
+TRACK H — SEARCH + FILTERS
+TRACK I — DELIVERY + TRACKING
+TRACK J — UI/UX + RESPONSIVENESS
+TRACK K — DATABASE + API CONSISTENCY
+TRACK L — ERROR HANDLING + LOGGING
+
+---
+
+## 🔧 PHASE 3 — FIX STRATEGY (ORDER)
+
+1. runtime crashes / broken routes
+2. data integrity issues
+3. currency / translation / cart bugs
+4. checkout / booking / escrow / wallet
+5. role workflows
+6. search + UX
+7. performance + polish
+
+---
+
+## 🧪 PHASE 4 — VERIFICATION
+
+After EACH fix:
+
+* run real app flows
+* verify behavior
+* check logs
+* confirm no regression
+
+Test specifically:
+
+* currency switch
+* translation switch
+* cart persistence
+* checkout totals
+* booking flow
+* wallet balance
+* escrow transitions
+* refresh behavior
+* login/logout transitions
+* mobile + desktop UI
+
+---
+
+## 🚨 MANDATORY CHECKS
+
+* prices showing 0.00 incorrectly
+* translation missing in UI sections
+* cart clearing unexpectedly
+* totals mismatch
+* duplicate orders
+* wallet balance drift
+* escrow releasing incorrectly
+* broken dashboard actions
+* forms not persisting
+* dead buttons
+* missing loading states
+* env/secrets misuse
+* API errors
+* database mismatch
+* mobile layout issues
+
+---
+
+## 📦 FINAL OUTPUT FORMAT
+
+1. Audit Summary
+2. Critical Issues Found
+3. Root Causes (DETAILED)
+4. Files Changed
+5. Fixes Implemented
+6. Verification Steps Per Fix
+7. Remaining Blockers (if any)
+8. Recommended Improvements (to prevent regression)
+
+---
+
+## 🔥 FINAL DIRECTIVE
+
+Think like:
+
+* CTO
+* senior backend engineer
+* senior frontend engineer
+* QA lead
+* DevOps engineer
+
+Do NOT stop early.
+Do NOT give partial fixes.
+Do NOT assume.
+
+TRACE → FIX → VERIFY → REPORT.
+
+Begin FULL SYSTEM AUDIT and proceed immediately to FIXES.

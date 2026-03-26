@@ -2,7 +2,9 @@
   "common": {
     "store": "المتجر",
     "language": "اللغة",
-    "currency": "العملة"
+    "currency": "العملة",
+    "selectLanguage": "اختر اللغة",
+    "selectCurrency": "اختر العملة"
   },
   "nav": {
     "home": "الرئيسية",
@@ -25,8 +27,53 @@
     "featuredBrands": "العلامات التجارية المميزة",
     "featuredProducts": "المنتجات المميزة",
     "bestSellingProducts": "المنتجات الأكثر مبيعاً",
+    "bestSellersBeauty": "الأكثر مبيعاً في الجمال والعناية الشخصية",
+    "localTopSellers": "الأكثر مبيعاً محلياً",
     "topSellers": "أفضل البائعين",
+    "topSellersDildos": "الأكثر مبيعاً في القضبان لك",
+    "topCategoriesVibrator": "أفضل الفئات في الهزازات",
+    "internationalTopSellersDolls": "الأكثر مبيعاً دولياً في الدمى",
+    "popularEssentials": "المنتجات الشائعة في الأساسيات دولياً",
+    "internationalTopSellers": "الأكثر مبيعاً دولياً",
     "fromNearbySellers": "من البائعين القريبين"
+  },
+  "category": {
+    "viewAll": "عرض الكل ←"
+  },
+  "cart": {
+    "title": "سلة التسوق",
+    "loadingCart": "جاري تحميل سلتك...",
+    "continueShopping": "متابعة التسوق",
+    "empty": "سلة التسوق فارغة",
+    "emptyDescriptionEntiznet": "ابدأ باستكشاف منتجاتنا المميزة وأضف عناصر إلى سلتك.",
+    "emptyDescriptionPrimediscreet": "اكتشف مجموعتنا المختارة من المنتجات السرية.",
+    "startShopping": "ابدأ التسوق",
+    "each": "للقطعة",
+    "quantity": "الكمية:",
+    "remove": "إزالة",
+    "clearAll": "إفراغ السلة",
+    "orderSummary": "ملخص الطلب",
+    "items": "العناصر",
+    "shipping": "الشحن",
+    "free": "مجاني",
+    "total": "المجموع",
+    "proceedToCheckout": "المتابعة للدفع",
+    "secureCheckout": "دفع آمن",
+    "discreetPackaging": "تغليف سري",
+    "returns": "إرجاع خلال 30 يوم"
+  },
+  "checkout": {
+    "title": "الدفع",
+    "continueShopping": "متابعة التسوق",
+    "emptyCart": "سلة التسوق فارغة",
+    "emptyDescription": "أضف عناصر إلى سلتك قبل الدفع.",
+    "each": "للقطعة",
+    "total": "المجموع",
+    "placeOrder": "تأكيد الطلب",
+    "placingOrder": "جاري تأكيد الطلب...",
+    "remove": "إزالة",
+    "orderSuccess": "تم تأكيد الطلب بنجاح!",
+    "orderFailure": "فشل في تأكيد الطلب. يرجى المحاولة مرة أخرى."
   },
   "footer": {
     "copyright": "جميع الحقوق محفوظة.",
@@ -65,12 +112,6 @@
   "addToCart": "أضف إلى السلة",
   "addedToCart": "تمت الإضافة إلى السلة!",
   "quantity": "الكمية:",
-  "continueShopping": "متابعة التسوق",
-  "youSave": "توفر",
-  "cart": "السلة",
-  "removeFromCart": "إزالة من السلة",
-  "checkout": "إتمام الشراء",
-  "total": "المجموع",
-  "productNotFound": "المنتج غير موجود",
-  "browseProducts": "تصفح المنتجات"
+  "browseProducts": "تصفح المنتجات",
+  "productNotFound": "المنتج غير موجود"
 }

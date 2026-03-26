@@ -18,13 +18,20 @@ interface FeaturedProduct {
 }
 
 interface FeaturedSectionProps {
-  title: string;
+  title?: string;
+  titleKey?: string;
+  titleFallback?: string;
   items: FeaturedProduct[];
   viewAllHref?: string;
+  locale?: string;
+  currency?: string;
+  rates?: any;
 }
 
 export default function FeaturedSection({
   title,
+  titleKey,
+  titleFallback,
   items,
   viewAllHref,
 }: FeaturedSectionProps) {
@@ -35,7 +42,7 @@ export default function FeaturedSection({
       <div className="flex items-center justify-between mb-4">
         {/* Translated title with fallback to prop */}
         <h2 className="text-xl md:text-2xl font-bold text-foreground">
-          <T k="home.featuredProducts" fallback={title} />
+          {titleKey ? <T k={titleKey} fallback={titleFallback || title || ""} /> : (title || titleFallback || "")}
         </h2>
 
         {viewAllHref && (

@@ -2,7 +2,9 @@
   "common": {
     "store": "Магазин",
     "language": "Язык",
-    "currency": "Валюта"
+    "currency": "Валюта",
+    "selectLanguage": "Выберите язык",
+    "selectCurrency": "Выберите валюту"
   },
   "nav": {
     "home": "Главная",
@@ -25,8 +27,53 @@
     "featuredBrands": "Избранные бренды",
     "featuredProducts": "Избранные товары",
     "bestSellingProducts": "Самые продаваемые товары",
+    "bestSellersBeauty": "Бестселлеры в красоте и уходе",
+    "localTopSellers": "Местные бестселлеры",
     "topSellers": "Лучшие продавцы",
+    "topSellersDildos": "Бестселлеры в фаллоимитаторах для вас",
+    "topCategoriesVibrator": "Топ-категории в вибраторах",
+    "internationalTopSellersDolls": "Международные бестселлеры в куклах",
+    "popularEssentials": "Популярные товары первой необходимости",
+    "internationalTopSellers": "Международные бестселлеры",
     "fromNearbySellers": "От ближайших продавцов"
+  },
+  "category": {
+    "viewAll": "Смотреть все →"
+  },
+  "cart": {
+    "title": "Корзина",
+    "loadingCart": "Загрузка корзины...",
+    "continueShopping": "Продолжить покупки",
+    "empty": "Ваша корзина пуста",
+    "emptyDescriptionEntiznet": "Начните исследовать наши премиальные продукты и добавляйте товары в корзину.",
+    "emptyDescriptionPrimediscreet": "Откройте для себя нашу подборку дискретных товаров.",
+    "startShopping": "Начать покупки",
+    "each": "шт.",
+    "quantity": "Кол-во:",
+    "remove": "Удалить",
+    "clearAll": "Очистить корзину",
+    "orderSummary": "Итог заказа",
+    "items": "Товары",
+    "shipping": "Доставка",
+    "free": "Бесплатно",
+    "total": "Итого",
+    "proceedToCheckout": "Перейти к оплате",
+    "secureCheckout": "Безопасная оплата",
+    "discreetPackaging": "Дискретная упаковка",
+    "returns": "Возврат в течение 30 дней"
+  },
+  "checkout": {
+    "title": "Оплата",
+    "continueShopping": "Продолжить покупки",
+    "emptyCart": "Ваша корзина пуста",
+    "emptyDescription": "Добавьте товары в корзину перед оформлением заказа.",
+    "each": "шт.",
+    "total": "Итого",
+    "placeOrder": "Оформить заказ",
+    "placingOrder": "Оформление заказа...",
+    "remove": "Удалить",
+    "orderSuccess": "Заказ успешно оформлен!",
+    "orderFailure": "Не удалось оформить заказ. Попробуйте еще раз."
   },
   "footer": {
     "copyright": "Все права защищены.",
@@ -65,12 +112,6 @@
   "addToCart": "Добавить в корзину",
   "addedToCart": "Добавлено в корзину!",
   "quantity": "Количество:",
-  "continueShopping": "Продолжить покупки",
-  "youSave": "Вы экономите",
-  "cart": "Корзина",
-  "removeFromCart": "Удалить из корзины",
-  "checkout": "Оформить заказ",
-  "total": "Итого",
-  "productNotFound": "Товар не найден",
-  "browseProducts": "Просмотреть товары"
+  "browseProducts": "Просмотреть товары",
+  "productNotFound": "Товар не найден"
 }

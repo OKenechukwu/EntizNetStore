@@ -2,7 +2,9 @@
   "common": {
     "store": "Boutique",
     "language": "Langue",
-    "currency": "Devise"
+    "currency": "Devise",
+    "selectLanguage": "Choisir la langue",
+    "selectCurrency": "Choisir la devise"
   },
   "nav": {
     "home": "Accueil",
@@ -25,8 +27,53 @@
     "featuredBrands": "Marques en Vedette",
     "featuredProducts": "Produits en Vedette",
     "bestSellingProducts": "Produits les Plus Vendus",
+    "bestSellersBeauty": "Meilleures Ventes en Beauté et Soins Personnels",
+    "localTopSellers": "Meilleures Ventes Locales",
     "topSellers": "Meilleurs Vendeurs",
+    "topSellersDildos": "Meilleures Ventes en Godes pour vous",
+    "topCategoriesVibrator": "Catégories Principales en Vibrateurs",
+    "internationalTopSellersDolls": "Meilleures Ventes Internationales en Poupées",
+    "popularEssentials": "Produits Populaires en Essentiels à l'International",
+    "internationalTopSellers": "Meilleures Ventes Internationales",
     "fromNearbySellers": "Des Vendeurs à Proximité"
+  },
+  "category": {
+    "viewAll": "Voir Tout →"
+  },
+  "cart": {
+    "title": "Panier",
+    "loadingCart": "Chargement de votre panier...",
+    "continueShopping": "Continuer les Achats",
+    "empty": "Votre panier est vide",
+    "emptyDescriptionEntiznet": "Commencez à explorer nos produits premium et ajoutez des articles à votre panier.",
+    "emptyDescriptionPrimediscreet": "Découvrez notre sélection de produits discrets.",
+    "startShopping": "Commencer vos Achats",
+    "each": "pièce",
+    "quantity": "Qté:",
+    "remove": "Supprimer",
+    "clearAll": "Vider le Panier",
+    "orderSummary": "Résumé de la Commande",
+    "items": "Articles",
+    "shipping": "Livraison",
+    "free": "Gratuit",
+    "total": "Total",
+    "proceedToCheckout": "Passer à la Caisse",
+    "secureCheckout": "Paiement Sécurisé",
+    "discreetPackaging": "Emballage Discret",
+    "returns": "Retours sous 30 Jours"
+  },
+  "checkout": {
+    "title": "Paiement",
+    "continueShopping": "Continuer les Achats",
+    "emptyCart": "Votre panier est vide",
+    "emptyDescription": "Ajoutez des articles à votre panier avant de passer à la caisse.",
+    "each": "pièce",
+    "total": "Total",
+    "placeOrder": "Passer la Commande",
+    "placingOrder": "Commande en cours...",
+    "remove": "Supprimer",
+    "orderSuccess": "Commande passée avec succès!",
+    "orderFailure": "Échec de la commande. Veuillez réessayer."
   },
   "footer": {
     "copyright": "Tous droits réservés.",
@@ -65,12 +112,6 @@
   "addToCart": "Ajouter au Panier",
   "addedToCart": "Ajouté au Panier!",
   "quantity": "Quantité:",
-  "continueShopping": "Continuer les Achats",
-  "youSave": "Vous économisez",
-  "cart": "Panier",
-  "removeFromCart": "Retirer du Panier",
-  "checkout": "Commander",
-  "total": "Total",
-  "productNotFound": "Produit Introuvable",
-  "browseProducts": "Parcourir les Produits"
+  "browseProducts": "Parcourir les Produits",
+  "productNotFound": "Produit Introuvable"
 }

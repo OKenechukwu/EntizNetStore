@@ -2,7 +2,9 @@
   "common": {
     "store": "Store",
     "language": "Language",
-    "currency": "Currency"
+    "currency": "Currency",
+    "selectLanguage": "Select language",
+    "selectCurrency": "Select currency"
   },
   "nav": {
     "home": "Home",
@@ -25,11 +27,75 @@
     "featuredBrands": "Featured Brands",
     "featuredProducts": "Featured Products",
     "bestSellingProducts": "Best Selling Products",
+    "bestSellersBeauty": "Best Sellers in Beauty & Personal Care",
+    "localTopSellers": "Local Top Sellers",
     "topSellers": "Top Sellers",
+    "topSellersDildos": "Top Sellers in Dildos for you",
+    "topCategoriesVibrator": "Top Categories in Vibrator",
+    "internationalTopSellersDolls": "International Top Sellers in Dolls",
+    "popularEssentials": "Popular Products in Essentials Internationally",
+    "internationalTopSellers": "International Top Sellers",
     "fromNearbySellers": "From Nearby Sellers"
   },
+  "category": {
+    "viewAll": "View All →"
+  },
+  "cart": {
+    "title": "Shopping Cart",
+    "loadingCart": "Loading your cart...",
+    "continueShopping": "Continue Shopping",
+    "empty": "Your cart is empty",
+    "emptyDescriptionEntiznet": "Start exploring our premium products and add items to your cart.",
+    "emptyDescriptionPrimediscreet": "Discover our curated selection of discreet products.",
+    "startShopping": "Start Shopping",
+    "each": "each",
+    "quantity": "Qty:",
+    "remove": "Remove",
+    "clearAll": "Clear Cart",
+    "orderSummary": "Order Summary",
+    "items": "Items",
+    "shipping": "Shipping",
+    "free": "Free",
+    "total": "Total",
+    "proceedToCheckout": "Proceed to Checkout",
+    "secureCheckout": "Secure Checkout",
+    "discreetPackaging": "Discreet Packaging",
+    "returns": "30-Day Returns"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "continueShopping": "Continue Shopping",
+    "emptyCart": "Your cart is empty",
+    "emptyDescription": "Add items to your cart before checking out.",
+    "each": "each",
+    "total": "Total",
+    "placeOrder": "Place Order",
+    "placingOrder": "Placing Order...",
+    "remove": "Remove",
+    "orderSuccess": "Order placed successfully!",
+    "orderFailure": "Failed to place order. Please try again."
+  },
   "footer": {
-    "copyright": "All rights reserved."
+    "copyright": "All rights reserved.",
+    "shop": "Shop",
+    "categories": "Categories",
+    "brands": "Brands",
+    "popular": "Popular",
+    "sale": "Sale",
+    "support": "Support",
+    "helpCenter": "Help Center",
+    "privacy": "Privacy Policy",
+    "terms": "Terms & Conditions",
+    "contact": "Contact Us",
+    "sellers": "For Sellers",
+    "becomeSeller": "Become a Seller",
+    "sellerDashboard": "Seller Dashboard",
+    "sellerResources": "Seller Resources",
+    "bsm": "Brand Success Manager",
+    "sellAsBsm": "Sell as BSM",
+    "bsmDashboard": "BSM Dashboard",
+    "bsmResources": "BSM Resources",
+    "ageRestriction": "This site contains adult content. You must be 18 or older to access."
   },
   "loading": "Loading…",
   "description": "Description",
@@ -42,5 +108,10 @@
   "productSpecifications": "Product Specifications",
   "certificationsSafety": "Certifications & Safety",
   "warrantyInformation": "Warranty Information",
-  "productExpiryInformation": "Product Expiry Information"
+  "productExpiryInformation": "Product Expiry Information",
+  "addToCart": "Add to Cart",
+  "addedToCart": "Added to Cart!",
+  "quantity": "Quantity:",
+  "browseProducts": "Browse Products",
+  "productNotFound": "Product Not Found"
 }

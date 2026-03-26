@@ -2,7 +2,9 @@
   "common": {
     "store": "ストア",
     "language": "言語",
-    "currency": "通貨"
+    "currency": "通貨",
+    "selectLanguage": "言語を選択",
+    "selectCurrency": "通貨を選択"
   },
   "nav": {
     "home": "ホーム",
@@ -25,8 +27,53 @@
     "featuredBrands": "注目ブランド",
     "featuredProducts": "注目製品",
     "bestSellingProducts": "ベストセラー製品",
+    "bestSellersBeauty": "ビューティー＆パーソナルケアのベストセラー",
+    "localTopSellers": "地元のトップセラー",
     "topSellers": "トップセラー",
+    "topSellersDildos": "あなたのためのディルドのトップセラー",
+    "topCategoriesVibrator": "バイブレーターのトップカテゴリー",
+    "internationalTopSellersDolls": "ドールの国際トップセラー",
+    "popularEssentials": "エッセンシャルの人気商品（国際）",
+    "internationalTopSellers": "国際トップセラー",
     "fromNearbySellers": "近くのセラーから"
+  },
+  "category": {
+    "viewAll": "すべて見る →"
+  },
+  "cart": {
+    "title": "ショッピングカート",
+    "loadingCart": "カートを読み込んでいます...",
+    "continueShopping": "ショッピングを続ける",
+    "empty": "カートは空です",
+    "emptyDescriptionEntiznet": "プレミアム製品を探索して、カートにアイテムを追加してください。",
+    "emptyDescriptionPrimediscreet": "厳選されたディスクリート製品をご覧ください。",
+    "startShopping": "ショッピングを始める",
+    "each": "個",
+    "quantity": "数量：",
+    "remove": "削除",
+    "clearAll": "カートを空にする",
+    "orderSummary": "注文概要",
+    "items": "アイテム",
+    "shipping": "配送",
+    "free": "無料",
+    "total": "合計",
+    "proceedToCheckout": "レジへ進む",
+    "secureCheckout": "安全な支払い",
+    "discreetPackaging": "プライバシー配送",
+    "returns": "30日間返品保証"
+  },
+  "checkout": {
+    "title": "お支払い",
+    "continueShopping": "ショッピングを続ける",
+    "emptyCart": "カートは空です",
+    "emptyDescription": "お支払い前にカートにアイテムを追加してください。",
+    "each": "個",
+    "total": "合計",
+    "placeOrder": "注文する",
+    "placingOrder": "注文処理中...",
+    "remove": "削除",
+    "orderSuccess": "注文が正常に完了しました！",
+    "orderFailure": "注文に失敗しました。もう一度お試しください。"
   },
   "footer": {
     "copyright": "無断複写・転載を禁じます。",
@@ -65,12 +112,6 @@
   "addToCart": "カートに追加",
   "addedToCart": "カートに追加されました！",
   "quantity": "数量：",
-  "continueShopping": "ショッピングを続ける",
-  "youSave": "節約額",
-  "cart": "カート",
-  "removeFromCart": "カートから削除",
-  "checkout": "レジへ進む",
-  "total": "合計",
-  "productNotFound": "商品が見つかりません",
-  "browseProducts": "商品を閲覧"
+  "browseProducts": "商品を閲覧",
+  "productNotFound": "商品が見つかりません"
 }

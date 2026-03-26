@@ -32,7 +32,7 @@ const DEMO_IMAGES = [
 const DEMO_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
   id: `product-${i + 1}`,
   title: `Premium Product ${i + 1}`,
-  priceUSD: Number((Math.random() * 100 + 20).toFixed(2)),
+  price: Number((Math.random() * 100 + 20).toFixed(2)),
   rating: parseFloat((Math.random() * 2 + 3).toFixed(1)),
   href: `/products/demo-${i + 1}`,
   image: DEMO_IMAGES[i % DEMO_IMAGES.length],
@@ -63,35 +63,30 @@ export default async function HomePage() {
   const rates = defaultRates();
 
   const blocks = [
-    "Featured Products",
-    "Best Selling Products",
-    "Best Sellers in Beauty & Personal Care",
-    "Local Top sellers",
-    "Top Sellers",
-    "Top Sellers in Dildos for you",
-    "Top categories in Vibrator",
-    "International Top Sellers in Dolls",
-    "Popular Products in Essentials Internationally",
-    "International top sellers",
+    { key: "home.featuredProducts", fallback: "Featured Products" },
+    { key: "home.bestSellingProducts", fallback: "Best Selling Products" },
+    { key: "home.bestSellersBeauty", fallback: "Best Sellers in Beauty & Personal Care" },
+    { key: "home.localTopSellers", fallback: "Local Top Sellers" },
+    { key: "home.topSellers", fallback: "Top Sellers" },
+    { key: "home.topSellersDildos", fallback: "Top Sellers in Dildos for you" },
+    { key: "home.topCategoriesVibrator", fallback: "Top Categories in Vibrator" },
+    { key: "home.internationalTopSellersDolls", fallback: "International Top Sellers in Dolls" },
+    { key: "home.popularEssentials", fallback: "Popular Products in Essentials Internationally" },
+    { key: "home.internationalTopSellers", fallback: "International Top Sellers" },
   ];
 
   return (
     <div className="w-full">
-      {/* Keep hero & categories exactly as before */}
       <HeroSlider />
       <CategoriesRow />
 
-      {/* Render your exact section titles */}
       <div className="space-y-6 pb-12">
-        {blocks.map((label, idx) => (
+        {blocks.map((block, idx) => (
           <FeaturedSection
             key={idx}
-            title={label}
+            titleKey={block.key}
+            titleFallback={block.fallback}
             items={DEMO_PRODUCTS}
-            // currency/i18n props (used by your updated FeaturedSection)
-            locale={locale}
-            currency={currency}
-            rates={rates}
             viewAllHref="/store"
           />
         ))}
