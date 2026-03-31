@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
 import { T } from "@/components/i18n/I18nProvider";
+import I18nText from "@/components/i18n/I18nText";
 import { useBrand } from "@/components/providers/BrandProvider";
 import { convertFromBase, formatPrice } from "@/lib/currency";
 
@@ -85,7 +86,7 @@ export default function FeaturedSection({
 
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-medium text-foreground line-clamp-2">
-                  {item.title}
+                  <I18nText text={item.title} />
                 </h3>
 
                 {typeof item.rating === "number" && item.rating > 0 && (

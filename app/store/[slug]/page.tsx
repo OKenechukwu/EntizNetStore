@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import I18nText from "@/components/i18n/I18nText";
 
 // --- Types ---
 type SellerRow = {
@@ -271,7 +272,7 @@ export default function PublicStorefrontPage() {
                 />
               </div>
               <div className="flex-1">
-                <h3 className="font-medium line-clamp-2 mb-1">{p.title}</h3>
+                <h3 className="font-medium line-clamp-2 mb-1"><I18nText text={p.title} /></h3>
                 <p className="text-accent-gold font-semibold">
                   {currency(p.price)}
                 </p>

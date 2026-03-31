@@ -17,7 +17,8 @@ import {
   Feather,
   Crown,
 } from "lucide-react";
-import { T } from "@/components/i18n/I18nProvider";
+import { T, useI18n } from "@/components/i18n/I18nProvider";
+import I18nText from "@/components/i18n/I18nText";
 
 const CATEGORIES = [
   { name: "Vibrators", icon: <Zap className="h-7 w-7" />, href: "/categories/vibrators" },
@@ -36,7 +37,7 @@ const CATEGORIES = [
   { name: "Supplements", icon: <Star className="h-7 w-7" />, href: "/categories/supplements-and-enhancers" },
   { name: "Candles", icon: <Flame className="h-7 w-7" />, href: "/categories/candles-and-atmosphere" },
   { name: "Education", icon: <Wand2 className="h-7 w-7" />, href: "/categories/education-and-accessories" },
-].slice(0, 16); // 2 rows of 8
+].slice(0, 16);
 
 export default function CategoriesRow() {
   return (
@@ -50,7 +51,6 @@ export default function CategoriesRow() {
         </p>
       </div>
 
-      {/* Grid: 4 cols mobile, 6 cols tablet, 8 cols desktop → Creates 2 rows of 8 on desktop */}
       <div className="grid gap-3 md:gap-4 grid-cols-4 sm:grid-cols-6 md:grid-cols-8">
         {CATEGORIES.map((category) => (
           <Link
@@ -62,7 +62,7 @@ export default function CategoriesRow() {
               {category.icon}
             </div>
             <span className="text-xs font-medium text-center text-foreground/90 transition-colors group-hover:text-brand-secondary">
-              {category.name}
+              <I18nText text={category.name} />
             </span>
           </Link>
         ))}

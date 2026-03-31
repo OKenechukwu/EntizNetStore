@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useBrand } from "@/components/BrandProvider";
 import Link from "next/link";
-import Price from "@/components/ui/Price"; // ⬅️ unified Price component (symbol + conversion)
+import Price from "@/components/ui/Price";
+import I18nText from "@/components/i18n/I18nText";
 
 interface SaleProduct {
   id: string;
@@ -339,7 +340,7 @@ export default function SalePage() {
           className="font-semibold mb-1 line-clamp-2"
           style={{ color: theme.colors.text.primary }}
         >
-          {product.title}
+          <I18nText text={product.title} />
         </h3>
 
         <p

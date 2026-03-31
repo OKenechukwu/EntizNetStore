@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getCart, setQty, removeItem, clearCart, subtotalBase, type CartItem } from '@/lib/cart'
 import Price from '@/components/common/Price'
 import { T, useI18n } from '@/components/i18n/I18nProvider'
+import I18nText from '@/components/i18n/I18nText'
 
 export default function CartPage() {
   const { theme, brand } = useBrand()
@@ -119,7 +120,7 @@ export default function CartPage() {
                     {/* Product Info */}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg mb-1" style={{ color: theme.colors.text.primary }}>
-                        {item.title}
+                        <I18nText text={item.title} />
                       </h3>
                       <p className="text-sm mb-3" style={{ color: theme.colors.text.secondary }}>
                         <Price amount={item.priceBase} /> <T k="cart.each" />

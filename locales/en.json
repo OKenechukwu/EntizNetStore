@@ -4,7 +4,10 @@
     "language": "Language",
     "currency": "Currency",
     "selectLanguage": "Select language",
-    "selectCurrency": "Select currency"
+    "selectCurrency": "Select currency",
+    "shopByCategory": "Shop by Category",
+    "exploreCurated": "Explore our curated collections",
+    "items": "items"
   },
   "nav": {
     "home": "Home",

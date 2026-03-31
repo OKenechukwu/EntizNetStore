@@ -4,7 +4,10 @@
     "language": "भाषा",
     "currency": "मुद्रा",
     "selectLanguage": "भाषा चुनें",
-    "selectCurrency": "मुद्रा चुनें"
+    "selectCurrency": "मुद्रा चुनें",
+    "shopByCategory": "श्रेणी के अनुसार खरीदें",
+    "exploreCurated": "हमारे चुनिंदा संग्रहों का अन्वेषण करें",
+    "items": "आइटम"
   },
   "nav": {
     "home": "होम",

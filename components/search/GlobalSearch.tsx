@@ -3,6 +3,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import I18nText from "@/components/i18n/I18nText";
 
 type ProductLite = {
   id: string;
@@ -144,7 +145,7 @@ export default function GlobalSearch() {
                 <div className="w-10 h-10 rounded bg-white/10" />
               )}
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{p.title}</div>
+                <div className="text-sm font-medium truncate"><I18nText text={p.title} /></div>
                 {p.description ? (
                   <div className="text-xs opacity-70 line-clamp-1">{p.description}</div>
                 ) : null}

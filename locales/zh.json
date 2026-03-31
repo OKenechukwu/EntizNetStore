@@ -4,7 +4,10 @@
     "language": "语言",
     "currency": "货币",
     "selectLanguage": "选择语言",
-    "selectCurrency": "选择货币"
+    "selectCurrency": "选择货币",
+    "shopByCategory": "按类别购物",
+    "exploreCurated": "探索我们精选的系列",
+    "items": "件商品"
   },
   "nav": {
     "home": "首页",

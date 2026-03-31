@@ -4,7 +4,10 @@
     "language": "اللغة",
     "currency": "العملة",
     "selectLanguage": "اختر اللغة",
-    "selectCurrency": "اختر العملة"
+    "selectCurrency": "اختر العملة",
+    "shopByCategory": "تسوق حسب الفئة",
+    "exploreCurated": "استكشف مجموعاتنا المنسقة",
+    "items": "عناصر"
   },
   "nav": {
     "home": "الرئيسية",

@@ -4,7 +4,10 @@
     "language": "Sprache",
     "currency": "Währung",
     "selectLanguage": "Sprache wählen",
-    "selectCurrency": "Währung wählen"
+    "selectCurrency": "Währung wählen",
+    "shopByCategory": "Nach Kategorie einkaufen",
+    "exploreCurated": "Entdecken Sie unsere kuratierten Kollektionen",
+    "items": "Artikel"
   },
   "nav": {
     "home": "Startseite",

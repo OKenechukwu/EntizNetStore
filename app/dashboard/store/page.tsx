@@ -42,7 +42,7 @@ export default async function DashboardStorePage() {
   // Currency preference + FX rates
   const userCurrency =
     cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
-  const rates = await getFxRates(BASE_CURRENCY);
+  const rates = await getFxRates();
 
   // Error state
   if (error) {

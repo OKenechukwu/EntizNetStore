@@ -4,7 +4,10 @@
     "language": "ภาษา",
     "currency": "สกุลเงิน",
     "selectLanguage": "เลือกภาษา",
-    "selectCurrency": "เลือกสกุลเงิน"
+    "selectCurrency": "เลือกสกุลเงิน",
+    "shopByCategory": "เลือกซื้อตามหมวดหมู่",
+    "exploreCurated": "สำรวจคอลเลกชันที่คัดสรร",
+    "items": "รายการ"
   },
   "nav": {
     "home": "หน้าแรก",

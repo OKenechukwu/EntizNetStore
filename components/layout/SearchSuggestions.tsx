@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Search } from "lucide-react";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import I18nText from "@/components/i18n/I18nText";
 
 type Suggestion = {
   id: string;
@@ -185,7 +186,7 @@ export default function SearchSuggestions({ className }: Props) {
                 </div>
               )}
               <div className="flex-1 text-sm">
-                <div className="line-clamp-2 font-medium">{item.title}</div>
+                <div className="line-clamp-2 font-medium"><I18nText text={item.title} /></div>
               </div>
             </Link>
           ))}

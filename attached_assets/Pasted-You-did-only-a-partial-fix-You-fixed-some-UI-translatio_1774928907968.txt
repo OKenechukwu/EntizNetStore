@@ -1,0 +1,94 @@
+You did only a partial fix.
+
+You fixed some UI translation keys, but you did NOT fix the actual localization requirement of this platform.
+
+CRITICAL CORRECTION:
+On this platform, translation must include ALL user-visible product content and ALL user-visible category/tab labels.
+
+That means:
+
+* product names must translate into the selected local language
+* category tabs must translate into the selected local language
+* subcategory tabs must translate into the selected local language
+* any visible product label, tag, badge, variation label, or category label must translate
+
+This is not optional.
+Do not argue that product names should remain in the original language unless they are explicit brand names.
+Generic product names MUST be localized.
+
+Now do a full deep audit specifically for localization of dynamic content.
+
+AUDIT THESE AREAS:
+
+1. Product cards
+2. Product detail pages
+3. Category tabs
+4. Subcategory tabs
+5. Filter labels
+6. Search result labels
+7. Cart item titles
+8. Checkout item titles
+9. Product badges/tags
+10. Product attributes/spec labels
+
+TRACE the full flow:
+
+* source product data
+* demo/mock product data
+* database product schema if present
+* API response shape
+* frontend rendering components
+* translation dictionary / localization utilities
+* category constant files / tab config files / slug-to-label mappings
+
+ROOT GOAL:
+Find why product names and category tabs are staying untranslated even after the UI translation pass.
+
+IMPORTANT:
+If product/category values are dynamic data, implement proper localization support for them.
+Do not just translate static page chrome.
+
+REQUIRED FIX APPROACH:
+A. If product names are currently hardcoded:
+
+* move them into a localization-ready structure
+* support localized fields like:
+  name: { en, es, fr, de, pt, ja, zh, th, ar, id, ru, hi }
+  OR a normalized translation mapping system
+
+B. If categories/tabs are based on slugs/constants:
+
+* create a proper translation map between stable internal slugs and display labels
+* never rely on raw slug strings as final UI labels
+
+C. If the product name is a true brand name:
+
+* preserve the brand name
+* but still translate the generic descriptor around it where applicable
+
+D. Make the rendering components resolve translated values based on current locale consistently on:
+
+* home page
+* category pages
+* product page
+* cart
+* checkout
+* saved items / wishlist if present
+
+VERIFICATION REQUIRED:
+After fixes, verify by switching languages and proving that:
+
+* product names change language
+* category tabs change language
+* product pages show translated titles
+* cart and checkout reflect translated item names
+* no fallback remains stuck in English unless translation is intentionally missing
+
+FINAL OUTPUT FORMAT:
+
+1. exact root cause
+2. files affected
+3. exact implementation strategy used
+4. what now translates that did not before
+5. remaining untranslated cases, if any
+6. proof of verification

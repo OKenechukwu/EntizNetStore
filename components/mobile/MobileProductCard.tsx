@@ -5,6 +5,7 @@ import { useBrand } from '@/components/BrandProvider'
 import WishlistButton from '@/components/wishlist/WishlistButton'
 import Link from 'next/link'
 import Price from '@/components/common/Price'
+import I18nText from '@/components/i18n/I18nText'
 
 interface MobileProductCardProps {
   product: {
@@ -133,7 +134,7 @@ export default function MobileProductCard({ product, className = '' }: MobilePro
         <Link href={`/products/${product.slug}`}>
           <h3 className="font-semibold text-sm line-clamp-2 hover:opacity-80 transition-opacity" 
               style={{ color: theme.colors.text.primary }}>
-            {product.title}
+            <I18nText text={product.title} />
           </h3>
         </Link>
 

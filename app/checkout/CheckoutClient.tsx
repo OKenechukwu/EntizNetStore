@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
 import { getFxRates, convertFromBase, DEFAULT_CURRENCY } from "@/lib/currency";
+import I18nText from "@/components/i18n/I18nText";
 import {
   getCart,
   setQty,
@@ -173,7 +174,7 @@ export default function CheckoutClient() {
                 )}
 
                 <div className="flex-1">
-                  <h3 className="font-medium">{item.title}</h3>
+                  <h3 className="font-medium"><I18nText text={item.title} /></h3>
                   <p className="text-sm text-gray-600">
                     {formatPrice(convertPrice(item.priceBase), userCurrency)}{" "}
                     <T k="checkout.each" />

@@ -1,36 +1,31 @@
-// app/store/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { T, useI18n } from "@/components/i18n/I18nProvider";
+import I18nText from "@/components/i18n/I18nText";
 
 import CategoriesRow from "@/components/home/CategoriesRow";
 import { CATEGORIES } from "@/data/categories";
 
 import {
   getFxRates,
-  convertAndFormatFromBase,
+  convertFromBase,
+  formatPrice,
   type SupportedCurrency,
 } from "@/lib/currency";
 
-/* -------------------------------------------
-   Royal Desire helpers (semantic + surface)
--------------------------------------------- */
 const grad =
   "bg-[linear-gradient(135deg,var(--brand-primary,#5B0060),var(--brand-secondary,#D1B000))]";
 const cardBase =
   "overflow-hidden rounded-[14px] border border-white/10 bg-[var(--surface,rgba(255,255,255,0.04))] backdrop-blur transition hover:bg-white/[0.08]";
 const titleH3 = "mb-4 text-[20px] md:text-[22px] font-extrabold";
 
-/* -------------------------------------------
-   Inline components
--------------------------------------------- */
 function CategoryQuickRow() {
+  const { locale } = useI18n();
   return (
     <section className="w-full px-4 md:px-8 lg:px-12 -mt-2 md:-mt-3">
-      {/* 6 visible categories above the fold (full width, responsive) */}
       <div
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label="Top categories"
@@ -41,7 +36,7 @@ function CategoryQuickRow() {
             key={c.key ?? c.slug ?? c.name}
             href={`/categories/${c.key ?? c.slug}`}
             className={cardBase}
-            aria-label={`${c.name}${c.desc ? ` — ${c.desc}` : ""}`}
+            aria-label={c.name}
             role="listitem"
           >
             <div className="relative aspect-[16/10]">
@@ -55,16 +50,16 @@ function CategoryQuickRow() {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/60" />
               <div className="absolute bottom-1 left-1 right-1 text-[11px] opacity-85">
-                {c.count ?? 0} items
+                {c.count ?? 0} <T k="common.items" fallback="items" />
               </div>
             </div>
             <div className="p-3">
               <div className="line-clamp-1 text-[13.5px] font-bold">
-                {c.name}
+                <I18nText text={c.name} />
               </div>
               {c.desc && (
                 <div className="line-clamp-2 text-[12.5px] opacity-80">
-                  {c.desc}
+                  <I18nText text={c.desc} />
                 </div>
               )}
             </div>
@@ -72,7 +67,6 @@ function CategoryQuickRow() {
         ))}
       </div>
 
-      {/* Quick subcategory chips */}
       {Array.isArray(CATEGORIES?.[0]?.sub) && CATEGORIES[0].sub.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2" aria-label="Quick filters">
           {CATEGORIES[0].sub.map((s: any) => (
@@ -81,7 +75,7 @@ function CategoryQuickRow() {
               className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
               type="button"
             >
-              {s.name ?? s.title}
+              <I18nText text={s.name ?? s.title} />
             </button>
           ))}
         </div>
@@ -114,14 +108,11 @@ function FeaturedBrands() {
   );
 }
 
-/* -------------------------------------------
-   Product item type (store prices in USD, number)
--------------------------------------------- */
 type Item = {
   id: string;
   title: string;
   img: string;
-  priceUSD: number; // ✅ numeric USD base
+  priceUSD: number;
 };
 
 function ProductGrid({
@@ -143,14 +134,12 @@ function ProductGrid({
         role="list"
       >
         {items.map((p) => {
-          const displayPrice = rates
-            ? convertAndFormatFromBase(
-                p.priceUSD,
-                currency as SupportedCurrency,
-                locale,
-                rates,
-              )
-            : ""; // avoid flicker until rates load
+          const converted = rates
+            ? convertFromBase(p.priceUSD, currency as SupportedCurrency, rates)
+            : null;
+          const displayPrice = converted !== null
+            ? formatPrice(converted, currency as SupportedCurrency, locale)
+            : "";
 
           return (
             <Link
@@ -170,7 +159,7 @@ function ProductGrid({
               </div>
               <div className="p-3">
                 <div className="line-clamp-2 text-[13.5px] font-bold">
-                  {p.title}
+                  <I18nText text={p.title} />
                 </div>
                 <div
                   className={`${grad} bg-clip-text font-extrabold text-transparent`}
@@ -186,20 +175,14 @@ function ProductGrid({
   );
 }
 
-/* -------------------------------------------
-   Demo data (now numeric USD, NOT strings)
--------------------------------------------- */
 const demo = (prefix: string, n: number): Item[] =>
   Array.from({ length: n }).map((_, i) => ({
     id: `${prefix}-${i}`,
     title: `Lumina Velvet Oil ${100 + i}ml`,
     img: `/demo/products/p${(i % 6) + 1}.jpg`,
-    priceUSD: 19 + i, // ✅ base in USD as number
+    priceUSD: 19 + i,
   }));
 
-/* -------------------------------------------
-   Main Page
--------------------------------------------- */
 export default function StoreHome() {
   const { t } = useI18n();
 
@@ -208,16 +191,14 @@ export default function StoreHome() {
   const top = useMemo(() => demo("top", 10), []);
   const near = useMemo(() => demo("near", 10), []);
 
-  // Fetch FX rates on mount (client page)
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const r = await getFxRates("USD");
+        const r = await getFxRates();
         if (mounted) setRates(r);
       } catch {
-        // leave null; UI shows loading ellipsis
       }
     })();
     return () => {
@@ -227,7 +208,6 @@ export default function StoreHome() {
 
   return (
     <main className="min-h-screen w-full bg-background text-foreground">
-      {/* Hero (dark + gradient) */}
       <section className="relative mx-auto w-full max-w-screen-2xl px-4 pt-6">
         <div className="relative overflow-hidden rounded-2xl border border-white/10">
           <div className="aspect-[16/6] w-full bg-[linear-gradient(135deg,rgba(120,0,200,0.6),rgba(209,176,0,0.45))]" />
@@ -243,14 +223,11 @@ export default function StoreHome() {
         </div>
       </section>
 
-      {/* Category Section (12 visible + Show more to 17) */}
       <CategoriesRow />
 
-      {/* Quick & Brand Rows */}
       <CategoryQuickRow />
       <FeaturedBrands />
 
-      {/* Product Sections */}
       <ProductGrid
         title={t("home.featuredProducts")}
         items={featured}
@@ -272,7 +249,6 @@ export default function StoreHome() {
         rates={rates}
       />
 
-      {/* Footer */}
       <footer className="mt-16 w-full bg-[var(--brand-primary,#5B0060)] py-10 text-white">
         <div className="px-4 text-center md:px-8 lg:px-12">
           <p className="text-sm opacity-70">

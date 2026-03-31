@@ -4,7 +4,10 @@
     "language": "Bahasa",
     "currency": "Mata Uang",
     "selectLanguage": "Pilih bahasa",
-    "selectCurrency": "Pilih mata uang"
+    "selectCurrency": "Pilih mata uang",
+    "shopByCategory": "Belanja berdasarkan Kategori",
+    "exploreCurated": "Jelajahi koleksi pilihan kami",
+    "items": "item"
   },
   "nav": {
     "home": "Beranda",

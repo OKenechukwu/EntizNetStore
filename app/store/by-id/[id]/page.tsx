@@ -9,7 +9,7 @@ import {
 } from "@/lib/currency";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import AddToCartButton from "./AddToCartButton";
+import AddToCartButton from "../AddToCartButton";
 import ProductDetailsTabs from "@/components/products/ProductDetailsTabs";
 
 type Product = {
@@ -60,7 +60,7 @@ export default async function ProductDetailPage({
   // Currency preference + FX conversion
   const userCurrency =
     cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
-  const rates = await getFxRates(BASE_CURRENCY);
+  const rates = await getFxRates();
   const displayAmount = convertFromBase(
     Number(product.price ?? 0),
     userCurrency,

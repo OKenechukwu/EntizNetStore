@@ -4,7 +4,10 @@
     "language": "Язык",
     "currency": "Валюта",
     "selectLanguage": "Выберите язык",
-    "selectCurrency": "Выберите валюту"
+    "selectCurrency": "Выберите валюту",
+    "shopByCategory": "Покупки по категориям",
+    "exploreCurated": "Исследуйте наши подобранные коллекции",
+    "items": "товаров"
   },
   "nav": {
     "home": "Главная",

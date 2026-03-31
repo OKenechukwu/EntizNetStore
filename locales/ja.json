@@ -4,7 +4,10 @@
     "language": "言語",
     "currency": "通貨",
     "selectLanguage": "言語を選択",
-    "selectCurrency": "通貨を選択"
+    "selectCurrency": "通貨を選択",
+    "shopByCategory": "カテゴリーで探す",
+    "exploreCurated": "厳選されたコレクションを探索",
+    "items": "アイテム"
   },
   "nav": {
     "home": "ホーム",

@@ -4,7 +4,10 @@
     "language": "Idioma",
     "currency": "Moeda",
     "selectLanguage": "Selecionar idioma",
-    "selectCurrency": "Selecionar moeda"
+    "selectCurrency": "Selecionar moeda",
+    "shopByCategory": "Comprar por Categoria",
+    "exploreCurated": "Explore nossas coleções selecionadas",
+    "items": "itens"
   },
   "nav": {
     "home": "Início",

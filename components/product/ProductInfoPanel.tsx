@@ -9,6 +9,7 @@ import { useCurrency } from "@/components/currency/CurrencyProvider";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { convertFromBase, formatMoney } from "@/lib/currency";
 import { DEFAULT_RETURN_POLICY } from "@/types/product";
+import I18nText from "@/components/i18n/I18nText";
 
 type Props = {
   product: Product;
@@ -80,7 +81,7 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
       )}
 
       {/* Title */}
-      <h1 className="text-2xl md:text-3xl font-bold">{product.title}</h1>
+      <h1 className="text-2xl md:text-3xl font-bold"><I18nText text={product.title} /></h1>
 
       {/* Rating & Sold */}
       <div className="flex flex-wrap items-center gap-4 text-sm">
