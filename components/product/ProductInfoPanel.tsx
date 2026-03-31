@@ -102,7 +102,7 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
       <div className="rounded-xl bg-white/5 p-4">
         <div className="flex items-baseline gap-3">
           <div className="text-3xl font-bold text-brand-secondary">
-            {convertAndFormatFromBase(price, { currency, locale })}
+            {formatMoney(price, currency, locale)}
           </div>
           {originalPrice && (
             <div className="text-lg text-white/40 line-through">
