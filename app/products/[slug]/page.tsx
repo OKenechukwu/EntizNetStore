@@ -1,7 +1,12 @@
 // app/products/[slug]/page.tsx
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import {
+  getProductBySlug,
+  getRelatedProducts,
+  getFeaturedProducts,
+  getSellerProducts,
+} from "@/lib/data/products";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductInfoPanelClient from "@/components/product/ProductInfoPanelClient";
 import ProductTabs from "@/components/product/ProductTabs";
@@ -64,83 +69,15 @@ const DEMO_DB = Array.from({ length: 12 }, (_, i) => {
 });
 
 /* ---------------------------------- */
-/* DB fetchers (Supabase) */
+/* DB fetchers (Neon Postgres via lib/data/products) */
 /* ---------------------------------- */
 async function getProductFromDb(slug: string): Promise<Product | null> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("products")
-    .select(
-      `
-      id,
-      slug,
-      title,
-      brand,
-      images,
-      basePrice,
-      originalBasePrice,
-      rating,
-      reviewCount,
-      soldCount,
-      stockRemaining,
-      description,
-      category,
-      store:store_id (
-        id,
-        name,
-        slug
-      )
-    `
-    )
-    .eq("slug", slug)
-    .single();
-
-  if (error || !data) return null;
-
-  return {
-    id: data.id,
-    slug: data.slug,
-    title: data.title,
-    brand: data.brand
-      ? {
-          id: data.brand,
-          name: data.brand,
-          slug: data.brand.toLowerCase().replace(/\s+/g, "-"),
-        }
-      : undefined,
-    images: Array.isArray(data.images)
-      ? data.images.map((url: string) => ({ url }))
-      : [{ url: data.images }],
-    basePrice: data.basePrice,
-    originalBasePrice: data.originalBasePrice ?? undefined,
-    rating: data.rating ?? undefined,
-    reviewCount: data.reviewCount ?? 0,
-    soldCount: data.soldCount ?? 0,
-    stockRemaining: data.stockRemaining ?? 0,
-    description: data.description ?? "",
-    category: data.category ?? "general",
-    shippingOrigin: {
-      country: "United States",
-      isOverseas: false,
-    },
-    deliveryOptions: [
-      {
-        type: "standard",
-        etaDaysMin: 3,
-        etaDaysMax: 7,
-        feeBase: 0, // Free shipping (tweak when you add real shipping)
-      },
-    ],
-    returnPolicy: DEFAULT_RETURN_POLICY,
-    store: data.store
-      ? {
-          id: data.store.id,
-          name: data.store.name,
-          slug: data.store.slug,
-        }
-      : undefined,
-  };
+  try {
+    return await getProductBySlug(slug);
+  } catch (err) {
+    console.error("Failed to load product from database:", err);
+    return null;
+  }
 }
 
 function getProductFromDemo(slug: string): Product | null {
@@ -150,37 +87,12 @@ function getProductFromDemo(slug: string): Product | null {
 
 /* Recommendations for DB product */
 async function getRecommendationsFromDb(productSlug: string): Promise<Product[]> {
-  const supabase = createClient();
-
-  const { data: product } = await supabase
-    .from("products")
-    .select("id, category")
-    .eq("slug", productSlug)
-    .single();
-
-  if (!product) return [];
-
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, slug, title, basePrice, images, brand, rating, reviewCount")
-    .eq("category", product.category)
-    .neq("id", product.id)
-    .limit(8);
-
-  if (error || !data) return [];
-
-  return data.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    title: p.title,
-    basePrice: p.basePrice,
-    images: Array.isArray(p.images) ? p.images.map((url: string) => ({ url })) : [{ url: p.images }],
-    brand: p.brand
-      ? { id: p.brand, name: p.brand, slug: p.brand.toLowerCase().replace(/\s+/g, "-") }
-      : undefined,
-    rating: (p as any).rating ?? undefined,
-    reviewCount: (p as any).reviewCount ?? 0,
-  }));
+  try {
+    return await getRelatedProducts(productSlug, 8);
+  } catch (err) {
+    console.error("Failed to load recommendations:", err);
+    return [];
+  }
 }
 
 /* Recommendations for demo product */
@@ -190,25 +102,12 @@ function getRecommendationsFromDemo(currentSlug: string): Product[] {
 
 /* Sponsored (DB) */
 async function getSponsoredProductsDb(): Promise<Product[]> {
-  const supabase = createClient();
-
-  const { data } = await supabase
-    .from("products")
-    .select("id, slug, title, images, basePrice, brand")
-    .limit(6);
-
-  if (!data) return [];
-
-  return data.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    title: p.title,
-    images: Array.isArray(p.images) ? p.images.map((url: string) => ({ url })) : [{ url: p.images }],
-    basePrice: p.basePrice,
-    brand: p.brand
-      ? { id: p.brand, name: p.brand, slug: p.brand.toLowerCase().replace(/\s+/g, "-") }
-      : undefined,
-  }));
+  try {
+    return await getFeaturedProducts(6);
+  } catch (err) {
+    console.error("Failed to load sponsored products:", err);
+    return [];
+  }
 }
 
 /* Sponsored (demo) */
@@ -218,27 +117,12 @@ function getSponsoredProductsDemo(): Product[] {
 
 /* More from store (DB only – demo has no store) */
 async function getStoreProducts(storeId: string, excludeId: string): Promise<Product[]> {
-  const supabase = createClient();
-
-  const { data } = await supabase
-    .from("products")
-    .select("id, slug, title, images, basePrice, brand")
-    .eq("store_id", storeId)
-    .neq("id", excludeId)
-    .limit(8);
-
-  if (!data) return [];
-
-  return data.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    title: p.title,
-    images: Array.isArray(p.images) ? p.images.map((url: string) => ({ url })) : [{ url: p.images }],
-    basePrice: p.basePrice,
-    brand: p.brand
-      ? { id: p.brand, name: p.brand, slug: p.brand.toLowerCase().replace(/\s+/g, "-") }
-      : undefined,
-  }));
+  try {
+    return await getSellerProducts(storeId, excludeId, 8);
+  } catch (err) {
+    console.error("Failed to load store products:", err);
+    return [];
+  }
 }
 
 /* ---------------------------------- */
@@ -269,7 +153,7 @@ export default async function ProductPage({ params }: Props) {
   // 2) Fallback to demo if DB not found
   const isDemo = !product;
   if (!product) {
-    product = getProductFromDemo(params.slug) ?? undefined;
+    product = getProductFromDemo(params.slug);
   }
 
   if (!product) {

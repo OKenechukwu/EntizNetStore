@@ -4,7 +4,17 @@
 
 EntizNet is a Next.js 14 marketplace application built with TypeScript and App Router featuring a sophisticated dual brand architecture. The platform serves as a comprehensive luxury adult marketplace with two distinct brand experiences: EntizNetStore (warm luxury gold/ivory theme) and PrimeDiscreet (sophisticated champagne/charcoal theme). Users can browse products, manage inventory, handle orders through an escrow system, and enjoy brand-specific experiences with dedicated seller dashboards, KYC verification, and premium theming.
 
+## Database: Source of Truth
+
+- **All live application data (products, sellers, orders, reviews, etc.) lives in the Neon Postgres database at `NEON_DATABASE_URL`.** Server-side access goes through `lib/db.ts` (pg Pool) and the query helpers in `lib/data/products.ts`.
+- **Supabase (`NEXT_PUBLIC_SUPABASE_URL`) is used for authentication only.** The Supabase project contains no application tables — do not read or write app data through supabase-js.
+- Client components must never query the database directly; they fetch through server API routes (e.g. `/api/search/products`, `/api/storefront/[id]`).
+
 ## Recent Changes
+
+### August 2026 - Reconnected store to live Neon database
+- Product detail (`/products/[slug]`), seller dashboard (`/seller/dashboard`), search (`/search` + `/api/search/products`), and public storefront (`/store/[slug]` via `/api/storefront/[id]`) now read real rows from Neon instead of the empty Supabase project
+- Added `lib/db.ts` (Neon pg pool, single source of truth) and `lib/data/products.ts` (server-side product queries mapped to the real schema: `base_price`, `marketplace_brand`, `product_media`, review aggregates)
 
 ### October 2025 - Currency/Locale Decoupling + Lazada-Style Product Page
 - **Full Currency/Locale Independence**: Completely decoupled language and currency selection - changing language never changes currency

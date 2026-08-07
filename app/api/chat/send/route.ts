@@ -1,41 +1,32 @@
 // app/api/chat/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { translate } from "@/lib/i18n/translate";
-import { db } from "@/lib/db"; // your DB client
-import { getUserPreferredLang } from "@/lib/user-prefs"; // implement this
+import { query } from "@/lib/db";
 
+// Persists chat messages in the live Neon database (messages table).
 export async function POST(req: NextRequest) {
-  const { text, threadId, senderId, recipientId, sourceLang } =
-    await req.json();
+  try {
+    const { text, threadId, senderId, recipientId } = await req.json();
 
-  const recipientLang = await getUserPreferredLang(recipientId); // e.g., "fr"
-  let translatedText = text;
+    if (!text || !senderId || !recipientId) {
+      return NextResponse.json(
+        { error: "text, senderId and recipientId are required" },
+        { status: 400 }
+      );
+    }
 
-  if (recipientLang && recipientLang !== sourceLang) {
-    translatedText = await translate(text, recipientLang, {
-      formality: "default",
-    });
+    const rows = await query<{ id: string }>(
+      `INSERT INTO messages (sender_id, recipient_id, content, conversation_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [senderId, recipientId, text, threadId ?? null]
+    );
+
+    return NextResponse.json({ ok: true, messageId: rows[0]?.id });
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    return NextResponse.json(
+      { error: "Failed to send message" },
+      { status: 500 }
+    );
   }
-
-  // 1) Save original
-  const msg = await db.message.create({
-    data: { threadId, senderId, text, sourceLang },
-  });
-
-  // 2) Cache translation (optional but ideal for speed)
-  if (translatedText !== text) {
-    await db.messageTranslation.create({
-      data: {
-        messageId: msg.id,
-        lang: recipientLang,
-        text: translatedText,
-        provider: "deepl",
-      },
-    });
-  }
-
-  // 3) Notify recipient (realtime / socket / supabase)
-  // publish({ threadId, message: { ...msg, textForRecipient: translatedText } });
-
-  return NextResponse.json({ ok: true, messageId: msg.id });
 }

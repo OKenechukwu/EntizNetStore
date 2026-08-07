@@ -9,3 +9,4 @@ Verified 2026-08-07 during inspection-only audit:
 - RLS on Neon is effectively off: products and most tables have RLS disabled; a few tables have RLS enabled with 0 policies; only `notifications` has 4 policies (public role, JWT-claim based). The connecting role `neondb_owner` has BYPASSRLS anyway.
 **Why:** any "fix RLS/ownership" work must target the Neon DB reality, not the Supabase migrations in `supabase/migrations/`, and RLS cannot protect anything while the app's data path (Supabase REST) points at an empty project.
 **How to apply:** before schema/security changes, re-verify which database the app actually reads at runtime and reconcile the Supabase-vs-Neon split first.
+- Decision (2026-08-07): Neon is the single source of truth for app data; Supabase is auth-only. There is no persisted storefront slug — public storefront URLs resolve by seller UUID or a slug derived from the storefront name.

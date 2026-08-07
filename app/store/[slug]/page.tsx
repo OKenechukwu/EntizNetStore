@@ -19,6 +19,7 @@ type SellerRow = {
 
 type Product = {
   id: string;
+  slug?: string | null;
   title: string;
   price: number;
   image_url: string | null;
@@ -58,53 +59,25 @@ export default function PublicStorefrontPage() {
     async function run() {
       setLoading(true);
       try {
-        // 1) Resolve seller
-        let sellerRes = await supabase
-          .from("seller_profile")
-          .select("id,storefront_name,bio,logo_url,banner_url,store_slug")
-          .eq("store_slug", slug)
-          .maybeSingle();
-
-        if (!sellerRes.data) {
-          // fallback: allow /store/{seller_id}
-          sellerRes = await supabase
-            .from("seller_profile")
-            .select("id,storefront_name,bio,logo_url,banner_url,store_slug")
-            .eq("id", slug)
-            .maybeSingle();
-        }
+        // Fetch seller + products from the live database via server API
+        const params = new URLSearchParams({ page: String(page) });
+        if (q) params.set("q", q);
+        const res = await fetch(
+          `/api/storefront/${encodeURIComponent(String(slug))}?${params.toString()}`,
+          { cache: "no-store" },
+        );
 
         if (cancelled) return;
 
-        if (!sellerRes.data) {
+        if (!res.ok) {
           router.replace("/store"); // seller not found → back to marketplace
           return;
         }
-        setSeller(sellerRes.data);
 
-        // 2) Count products
-        const { count: total } = await supabase
-          .from("products")
-          .select("*", { count: "exact", head: true })
-          .eq("seller_id", sellerRes.data.id)
-          .eq("status", "active")
-          .ilike("title", q ? `%${q}%` : "%");
-
-        if (typeof total === "number") setCount(total || 0);
-
-        // 3) Page products
-        const { data: prods } = await supabase
-          .from("products")
-          .select("id,title,price,image_url,status,created_at")
-          .eq("seller_id", sellerRes.data.id)
-          .eq("status", "active")
-          .ilike("title", q ? `%${q}%` : "%")
-          .order("created_at", { ascending: false })
-          .range(from, to);
-
-        if (!cancelled) {
-          setProducts(prods || []);
-        }
+        const json = await res.json();
+        setSeller(json.seller ?? null);
+        setCount(Number(json.count ?? 0));
+        setProducts(Array.isArray(json.products) ? json.products : []);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -285,7 +258,7 @@ export default function PublicStorefrontPage() {
                   Add to Cart
                 </button>
                 <Link
-                  href={`/product/${p.id}`}
+                  href={`/products/${p.slug || p.id}`}
                   className="luxury-button-outline py-2 px-3"
                 >
                   View

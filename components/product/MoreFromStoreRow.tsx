@@ -33,13 +33,13 @@ export default function MoreFromStoreRow({ storeName, storeSlug, products }: Pro
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-bold">
           More from{" "}
-          <Link href={`/stores/${storeSlug}`} className="text-brand-secondary hover:underline">
+          <Link href={`/store/${storeSlug}`} className="text-brand-secondary hover:underline">
             {storeName}
           </Link>
         </h2>
         <div className="flex items-center gap-4">
           <Link
-            href={`/stores/${storeSlug}`}
+            href={`/store/${storeSlug}`}
             className="text-sm text-brand-secondary hover:underline"
           >
             View Store

@@ -175,21 +175,44 @@ function ProductGrid({
   );
 }
 
-const demo = (prefix: string, n: number): Item[] =>
-  Array.from({ length: n }).map((_, i) => ({
-    id: `${prefix}-${i}`,
-    title: `Lumina Velvet Oil ${100 + i}ml`,
-    img: `/demo/products/p${(i % 6) + 1}.jpg`,
-    priceUSD: 19 + i,
-  }));
-
 export default function StoreHome() {
   const { t } = useI18n();
 
-  const featured = useMemo(() => demo("feat", 10), []);
-  const best = useMemo(() => demo("best", 10), []);
-  const top = useMemo(() => demo("top", 10), []);
-  const near = useMemo(() => demo("near", 10), []);
+  // Live products from the marketplace database (via server API)
+  const [items, setItems] = useState<Item[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/search/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marketplace_brand: "", limit: 40 }),
+        });
+        const json = await res.json();
+        if (mounted && Array.isArray(json.products)) {
+          setItems(
+            json.products.map((p: any) => ({
+              id: p.slug ?? p.id,
+              title: p.title ?? p.name,
+              img: p.image_url,
+              priceUSD: Number(p.base_price ?? 0),
+            })),
+          );
+        }
+      } catch (e) {
+        console.error("Failed to load live products:", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const featured = useMemo(() => items.slice(0, 10), [items]);
+  const best = useMemo(() => items.slice(0, 10), [items]);
+  const top = useMemo(() => [...items].sort((a, b) => b.priceUSD - a.priceUSD).slice(0, 10), [items]);
+  const near = useMemo(() => [...items].reverse().slice(0, 10), [items]);
 
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   useEffect(() => {

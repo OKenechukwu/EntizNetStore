@@ -4,7 +4,6 @@
 import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBrand } from "@/components/BrandProvider";
-import { getSupabaseClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import Price from "@/components/ui/Price";
 
@@ -28,7 +27,6 @@ function SearchResults() {
   const initialQuery = searchParams.get("q") || "";
 
   const { theme, brand } = useBrand();
-  const supabase = getSupabaseClient();
 
   const [q, setQ] = useState<string>(initialQuery);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -100,7 +98,7 @@ function SearchResults() {
             name: p.name,
             description: p.description,
             price: Number(p?.base_price ?? p?.price ?? 0),
-            slug: p.id,
+            slug: p.slug ?? p.id,
             image_url: p.image_url,
             rating: p.rating,
             reviews_count: p.reviews_count,
@@ -128,24 +126,22 @@ function SearchResults() {
   const loadRelatedProducts = async (searchQuery: string) => {
     try {
       const term = (searchQuery.toLowerCase().split(" ")[0] || "").trim();
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, description, base_price, status, marketplace_brand, created_at, updated_at, image_url"
-        )
-        .or(`name.ilike.%${term}%,description.ilike.%${term}%,tags.ilike.%${term}%`)
-        .eq("marketplace_brand", brand)
-        .eq("status", "active")
-        .limit(8);
+      const res = await fetch("/api/search/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: term, marketplace_brand: brand, limit: 8 }),
+      });
+      const json = await res.json();
+      const data = Array.isArray(json.products) ? json.products : null;
 
-      if (!error && data) {
+      if (data) {
         // ✅ Normalize price for related
         const processed = data.map((p: any) => ({
           id: p.id,
           name: p.name,
           description: p.description,
           price: Number(p?.base_price ?? p?.price ?? 0),
-          slug: p.id,
+          slug: p.slug ?? p.id,
           image_url: p.image_url,
         })) as Product[];
 
@@ -161,24 +157,22 @@ function SearchResults() {
 
   const loadRecommendedProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, description, base_price, status, marketplace_brand, created_at, updated_at, image_url"
-        )
-        .eq("marketplace_brand", brand)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(6);
+      const res = await fetch("/api/search/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketplace_brand: brand, limit: 6 }),
+      });
+      const json = await res.json();
+      const data = Array.isArray(json.products) ? json.products : null;
 
-    if (!error && data) {
+    if (data) {
         // ✅ Normalize price for recommended
         const processed = data.map((p: any) => ({
           id: p.id,
           name: p.name,
           description: p.description,
           price: Number(p?.base_price ?? p?.price ?? 0),
-          slug: p.id,
+          slug: p.slug ?? p.id,
           image_url: p.image_url,
         })) as Product[];
 
@@ -194,7 +188,7 @@ function SearchResults() {
 
   // Local ProductCard -> uses <Price amountUSD + rates>
   const ProductCard = ({ product }: { product: Product }) => (
-    <Link href={`/store/${product.id}`} className="group">
+    <Link href={`/products/${product.slug || product.id}`} className="group">
       <div
         className="border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300"
         style={{ borderColor: theme.colors.glass.border }}
