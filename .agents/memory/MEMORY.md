@@ -1,0 +1,1 @@
+- [Live DB topology](live-db-topology.md) — live data is in Neon (`NEON_DATABASE_URL`), Supabase project is empty; products ownership = seller_id only, RLS effectively off.

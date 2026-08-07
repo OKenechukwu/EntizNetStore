@@ -1,0 +1,210 @@
+EntizNetStore — Live Product Ownership & RLS Verification
+
+We are beginning controlled stabilization of the existing EntizNetStore project.
+
+IMPORTANT: THIS TASK IS INSPECTION ONLY.
+
+Do not edit application code.
+
+Do not create, edit, delete, rename, or apply migrations.
+
+Do not alter database tables, columns, indexes, constraints, functions, triggers, RLS policies, or storage policies.
+
+Do not insert, update, or delete database records.
+
+Do not install packages.
+
+Do not deploy.
+
+Do not commit or push.
+
+Do not attempt to “fix” anything yet.
+
+We previously completed a technical audit which discovered a serious ownership inconsistency:
+
+Repository migrations use:
+
+products.provider_id
+
+while parts of the current application use:
+
+products.owner
+
+For example:
+
+* Product creation currently writes `provider_id`
+* Seller dashboard queries use `owner`
+* Seller edit routes use `owner`
+* Historical RLS information suggests both `owner` and `provider_id` may have existed
+
+We must determine the CURRENT LIVE DATABASE TRUTH before changing anything.
+
+TASK 1 — Inspect the live products schema
+
+Inspect the actual connected Supabase `products` table.
+
+Report whether these columns currently exist:
+
+* owner
+* provider_id
+* seller_id
+* owner_id
+* user_id
+
+Also report the relevant current columns including:
+
+* id
+* title
+* description
+* price
+* images
+* status, if present
+* stock/inventory-related fields, if present
+* created_at
+* updated_at
+
+For each relevant column report:
+
+* name
+* type
+* nullable/not nullable
+* default
+* foreign key relationship
+
+Do not expose actual user IDs or personal information.
+
+TASK 2 — Ownership consistency
+
+If BOTH `owner` and `provider_id` exist, use aggregate/read-only inspection to determine:
+
+* total product count
+* number where owner is null
+* number where provider_id is null
+* number where both are populated
+* number where values match
+* number where values differ
+
+Do not print full rows or user UUID lists.
+
+If only one field exists, clearly state that.
+
+TASK 3 — Inspect current products RLS
+
+Inspect every CURRENT RLS policy on the live `products` table.
+
+Report:
+
+* policy name
+* operation
+* roles
+* USING condition
+* WITH CHECK condition
+* permissive/restrictive
+
+Then explain the effective behavior for:
+
+1. Anonymous visitor viewing products
+2. Logged-in buyer viewing products
+3. Seller creating a product
+4. Seller viewing own products
+5. Seller updating own products
+6. Seller deleting own products
+7. Seller attempting to modify another seller's product
+
+Do not modify the policies.
+
+TASK 4 — Seller authorization
+
+Inspect the current tables related to roles, sellers, providers, profiles, or user capabilities.
+
+Determine:
+
+* whether any authenticated user can currently create a product;
+* whether there is a seller-specific authorization check;
+* how the system currently determines that a user is allowed to sell;
+* whether users can assign themselves privileged seller/provider roles.
+
+Do not change anything.
+
+TASK 5 — Product image storage
+
+Inspect the current Supabase storage configuration for the `store-products` bucket.
+
+Report:
+
+* whether the bucket exists;
+* whether it is public or private;
+* who can read files;
+* who can upload;
+* who can update/delete;
+* whether uploads are ownership scoped;
+* whether one seller could potentially upload or modify images belonging to another seller.
+
+Do not upload or delete files.
+
+TASK 6 — Compare database with repository
+
+Compare the verified live database with:
+
+* `supabase/migrations/001_create_store_schema.sql`
+* `supabase/migrations/002_add_rls_policies.sql`
+* `supabase/migrations/003_create_orders_table.sql`
+* current application files using `owner`
+* current application files using `provider_id`
+
+Report every important mismatch.
+
+Especially tell us whether rebuilding a fresh Supabase database using the repository migrations would create a database different from the current live system.
+
+REQUIRED FINAL REPORT
+
+Return:
+
+A. Current live ownership model
+
+Clearly state whether:
+
+* owner exists
+* provider_id exists
+* both exist
+
+and which appears to be the currently used ownership field.
+
+B. Ownership data consistency
+
+Aggregate counts only.
+
+C. Current live product RLS
+
+Include a table of active policies.
+
+D. Seller authorization status
+
+Explain who can currently create and manage products.
+
+E. Product storage security
+
+F. Live database vs repository migration differences
+
+G. Risks discovered
+
+Rank:
+
+CRITICAL
+HIGH
+MEDIUM
+LOW
+
+H. Recommended correction sequence
+
+Recommend small independent fixes in the safest order.
+
+DO NOT IMPLEMENT THEM.
+
+I. First implementation recommendation
+
+Recommend exactly ONE narrowly scoped first change.
+
+Stop after the report.
+
+Do not modify anything.
