@@ -53,3 +53,7 @@ externalPort = 80
 
 [userenv.shared]
 NEXT_PUBLIC_SUPPORTED_LOCALES = "en,es,fr,de,pt,ja,zh,th,ar,id,ru,hi"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
