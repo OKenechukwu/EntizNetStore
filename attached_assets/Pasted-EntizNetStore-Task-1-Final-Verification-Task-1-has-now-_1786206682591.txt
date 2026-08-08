@@ -1,0 +1,152 @@
+EntizNetStore — Task #1 Final Verification
+
+Task #1 has now been implemented.
+
+The Git commit states that EntizNetStore now uses a server-side PostgreSQL/Neon data layer for marketplace data while Supabase remains authentication-only.
+
+This task is VERIFICATION ONLY.
+
+Do not edit any files.
+Do not fix anything.
+Do not change database data or schema.
+Do not change environment variables.
+Do not create migrations.
+Do not install packages.
+
+Verify the implementation that was just merged.
+
+1. Database architecture
+
+Confirm:
+
+Neon is now the canonical runtime database for marketplace data.
+Supabase is now used only for authentication.
+NEON_DATABASE_URL is used only in server-side code.
+The Neon connection string or credentials are never exposed to client/browser code.
+Identify exactly which module creates the Neon connection.
+2. Changed routes
+
+Verify each route changed by Task #1:
+
+/store
+product detail
+/store/[slug]
+seller dashboard
+product search
+storefront API/pages
+recommendation/product components
+chat/send route if changed
+
+For each, state:
+
+working;
+broken;
+partially working;
+not tested.
+3. Existing marketplace data
+
+Confirm through the application runtime:
+
+the existing 14 Neon products can be queried;
+/store loads products from Neon;
+product detail pages load;
+seller storefront pages load;
+search returns Neon products.
+
+Do not modify any products.
+
+4. Authentication boundary
+
+This is critical.
+
+Explain exactly how a Supabase-authenticated user's identity is trusted by the new Neon server-side data layer.
+
+Verify whether:
+
+the server validates the Supabase session before seller operations;
+the authenticated Supabase user UUID is used when querying Neon seller data;
+a browser/client cannot provide an arbitrary seller_id and impersonate another seller;
+Neon queries for seller-owned resources are performed server-side only.
+
+Do not fix anything if a weakness is found. Report it.
+
+5. Seller dashboard
+
+Confirm whether the seller dashboard currently queries:
+
+products.seller_id
+
+rather than:
+
+owner
+
+or:
+
+provider_id.
+
+Also state whether product create/edit/delete routes still contain owner or provider_id references.
+
+6. Product schema compatibility
+
+Check whether current runtime pages now correctly use the live Neon schema, particularly:
+
+seller_id
+base_price
+product_media
+slug
+status
+
+Report remaining application references to obsolete fields such as:
+
+owner
+provider_id
+products.price
+products.images
+7. Security
+
+Confirm whether Task #1 introduced any direct client-side database access to Neon.
+
+Check whether SQL queries use parameters rather than string concatenation.
+
+Identify any route where user-provided IDs, slugs, search text, seller IDs, or product IDs could reach SQL unsafely.
+
+Do not modify anything.
+
+8. Build and runtime validation
+
+Report results for:
+
+app startup;
+TypeScript check;
+production build;
+lint if configured;
+scripts/verify-live-db.mjs;
+/store runtime test;
+product-detail runtime test;
+search runtime test;
+seller dashboard runtime test.
+9. Post-merge additions
+
+Explain:
+
+why scripts/post-merge.sh was added;
+why .replit was changed;
+which packages Task #1 added;
+whether those additions are required for the Neon implementation.
+10. Final verdict
+
+Clearly separate:
+
+CONFIRMED WORKING
+
+STILL BROKEN
+
+SECURITY RISKS
+
+NOT TESTED
+
+RECOMMENDED NEXT TASK
+
+Do not implement the next task.
+
+Stop after the verification report.
