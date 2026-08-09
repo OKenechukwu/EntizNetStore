@@ -16,3 +16,6 @@ pnpm-debug.log*
 # OS / Misc
 .DS_Store
 supabase/.temp/
+
+# Database backups — never commit dumps
+backups/*.dump

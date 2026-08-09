@@ -1,0 +1,96 @@
+EntizNetStore — Module 1C-1A Final Safety Check Before Supabase Apply
+
+Before applying the canonical Supabase baseline, perform the following safety checks.
+
+Do not apply anything to Supabase yet.
+
+Do not modify source database data.
+
+1. Backup security
+
+Inspect:
+
+backups/replit_database_20260809T114139Z.dump
+
+backups/legacy_neon_20260809T114139Z.dump
+
+Confirm whether either backup is:
+
+Git tracked;
+staged;
+included in any commit/checkpoint;
+capable of being pushed to GitHub.
+
+These database dumps must NOT be committed to the repository.
+
+Ensure the backup dump pattern/directory is excluded by .gitignore.
+
+The human-readable backup manifest may remain tracked as long as it contains no secrets or private record contents.
+
+If either dump has already entered Git history, STOP and report exactly what happened before attempting history rewriting.
+
+Do not delete the backups themselves.
+
+2. Confirm target Supabase migration history
+
+Inspect the connected EntizNetStore Supabase project read-only.
+
+Confirm:
+
+whether supabase_migrations.schema_migrations contains any applied project migration versions;
+whether migrations 001–006 were ever applied to this Supabase project;
+whether the target remains effectively clean.
+
+Do not alter migration history.
+
+3. Legacy migration disposition
+
+The old repository migrations must remain preserved for historical reference, but must NOT execute against the new canonical Supabase backend.
+
+If the target Supabase project confirms they were never applied:
+
+propose the safest way to move the obsolete migrations out of the active:
+
+supabase/migrations/
+
+execution path while preserving their contents in a clearly named archive/reference directory.
+
+Do not delete them.
+
+Do not rewrite their SQL.
+
+Do not perform the move yet unless it is clearly required to prepare the clean migration history; report the exact proposed file moves first.
+
+4. Canonical baseline confirmation
+
+Confirm the only migration intended to establish the new EntizNetStore Supabase marketplace schema is:
+
+20260809114139_canonical_marketplace_baseline.sql
+
+Confirm it still has:
+
+23 application tables;
+seller_id as product ownership;
+no owner;
+no provider_id;
+no products.price;
+no products.images;
+RLS enabled;
+zero final RLS policies at this stage;
+no migrated marketplace data;
+no Auth users;
+no Storage buckets.
+5. Report only
+
+Return:
+
+backup Git-safety status;
+Supabase migration-history status;
+exact legacy migration files that need to leave the active migration directory;
+proposed archive location;
+confirmation that the canonical baseline is ready;
+GO / NO-GO for applying it.
+
+Stop after the report.
+
+Do not apply the Supabase migration yet.
