@@ -1,0 +1,126 @@
+EntizNetStore — Module 1C-1A Backup and Canonical Supabase Schema Draft
+
+The Module 1C pre-migration audit is approved with the following architectural decisions:
+
+Supabase will become the single canonical EntizNetStore backend.
+Supabase will provide Auth, PostgreSQL, Storage and RLS.
+products.seller_id is the canonical product ownership field.
+Do not create the 11 historical Supabase Auth users yet.
+Do not assign or delete the 3 products with NULL seller_id.
+Do not add NOT NULL to products.seller_id yet.
+Do not add user-related foreign keys to auth.users yet.
+Product images will eventually use a public-read, seller-write-controlled Supabase Storage bucket, but do not create it during this task.
+
+This task has two objectives only:
+
+1. Create verified source backups
+
+Create dated logical backups of:
+
+the current Replit-managed DATABASE_URL database;
+the legacy NEON_DATABASE_URL database.
+
+Do not modify either source database.
+
+Verify each backup can be parsed/restored sufficiently to establish that it is usable.
+
+Record:
+
+backup filename;
+creation time;
+source;
+table count;
+important row counts;
+verification result.
+
+Do not commit secrets or connection strings.
+
+2. Draft the canonical Supabase schema migration
+
+Create a NEW migration file representing the intended EntizNetStore Supabase marketplace baseline.
+
+Use the current live marketplace schema as the source, not obsolete migrations 001–003.
+
+The migration should contain the intended:
+
+application tables;
+columns;
+primary keys;
+non-user foreign keys;
+unique constraints;
+check constraints;
+indexes;
+timestamps/defaults;
+canonical seller_id ownership model.
+
+RLS should be enabled on exposed application tables, but DO NOT create the final RLS policies yet.
+
+Do not:
+
+create Auth users;
+insert marketplace data;
+create Storage buckets;
+create user-related FKs to auth.users;
+make products.seller_id NOT NULL;
+assign the three orphaned products;
+delete or rewrite old migrations;
+change runtime database connections;
+change application code.
+Important migration exclusions
+
+Do not reproduce obsolete schema artifacts merely because they exist in old migration files.
+
+In particular, do not restore:
+
+provider_id;
+owner product ownership;
+obsolete products.price;
+obsolete products.images;
+stale migrations/functions that no longer match the current schema;
+duplicate singular buyer_profile / seller_profile structures if they are not part of the verified live canonical schema.
+
+Do not import Replit/Neon database roles or system schemas into Supabase.
+
+Do not overwrite or recreate Supabase-managed:
+
+auth;
+storage;
+Supabase system schemas.
+Security architecture note
+
+The eventual application architecture must use Supabase Auth + RLS for normal authenticated user access.
+
+Do not design normal seller/buyer CRUD around a privileged direct PostgreSQL connection that bypasses RLS.
+
+Direct database/service-role access should be reserved for trusted administrative/system operations.
+
+Validation
+
+Validate the proposed migration against a temporary/scratch PostgreSQL environment if available.
+
+Check for:
+
+SQL syntax errors;
+dependency-order problems;
+invalid foreign keys;
+duplicate object names;
+incompatible constraints;
+references to missing tables;
+obsolete ownership fields.
+Required report
+
+Return:
+
+backup verification results;
+exact backup files created;
+exact migration file created;
+complete table list in the proposed baseline;
+constraints intentionally included;
+constraints intentionally deferred;
+objects deliberately excluded from the old schema/migrations;
+migration validation results;
+any issues requiring architectural review.
+
+Do not apply the migration to Supabase yet.
+
+Stop after creating and validating the draft.
