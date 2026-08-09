@@ -5,7 +5,7 @@
 -- 001–003.
 --
 -- Scope of this migration (per approved Module 1C plan):
---   INCLUDED : all 23 application tables, PKs, unique constraints, check
+--   INCLUDED : all 24 application tables, PKs, unique constraints, check
 --              constraints, non-user foreign keys, indexes, defaults,
 --              canonical seller_id ownership model, RLS ENABLED on all tables.
 --   DEFERRED : RLS policies (designed separately, applied in a later step);

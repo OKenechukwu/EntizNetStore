@@ -1,0 +1,108 @@
+EntizNetStore — Module 1C-2 Apply Canonical Marketplace Baseline to Supabase
+
+The corrected canonical marketplace baseline has been architecturally reviewed and is approved for application to the existing empty EntizNetStore Supabase project.
+
+This task is narrowly scoped to establishing the database structure only.
+
+Step 0 — Correct migration documentation
+
+In:
+
+supabase/migrations/20260809114139_canonical_marketplace_baseline.sql
+
+update the header/comment references from 23 application tables to 24 application tables because profiles_seller_private has now been added.
+
+Do not make any other schema changes unless required to apply the already-reviewed migration.
+
+Step 1 — Pre-apply safety verification
+
+Before applying anything, confirm again that the target Supabase project has:
+
+0 application tables;
+0 marketplace migration versions applied;
+0 Storage buckets;
+0 Auth users.
+
+Confirm that:
+
+supabase/migrations/
+
+contains only:
+
+20260809114139_canonical_marketplace_baseline.sql
+
+If the target is no longer clean, STOP and report.
+
+Step 2 — Apply the canonical baseline
+
+Apply only:
+
+20260809114139_canonical_marketplace_baseline.sql
+
+to the connected EntizNetStore Supabase project.
+
+Do NOT:
+
+migrate marketplace data;
+create Auth users;
+create Storage buckets;
+create RLS policies;
+add deferred Auth/user foreign keys;
+make products.seller_id NOT NULL;
+assign the 3 orphaned products;
+change application runtime database connections;
+modify source Replit databases;
+delete backups;
+restore archived legacy migrations.
+Step 3 — Post-apply structural verification
+
+After application, verify directly from Supabase:
+
+24 public application tables exist;
+expected PKs exist;
+expected unique/check constraints exist;
+all intended non-user FKs exist;
+the 6 audited mandatory parent fields are NOT NULL;
+products.seller_id remains nullable;
+products.seller_id exists;
+owner does not exist on products;
+provider_id does not exist on products;
+products.price does not exist;
+products.images does not exist;
+notifications.id is UUID;
+notifications.user_id is UUID;
+profiles_seller_private exists;
+sensitive fields tax_id, payout_method, and verification_documents are absent from profiles_seller;
+those sensitive fields exist in profiles_seller_private;
+messaging order/key foreign keys exist with the reviewed deletion behavior;
+RLS is enabled on all 24 application tables;
+there are exactly 0 marketplace RLS policies at this stage;
+there are still 0 marketplace data rows;
+there are still 0 Auth users;
+there are still 0 Storage buckets.
+Step 4 — Migration-history verification
+
+Confirm Supabase records only this new canonical marketplace migration as the EntizNetStore baseline.
+
+Confirm none of the archived legacy migrations were applied.
+
+Final report
+
+Return:
+
+exact migration applied;
+application result;
+table count;
+FK/constraint/index summary;
+RLS status;
+policy count;
+data row status;
+Auth user count;
+Storage bucket count;
+migration-history status;
+any warnings or differences from the reviewed baseline;
+GO / NO-GO for the next stage: identity and marketplace-data migration.
+
+Stop after verification.
+
+Do not begin identity creation or data migration automatically.
