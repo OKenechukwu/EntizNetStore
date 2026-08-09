@@ -1,0 +1,107 @@
+EntizNetStore — Module 1C Canonical Baseline Architecture Corrections
+
+Do not apply anything to Supabase yet.
+
+Modify only the draft canonical migration:
+
+supabase/migrations/20260809114139_canonical_marketplace_baseline.sql
+
+Objective: correct the baseline architecture before its first application.
+
+1. Seller privacy separation
+
+profiles_seller currently mixes public storefront information with sensitive seller information.
+
+Keep public/business fields in profiles_seller, including appropriate storefront fields.
+
+Move sensitive fields such as:
+
+tax_id
+payout_method
+sensitive verification metadata
+
+into a separate private seller table.
+
+Do not duplicate KYC document data already represented by the KYC tables.
+
+The private table must use seller_id/seller UUID as its ownership relationship.
+
+Do not create RLS policies yet.
+
+2. Notifications UUID normalization
+
+The source notifications table has zero rows.
+
+Change:
+
+notifications.id
+
+and:
+
+notifications.user_id
+
+from legacy varchar types to UUID.
+
+Use:
+
+id uuid default gen_random_uuid() primary key
+
+Keep the future user_id → auth.users(id) FK deferred until Auth reconciliation.
+
+3. Parent-child nullability audit
+
+Read-only inspect the source Replit database for NULL values in:
+
+product_variants.product_id
+product_media.product_id
+order_items.order_id
+escrow_transactions.order_id
+reviews.product_id
+featured_products.product_id
+
+Report the counts.
+
+Where the relationship is logically mandatory and existing data contains no NULLs, make the canonical baseline parent FK column NOT NULL.
+
+Do not modify source data.
+
+4. Messaging foreign keys
+
+Add appropriate non-user foreign keys:
+
+messages.order_id → orders.id
+messages.conversation_key_id → conversation_keys.id
+
+Choose safe deletion behavior and explain the choice.
+
+Keep sender/recipient Auth FKs deferred.
+
+5. Preserve existing decisions
+
+Do not:
+
+make products.seller_id NOT NULL;
+assign the 3 orphan products;
+create Auth users;
+create Storage;
+create RLS policies;
+insert data;
+apply the migration to Supabase;
+change runtime application code;
+restore owner, provider_id, products.price, or products.images.
+Validation
+
+Re-run the canonical migration against a fresh scratch PostgreSQL database.
+
+Confirm:
+
+migration applies cleanly;
+no duplicate objects;
+all intended FKs resolve;
+RLS remains enabled on every exposed application table;
+zero policies remain;
+no obsolete ownership fields returned.
+
+Return the exact changes and validation results.
+
+Stop afterward. Do not apply to Supabase.

@@ -77,14 +77,23 @@ create table public.profiles_seller (
     business_type text default 'individual'
         constraint profiles_seller_business_type_check
         check (business_type in ('individual', 'business', 'creator')),
-    tax_id text,
     verification_status text default 'pending'
         constraint profiles_seller_verification_status_check
         check (verification_status in ('pending', 'verified', 'rejected')),
-    verification_documents jsonb default '{}'::jsonb,
-    payout_method jsonb default '{}'::jsonb,
     return_policy text,
     shipping_policy text,
+    created_at timestamptz default now(),
+    updated_at timestamptz default now()
+);
+
+-- Private seller data, separated from the public storefront profile.
+-- Holds sensitive business/payout fields only; KYC document data stays in the
+-- dedicated kyc_* tables (not duplicated here). Ownership = seller_id.
+create table public.profiles_seller_private (
+    seller_id uuid primary key references public.profiles_seller(id) on delete cascade,
+    tax_id text,
+    payout_method jsonb default '{}'::jsonb,
+    verification_documents jsonb default '{}'::jsonb,  -- sensitive verification metadata
     created_at timestamptz default now(),
     updated_at timestamptz default now()
 );
@@ -145,7 +154,7 @@ create table public.products (
 
 create table public.product_variants (
     id uuid default gen_random_uuid() primary key,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id uuid not null references public.products(id) on delete cascade,
     title text not null,
     option1 text,
     option2 text,
@@ -170,7 +179,7 @@ create table public.product_variants (
 
 create table public.product_media (
     id uuid default gen_random_uuid() primary key,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id uuid not null references public.products(id) on delete cascade,
     variant_id uuid references public.product_variants(id) on delete set null,
     type text not null
         constraint product_media_type_check check (type in ('image', 'video')),
@@ -230,7 +239,7 @@ create table public.orders (
 
 create table public.order_items (
     id uuid default gen_random_uuid() primary key,
-    order_id uuid references public.orders(id) on delete cascade,
+    order_id uuid not null references public.orders(id) on delete cascade,
     product_id uuid references public.products(id),
     variant_id uuid references public.product_variants(id),
     quantity integer not null default 1,
@@ -249,7 +258,7 @@ create table public.order_items (
 
 create table public.escrow_transactions (
     id uuid default gen_random_uuid() primary key,
-    order_id uuid references public.orders(id) on delete cascade,
+    order_id uuid not null references public.orders(id) on delete cascade,
     seller_id uuid not null,  -- deferred FK -> profiles_seller(id)
     amount_cents bigint not null,
     status text default 'held'
@@ -264,7 +273,7 @@ create table public.escrow_transactions (
 
 create table public.reviews (
     id uuid default gen_random_uuid() primary key,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id uuid not null references public.products(id) on delete cascade,
     buyer_id uuid not null,  -- deferred FK -> profiles_buyer(id)
     order_id uuid,           -- live schema has no FK here; kept as-is
     rating integer not null
@@ -312,11 +321,15 @@ create table public.messages (
     message_type text default 'text'
         constraint messages_message_type_check
         check (message_type in ('text', 'image', 'order_inquiry', 'system')),
-    order_id uuid,
+    -- ON DELETE SET NULL: deleting an order must not destroy chat history;
+    -- the message survives with the order reference cleared.
+    order_id uuid references public.orders(id) on delete set null,
     read_at timestamptz,
     is_encrypted boolean default false,
     encryption_iv text,
-    conversation_key_id varchar(255),
+    -- ON DELETE RESTRICT: an encryption key still referenced by messages must
+    -- not be deletable, or those messages become permanently undecryptable.
+    conversation_key_id varchar(255) references public.conversation_keys(id) on delete restrict,
     conversation_id uuid references public.conversations(id),
     is_read boolean default false,
     created_at timestamptz default now(),
@@ -359,12 +372,12 @@ create table public.addresses (
     updated_at timestamptz default now()
 );
 
--- NOTE: live schema stores notifications ids/user_id as varchar (legacy).
--- Preserved as-is so the data migration is lossless; uuid conversion is a
--- flagged architectural-review item.
+-- Normalized from legacy varchar to uuid (source table has zero rows, so the
+-- conversion is lossless). user_id FK -> auth.users(id) deferred until Auth
+-- reconciliation.
 create table public.notifications (
-    id varchar default gen_random_uuid() primary key,
-    user_id varchar not null,
+    id uuid default gen_random_uuid() primary key,
+    user_id uuid not null,
     type varchar not null
         constraint notifications_type_check
         check (type in ('message', 'order', 'promo', 'system', 'payment', 'shipping')),
@@ -425,7 +438,7 @@ create table public.kyc_verification_requests (
 
 create table public.featured_products (
     id uuid default gen_random_uuid() primary key,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id uuid not null references public.products(id) on delete cascade,
     marketplace_brand text not null
         constraint featured_products_marketplace_brand_check
         check (marketplace_brand in ('entiznetstore', 'primediscreet')),
@@ -543,4 +556,5 @@ alter table public.product_variants enable row level security;
 alter table public.products enable row level security;
 alter table public.profiles_buyer enable row level security;
 alter table public.profiles_seller enable row level security;
+alter table public.profiles_seller_private enable row level security;
 alter table public.reviews enable row level security;
