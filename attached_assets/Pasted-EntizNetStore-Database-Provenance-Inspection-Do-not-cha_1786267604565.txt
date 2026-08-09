@@ -1,0 +1,94 @@
+EntizNetStore — Database Provenance Inspection
+
+Do not change anything.
+
+Do not modify code, database configuration, secrets, schema, data, migrations, or deployment.
+
+We need to determine the origin and ownership of the PostgreSQL/Neon database currently referenced by NEON_DATABASE_URL.
+
+The project owner does not knowingly have a separate Neon account and did not intentionally configure Neon.
+
+Please investigate and report:
+
+1. Replit database provenance
+
+Determine whether the database referenced by NEON_DATABASE_URL was provisioned by Replit's built-in Database/PostgreSQL system or manually connected as an external database.
+
+Inspect available Replit database metadata/configuration without exposing credentials.
+
+2. Environment-variable origin
+
+Determine:
+
+whether NEON_DATABASE_URL is a Replit-managed environment variable or manually created secret;
+whether DATABASE_URL also exists;
+whether legacy PostgreSQL variables such as PGHOST, PGUSER, PGDATABASE, etc. exist;
+whether the hostname indicates a Replit-managed/legacy Neon database.
+
+Do not print secret values, passwords, connection strings, or tokens.
+
+3. Database account/control
+
+Determine, as far as Replit exposes:
+
+whether this database belongs to this Replit app/workspace;
+whether it requires an independent Neon account;
+whether it is billed/managed through Replit;
+whether an external Neon organization/account can be identified.
+
+Do not attempt to access an external Neon dashboard.
+
+4. History
+
+Inspect Git history, Replit configuration, documentation, migrations, and project files to determine the earliest evidence of:
+
+Neon/Postgres database usage;
+NEON_DATABASE_URL;
+Supabase;
+Supabase authentication;
+Supabase marketplace database code.
+
+Give commit/date evidence where available.
+
+We want to understand whether the likely sequence was:
+
+Replit database first → Supabase later,
+
+or something else.
+
+5. Supabase provenance
+
+Determine which Supabase project the application is configured to use without displaying secrets.
+
+Explain whether repository evidence shows why Supabase was added and whether it was intended for:
+
+authentication only;
+database;
+storage;
+or all three.
+
+6. Architecture recommendation
+
+Do NOT implement anything.
+
+Based on provenance and the future requirement that EntizNetStore will integrate into the main EntizNet platform, explain whether we should ultimately:
+
+A. retain the Replit/Neon database;
+
+B. migrate the marketplace to Supabase;
+
+C. use another architecture.
+
+Include migration risk and data ownership implications.
+
+Final output
+
+Clearly separate:
+
+CONFIRMED FACTS
+HISTORICAL EVIDENCE
+INFERENCES
+CANNOT CONFIRM
+RECOMMENDATION
+
+Stop after the report.

@@ -1,12 +1,12 @@
 ---
 name: Live DB topology
-description: Where EntizNetStore's live data actually is (Neon, not Supabase) and RLS state, verified Aug 2026
+description: Where EntizNetStore's live data actually is (Replit-managed Postgres lineage), Supabase role, and RLS state
 ---
-Verified 2026-08-07 during inspection-only audit:
-- The connected Supabase project (NEXT_PUBLIC_SUPABASE_URL) is **empty**: PostgREST schema cache exposes no tables (PGRST205 for products, even with service role), and `/storage/v1/bucket` returns zero buckets. All app supabase-js queries against products therefore fail live.
-- The real marketplace schema lives in the **Neon Postgres** at `NEON_DATABASE_URL` (db `neondb`, 23 public tables). It has no `auth` or `storage` schema, no anon/authenticated/service_role roles, and `supabase_migrations.schema_migrations` is empty (schema was applied ad hoc, not via migration tooling).
-- Live `products` ownership field is **seller_id only** (nullable, NO foreign key). No `owner`/`provider_id` columns exist despite app code and old migrations referencing them. 14 products; 3 have NULL seller_id.
-- RLS on Neon is effectively off: products and most tables have RLS disabled; a few tables have RLS enabled with 0 policies; only `notifications` has 4 policies (public role, JWT-claim based). The connecting role `neondb_owner` has BYPASSRLS anyway.
-**Why:** any "fix RLS/ownership" work must target the Neon DB reality, not the Supabase migrations in `supabase/migrations/`, and RLS cannot protect anything while the app's data path (Supabase REST) points at an empty project.
-**How to apply:** before schema/security changes, re-verify which database the app actually reads at runtime and reconcile the Supabase-vs-Neon split first.
-- Decision (2026-08-07): Neon is the single source of truth for app data; Supabase is auth-only. There is no persisted storefront slug — public storefront URLs resolve by seller UUID or a slug derived from the storefront name.
+Verified 2026-08-07/08 during inspection-only audits:
+- **Provenance solved (2026-08-08):** `NEON_DATABASE_URL` is the LEGACY Replit-managed Neon-hosted built-in database (Replit provisioned it; no separate Neon account exists). Replit auto-migrated it to Helium infrastructure: `DATABASE_URL` (host `*.helium`, db `heliumdb`) is the CURRENT Replit-managed DB and contains an identical copy (same 23 tables, same 14 product slugs, sellers=4, orders=4, incl. `supabase_migrations` schema). Per Replit docs, the legacy connection string was saved to Secrets as `NEON_DATABASE_URL` for reference.
+- **Risk:** Task #1's data layer (`lib/db.ts`) connects to the LEGACY Neon URL, not `DATABASE_URL`. The two copies will diverge with new writes; Helium is the one integrated with Replit checkpoints/publish. Any future DB work should consider repointing `lib/db.ts` to `DATABASE_URL`.
+- The Supabase project (`NEXT_PUBLIC_SUPABASE_URL`) is empty of app data: PostgREST exposes no tables, zero storage buckets. Supabase is auth-only (per replit.md); legacy dashboard code still tries supabase-js product CRUD and fails.
+- Live `products` ownership field is **seller_id only** (nullable, no FK). No `owner`/`provider_id` columns. 3 of 14 products have NULL seller_id.
+- RLS effectively off: products has RLS disabled, 0 policies; a few tables RLS-on with 0 policies; only `notifications` has 4 JWT-claim policies. Connecting roles (`neondb_owner`, helium owner) bypass RLS. No anon/authenticated roles exist.
+**Why:** security/ownership fixes must be server-side application checks (DB roles bypass RLS), and must target the Replit-managed Postgres — Supabase migrations in `supabase/migrations/` do not describe the live DB (`supabase_migrations.schema_migrations` is empty).
+**How to apply:** before schema/security changes, confirm which URL `lib/db.ts` uses and whether Neon-vs-Helium divergence has started.
