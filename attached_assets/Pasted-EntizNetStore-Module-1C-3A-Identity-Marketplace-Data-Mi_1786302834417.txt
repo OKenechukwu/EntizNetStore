@@ -1,0 +1,201 @@
+EntizNetStore — Module 1C-3A Identity & Marketplace Data Migration Preflight
+
+Module 1C-2 is complete. The canonical Supabase schema is now live with 24 tables, RLS enabled, 0 policies, 0 application rows, 0 Auth users, and 0 Storage buckets.
+
+This task is INSPECTION AND MIGRATION PREPARATION ONLY.
+
+Do not create Supabase Auth users.
+Do not insert marketplace data into Supabase.
+Do not create RLS policies.
+Do not create Storage buckets.
+Do not change application runtime connections.
+Do not modify the source Replit database.
+
+1. Classify the 11 historical identities
+
+Inspect the current canonical source database at DATABASE_URL.
+
+Determine which of the 11 distinct user UUIDs appear in:
+
+profiles_seller
+products seller_id
+orders seller_id
+orders buyer_id
+reviews buyer_id
+KYC tables
+messages/conversations, if any
+any other user-linked tables
+
+For each identity, classify its relationship without exposing the UUID itself:
+
+seller
+buyer
+both
+order-only identity
+review-only identity
+other
+2. Determine whether identities appear real or demo/test
+
+Inspect available source fields, repository seed/demo fixtures, product records, seller names/storefronts, order metadata, and Git history.
+
+Determine whether the identities are likely:
+
+real historical accounts;
+demo/seed accounts;
+automated test data;
+cannot determine.
+
+Do not display full names, emails, phone numbers, addresses, tax IDs, or UUIDs in the report.
+
+You may report masked email domains or aggregate indicators only where useful.
+
+3. Authentication-source investigation
+
+Determine whether there is any evidence of a historical authentication store containing credentials or identity metadata for these users.
+
+Search:
+
+repository history;
+old Supabase configuration;
+Replit authentication/session code;
+database tables;
+seed scripts;
+fixtures;
+archived migrations.
+
+Report whether existing passwords can actually be migrated.
+
+Do not expose password hashes or credentials.
+
+4. Data migration inventory
+
+Produce exact current row counts for every source application table.
+
+Identify which tables:
+
+can migrate directly;
+require transformation;
+require identity reconciliation first;
+should remain empty;
+should not migrate.
+
+Pay special attention to:
+
+profiles_seller
+
+The source contains tax_id, payout_method, and verification_documents inside the seller profile, while the new Supabase target splits these into:
+
+profiles_seller
+profiles_seller_private
+
+Define the exact field mapping.
+
+5. Buyer-profile reconciliation
+
+We previously found profiles_buyer has 0 rows while orders/reviews reference historical buyer UUIDs.
+
+Determine:
+
+exact number of distinct buyer identities;
+which have enough source information to create a proper profiles_buyer;
+which would require a minimal placeholder marketplace profile;
+which should not be migrated if they are merely demo/test data.
+
+Do not create anything yet.
+
+6. Three products with NULL seller_id
+
+Inspect the three products with NULL seller_id.
+
+Without exposing sensitive data, determine whether repository/source evidence identifies their intended seller.
+
+Classify each as:
+
+ownership confidently identifiable;
+ownership possibly identifiable;
+ownership unknown.
+
+Do not assign, delete, or modify them.
+
+7. Existing transactional/demo data
+
+Inspect the 4 orders, 4 order items, 4 escrow rows, and 20 reviews.
+
+Determine whether these appear to be:
+
+genuine historical transactions;
+development/demo/test data;
+cannot determine.
+
+This matters because we do not want fake financial/order history in the eventual production database.
+
+Do not display private addresses, payment details, or personal information.
+
+8. Proposed migration batches
+
+Recommend the safest ordered migration batches.
+
+I expect something similar to:
+
+reference/catalog data;
+approved historical Auth identities;
+seller/buyer profiles;
+products and catalogue children;
+transactional data only if approved;
+KYC/private seller data only if appropriate;
+validation;
+deferred foreign keys;
+RLS policies;
+Storage.
+
+Adjust based on verified evidence.
+
+9. Auth-account strategy
+
+For REAL historical users, recommend the safest Supabase Auth migration approach.
+
+Clearly distinguish:
+
+preserving historical UUIDs;
+handling users whose passwords cannot be migrated;
+password reset/invite flow;
+email verification implications.
+
+Do not create accounts yet.
+
+For demo/test identities, recommend whether they should:
+
+be excluded entirely;
+become controlled seed accounts;
+be migrated only to a non-production/test environment.
+Required final report
+
+Return:
+
+A. Identity classification
+
+B. Real vs demo/test assessment
+
+C. Historical authentication findings
+
+D. Table-by-table migration map
+
+E. Seller-private field transformation
+
+F. Buyer-profile reconciliation
+
+G. Three orphan-product ownership findings
+
+H. Transactional-data authenticity assessment
+
+I. Recommended migration batches
+
+J. Auth-account migration strategy
+
+K. Items requiring my manual decision
+
+L. Exact first implementation task after approval
+
+Stop after the report.
+
+Do not migrate anything yet.
