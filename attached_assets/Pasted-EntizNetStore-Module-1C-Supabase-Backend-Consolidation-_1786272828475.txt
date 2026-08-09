@@ -1,0 +1,313 @@
+EntizNetStore — Module 1C Supabase Backend Consolidation — Pre-Migration Audit & Migration Plan
+
+We have made an architectural decision:
+
+Supabase will become the single canonical backend for EntizNetStore.
+
+The goal is to consolidate:
+
+authentication;
+PostgreSQL marketplace database;
+product/file storage;
+authorization/RLS
+
+into the existing EntizNetStore Supabase project.
+
+The existing Replit-managed PostgreSQL database currently contains the marketplace schema and data.
+
+We do NOT want to continue using either DATABASE_URL or NEON_DATABASE_URL as the permanent EntizNetStore marketplace database.
+
+This task is currently INSPECTION AND MIGRATION PLANNING ONLY.
+
+Do not migrate anything yet.
+
+Do not create/drop/alter Supabase tables.
+
+Do not modify data.
+
+Do not modify authentication users.
+
+Do not change environment variables.
+
+Do not change application runtime database connections.
+
+Do not delete or modify the Replit databases.
+
+Do not apply migrations.
+
+1. Inventory the source Replit database
+
+Inspect the current canonical Replit-managed database via DATABASE_URL.
+
+Produce the complete list of:
+
+schemas;
+tables;
+columns;
+primary keys;
+foreign keys;
+indexes;
+unique constraints;
+check constraints;
+triggers;
+functions;
+views;
+enums/custom types;
+RLS settings;
+policies;
+row counts.
+
+Do not expose sensitive row contents.
+
+Use aggregate information only.
+
+2. Inventory the existing Supabase project
+
+Inspect the Supabase project currently configured for EntizNetStore.
+
+Report:
+
+existing application tables;
+existing Auth configuration;
+number of Auth users;
+existing Storage buckets;
+existing RLS policies;
+existing database functions/triggers;
+extensions that may matter;
+whether the project is appropriate to become the canonical EntizNetStore backend.
+
+Do not expose user email addresses, credentials, keys or personal information.
+
+3. Identity compatibility audit
+
+This is critical.
+
+Compare the IDs used by the marketplace database with Supabase Auth identities.
+
+Specifically inspect:
+
+profiles_seller.id;
+profiles_buyer.id;
+product seller_id;
+order seller_id;
+order buyer_id;
+reviews;
+wishlists;
+messages/conversations;
+other tables containing user IDs.
+
+Determine whether these UUIDs already correspond to existing:
+
+auth.users.id
+
+in Supabase.
+
+Do not reveal actual UUIDs.
+
+Report aggregate counts such as:
+
+matching;
+missing;
+orphaned;
+conflicting.
+
+Do not change IDs.
+
+4. Migration compatibility
+
+Determine which parts of the Replit PostgreSQL schema can be migrated directly to Supabase and which require adaptation.
+
+Pay special attention to:
+
+tables that should reference auth.users(id);
+seller/buyer profiles;
+duplicate profile models;
+seller_id;
+products;
+variants;
+inventory;
+categories;
+reviews;
+wishlist;
+conversations/messages;
+notifications;
+orders/order_items;
+escrow-related placeholder tables;
+functions/triggers;
+extensions.
+
+Do not migrate Replit database roles into Supabase.
+
+Do not overwrite Supabase-managed schemas such as Auth or Storage.
+
+5. Current data integrity
+
+Before migration, inspect for:
+
+orphaned foreign references;
+NULL ownership fields;
+duplicate slugs;
+duplicate user/profile records;
+invalid category/product relationships;
+inconsistent order relationships;
+other data likely to make migration fail.
+
+We already know there are 3 products with seller_id IS NULL.
+
+Do not assign those products to anyone.
+
+Report them as reconciliation items.
+
+6. Supabase schema design
+
+Recommend the target Supabase schema.
+
+The target should use the current useful marketplace architecture, not the obsolete initial migrations.
+
+Canonical product ownership should be:
+
+products.seller_id
+
+unless repository/database evidence demonstrates a reason otherwise.
+
+Explain which user-owned tables should reference:
+
+auth.users(id)
+
+and which should reference application profile tables instead.
+
+Do not implement this yet.
+
+7. RLS design
+
+Design—but do not apply—the required Supabase RLS model.
+
+Cover at minimum:
+
+products;
+seller profiles;
+buyer profiles;
+addresses;
+variants;
+inventory;
+product media;
+wishlists;
+reviews;
+orders;
+order items;
+messages;
+conversations;
+notifications.
+
+Requirements:
+
+public users may only read marketplace data intended to be public;
+sellers may manage only their own products/resources;
+buyers may access only their private buyer resources;
+one seller must never edit/delete another seller's product;
+one user must never access another user's private orders/messages;
+privileged/admin access must not rely on client-supplied IDs.
+
+Supabase RLS will become the database-level enforcement layer.
+
+8. Product image/storage migration
+
+The target architecture should use Supabase Storage.
+
+Inspect current product_media URLs/data and determine:
+
+what images currently exist;
+where those images are hosted;
+whether they need to be copied;
+what bucket(s) should exist;
+recommended folder/path structure;
+seller ownership model;
+public vs private access;
+Storage RLS policies required.
+
+Do not upload or migrate images yet.
+
+9. Migration procedure
+
+Design a safe staged procedure:
+
+backup Replit PostgreSQL;
+verify backup;
+prepare target Supabase schema;
+migrate schema;
+migrate data;
+reconcile Auth identities;
+add foreign keys;
+create RLS policies;
+migrate product media/storage;
+validate counts and integrity;
+change application runtime to Supabase;
+test;
+temporarily preserve Replit database as rollback;
+retire Replit database dependency only after acceptance.
+
+Recommend appropriate tooling but do not execute migration yet.
+
+10. Application impact
+
+Identify every major application area currently using:
+
+DATABASE_URL;
+NEON_DATABASE_URL;
+lib/db.ts;
+pg;
+direct SQL;
+Supabase database APIs;
+
+Describe what must change after migration.
+
+Do not modify these files yet.
+
+11. Repository migrations
+
+The current migration history contains obsolete/conflicting schema generations.
+
+Do not edit or delete migration files yet.
+
+Recommend how we should establish a clean canonical migration baseline after Supabase is reconciled.
+
+Never rewrite a migration that has already been applied to a production database.
+
+Required final output
+
+A. Source database inventory
+
+B. Supabase target inventory
+
+C. Auth identity compatibility
+
+D. Data integrity problems
+
+E. Proposed final Supabase schema
+
+F. Proposed RLS architecture
+
+G. Storage migration plan
+
+H. Exact migration sequence
+
+I. Application changes required
+
+J. Rollback strategy
+
+K. Risks ranked Critical / High / Medium / Low
+
+L. Go / No-Go recommendation
+
+M. Exact first migration implementation task
+
+Clearly separate:
+
+confirmed facts;
+findings;
+assumptions/inferences;
+items requiring manual decision.
+
+Stop after reporting.
+
+Do not migrate or modify anything during this task.
