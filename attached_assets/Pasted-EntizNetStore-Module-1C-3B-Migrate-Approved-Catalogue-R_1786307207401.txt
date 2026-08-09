@@ -1,0 +1,137 @@
+EntizNetStore — Module 1C-3B Migrate Approved Catalogue Reference Data
+
+The Module 1C-3A preflight is approved with the following production-data decisions:
+
+Approved for migration
+categories — 16 rows
+brands — 6 rows
+
+Preserve their existing UUIDs and source values.
+
+Explicitly NOT approved for migration
+
+Do not migrate:
+
+the 4 historical seller identities;
+the 7 historical buyer/reviewer identities;
+any Supabase Auth accounts for those identities;
+profiles_seller;
+profiles_seller_private;
+profiles_buyer;
+products;
+product variants;
+product categories;
+orders;
+order items;
+escrow transactions;
+reviews;
+the historical KYC request;
+the 3 orphan products;
+any other historical/demo marketplace rows.
+
+These have been classified as development/demo data and must not contaminate the new production Supabase backend.
+
+Do not delete or modify them in the source Replit database.
+
+The source backups remain our historical rollback/reference copies.
+
+Objective
+
+Migrate only the approved identity-independent catalogue reference data from the canonical source database at DATABASE_URL into the new Supabase database at SUPABASE_DB_URL.
+
+1. Pre-migration verification
+
+Confirm:
+
+source categories count = 16;
+source brands count = 6;
+target categories count = 0;
+target brands count = 0;
+target has no Auth users;
+target contains no other application data.
+
+If the target unexpectedly contains marketplace data, STOP and report.
+
+2. Migrate categories
+
+Copy all source categories rows to Supabase preserving:
+
+UUIDs;
+parent relationships;
+names;
+slugs;
+descriptions;
+image URLs;
+adult flags;
+sort order;
+active state;
+metadata;
+timestamps.
+
+Respect category parent dependency order.
+
+Do not generate replacement IDs.
+
+3. Migrate brands
+
+Copy all source brands rows preserving:
+
+UUIDs;
+names;
+slugs;
+descriptions;
+logo/banner URLs;
+website;
+verification state;
+metadata;
+timestamps.
+
+Do not generate replacement IDs.
+
+4. Validation
+
+Verify:
+
+target categories = 16;
+target brands = 6;
+source/target IDs match exactly;
+source/target slug sets match exactly;
+parent category relationships match;
+unique constraints remain valid;
+no duplicate rows;
+no other public application tables received rows;
+Auth users remain 0;
+Storage buckets remain 0;
+RLS remains enabled;
+RLS policy count remains 0.
+
+Since RLS currently has zero policies, perform the migration using the trusted database migration connection, not through an unauthenticated client API.
+
+5. Demo-data preservation
+
+Do not delete demo data from DATABASE_URL.
+
+Do not create fake production users to preserve demo data.
+
+Do not assign the three orphan products.
+
+We will later create separate controlled development/staging seed data if needed.
+
+Final report
+
+Return:
+
+rows migrated;
+source/target count comparison;
+ID/slug parity;
+category hierarchy validation;
+confirmation no unapproved tables received data;
+Auth count;
+Storage bucket count;
+RLS status;
+policy count;
+any warnings.
+
+Stop after this migration.
+
+Do not begin seller/product migration or RLS work automatically.
