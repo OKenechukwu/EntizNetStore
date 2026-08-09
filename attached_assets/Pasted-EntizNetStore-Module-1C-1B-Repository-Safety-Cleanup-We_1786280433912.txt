@@ -1,0 +1,127 @@
+EntizNetStore — Module 1C-1B Repository Safety Cleanup
+
+We approve cleanup of the two blockers identified in the final safety check.
+
+Do NOT apply anything to Supabase during this task.
+
+Do NOT modify either source database.
+
+Do NOT delete the database backup files themselves.
+
+Do NOT push anything to GitHub until verification is complete.
+
+A. Protect the database backups
+
+The following dump files must remain available locally/private but must not exist in Git history that could later be pushed to GitHub:
+
+backups/replit_database_20260809T114139Z.dump
+
+backups/legacy_neon_20260809T114139Z.dump
+
+Before changing Git history:
+
+calculate and record SHA-256 checksums for both files;
+confirm both files currently exist and are readable;
+confirm .gitignore contains backups/*.dump.
+
+Then safely remove the dump files from the Git history reachable from the branch that will eventually be pushed to origin.
+
+The objective is:
+
+the dump files remain on local disk;
+they remain ignored;
+they are not Git-tracked;
+no commit reachable from the future GitHub branch contains their blobs.
+
+Because origin/main does not contain the offending checkpoint commit, use the safest cleanup method that preserves all legitimate development changes made since origin/main.
+
+Do not force-push.
+
+Do not push anything.
+
+Do not modify the private Replit gitsafe-backup remote unless absolutely necessary.
+
+After cleanup, verify:
+
+git ls-files backups/
+
+shows no .dump files,
+
+and:
+
+git rev-list --all --objects
+
+for the branch/history intended for GitHub contains no .dump blobs that would be pushed.
+
+Recalculate the SHA-256 checksums and confirm the local backup files are unchanged.
+
+B. Archive obsolete Supabase migrations
+
+Move these files out of the active:
+
+supabase/migrations/
+
+directory:
+
+001_create_store_schema.sql
+002_add_rls_policies.sql
+003_create_functions.sql
+004_expand_marketplace_schema.sql
+005_marketplace_rls_policies.sql
+006_add_marketplace_brand.sql
+20250926060603_init_profiles_with_country.sql
+
+Preserve them byte-for-byte under:
+
+supabase/migrations_archive_pre_baseline/
+
+Add a short README explaining:
+
+these migrations are historical;
+they were never applied to the current EntizNetStore Supabase project;
+they must not be executed against the new canonical backend;
+they are retained solely for historical/reference purposes.
+
+Do not rewrite their SQL.
+
+Do not delete them.
+
+C. Canonical active migration
+
+After archiving, verify that the only EntizNetStore marketplace migration in:
+
+supabase/migrations/
+
+is:
+
+20260809114139_canonical_marketplace_baseline.sql
+
+Do not apply it.
+
+D. GitHub safety verification
+
+Verify:
+
+no database dump is tracked;
+no database dump would be included in a future push to origin/main;
+the canonical migration is tracked;
+the archived legacy migrations are tracked;
+BACKUP_MANIFEST.md is tracked and contains no credentials or private row data;
+no connection strings, passwords, service-role keys or database secrets were introduced into Git.
+E. Final report
+
+Return:
+
+Git cleanup method used;
+whether legitimate commits/changes were preserved;
+backup checksums before/after;
+confirmation the dumps remain locally available;
+confirmation dumps cannot be pushed through the cleaned Git history;
+files moved to the migration archive;
+active migration directory contents;
+Git status;
+GO / NO-GO for Supabase baseline application.
+
+Stop after the report.
+
+Do not apply Supabase migrations yet.
