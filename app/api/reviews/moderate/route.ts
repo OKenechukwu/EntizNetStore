@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
@@ -14,24 +15,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    // Verify admin authentication
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { user, errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
+
     const supabase = createServerComponentClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user is admin (you may want to implement proper role checking)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
 
     // Get the current review
     const { data: review, error: reviewError } = await supabase
@@ -53,7 +41,7 @@ export async function POST(request: NextRequest) {
       .update({
         status: newStatus,
         moderated_at: new Date().toISOString(),
-        moderated_by: session.user.id,
+        moderated_by: user.id,
         moderation_reason: reason || null
       })
       .eq('id', review_id)
@@ -77,7 +65,7 @@ export async function POST(request: NextRequest) {
         content_id: review_id,
         action: action,
         reason: reason,
-        moderator_id: session.user.id,
+        moderator_id: user.id,
         created_at: new Date().toISOString()
       })
 

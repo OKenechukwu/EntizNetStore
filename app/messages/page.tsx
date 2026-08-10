@@ -7,8 +7,8 @@ export default async function MessagesPage() {
   const supabase = createServerComponentClient({ cookies })
   
   // Check authentication
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/auth/signin?redirect=/messages')
   }
 
@@ -17,12 +17,12 @@ export default async function MessagesPage() {
     supabase
       .from('profiles_buyer')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single(),
     supabase
       .from('profiles_seller')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
   ])
 
@@ -31,7 +31,7 @@ export default async function MessagesPage() {
   return (
     <div className="h-screen">
       <EnhancedMessageCenter 
-        currentUserId={session.user.id}
+        currentUserId={user.id}
         userType={userType}
       />
     </div>

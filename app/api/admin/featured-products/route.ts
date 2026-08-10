@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
@@ -8,15 +9,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const brand = searchParams.get('brand') || 'entiznetstore'
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     // Get featured products with product details
     const { data, error } = await supabase
@@ -47,15 +42,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { 
@@ -146,15 +135,9 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { 
@@ -217,15 +200,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const { searchParams } = new URL(request.url)
     const featuredId = searchParams.get('id')

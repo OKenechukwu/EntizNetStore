@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
@@ -9,15 +10,9 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get('period') || '7d'
     const brand = searchParams.get('brand') || 'entiznetstore'
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     // For now, return mock data since we're building the foundation
     // In a real implementation, this would query the actual database

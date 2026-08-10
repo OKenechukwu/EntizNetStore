@@ -23,10 +23,10 @@ export default async function DashboardStorePage() {
   // Auth (server-side)
   const supabase = createServerSupabase();
   const {
-    data: { session },
+    data: { user },
     error: sessErr,
-  } = await supabase.auth.getSession();
-  if (!session || sessErr) {
+  } = await supabase.auth.getUser();
+  if (!user || sessErr) {
     redirect("/auth/sign-in");
   }
 
@@ -34,7 +34,7 @@ export default async function DashboardStorePage() {
   const { data, error } = await supabase
     .from("products")
     .select("id,title,price,images")
-    .eq("owner", session.user.id)
+    .eq("owner", user.id)
     .order("title", { ascending: true });
 
   const products = (data ?? []) as Product[];

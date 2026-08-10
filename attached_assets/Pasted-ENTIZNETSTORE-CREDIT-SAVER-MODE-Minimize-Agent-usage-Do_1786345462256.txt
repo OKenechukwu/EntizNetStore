@@ -1,0 +1,187 @@
+ENTIZNETSTORE CREDIT-SAVER MODE
+
+Minimize Agent usage.
+
+Do not launch subagents.
+Do not perform another repository-wide audit.
+Module 1C-4A findings are already approved baseline facts.
+Inspect only the files directly required for this task.
+Do not inspect Git history.
+Do not write planning/docs/memory files.
+Do not work on unrelated issues.
+Run only targeted validation.
+
+EntizNetStore — Module 1C-4B1 Auth Security Core
+
+Implement ONLY the following security corrections.
+
+1. Remove client-controlled authorization roles
+
+Current signup code writes role into Supabase user_metadata and the application later treats that metadata as authorization.
+
+Remove active signup/account code that lets a user assign themselves:
+
+admin;
+seller;
+buyer;
+vendor;
+BSM;
+or another privileged capability
+
+through mutable user_metadata.
+
+Do not create a replacement role table.
+
+Production capability will later come from:
+
+profiles_buyer presence;
+profiles_seller presence;
+trusted app_metadata for admin only.
+
+Do not implement onboarding yet.
+
+Likely relevant files already identified:
+
+components/auth/AuthCard.tsx
+app/auth/sign-up/page.tsx
+lib/auth.ts
+
+Do not broadly refactor unrelated auth UI.
+
+2. Establish one trusted admin check
+
+Admin authorization must use:
+
+user.app_metadata.role === 'admin'
+
+after validating the current user server-side with:
+
+supabase.auth.getUser()
+
+Create/reuse one small server-only admin authorization helper.
+
+Do not allow user_metadata.role to grant admin privileges.
+
+Do not create any admin user during this task.
+
+3. Correct the Supabase admin client
+
+lib/supabase/admin.ts is currently misleading because it uses an anon key.
+
+Replace it with a genuinely server-only Supabase Admin client using:
+
+SUPABASE_SERVICE_ROLE_KEY
+
+Requirements:
+
+server-only;
+never imported by Client Components;
+never use a NEXT_PUBLIC_* service-role variable;
+fail safely when the server secret is missing;
+no service-role value logged or exposed.
+
+Do not change unrelated service-role usages during this task.
+
+4. Protect existing admin endpoints
+
+Apply the trusted admin check to the already identified admin endpoints under:
+
+app/api/admin/
+
+especially:
+
+categories;
+featured-products;
+stats;
+activity;
+KYC pending/review/document routes.
+
+Every admin endpoint must first:
+
+validate the Supabase user server-side;
+verify trusted app_metadata.role === 'admin';
+only then perform privileged operations.
+
+An authenticated ordinary user must receive 403.
+
+Do not redesign admin functionality.
+
+5. Replace known server getSession() authorization gates
+
+In server pages/routes already identified by Module 1C-4A, replace authorization decisions based on:
+
+auth.getSession()
+
+with validated:
+
+auth.getUser().
+
+Only change server-side authentication gates.
+
+Do not remove legitimate client-side getSession() usage where it is merely managing browser session state and is not being used as trusted server authorization.
+
+Known affected areas include:
+
+messages page;
+notifications page;
+seller dashboard/messages/new-product pages;
+dashboard store new/edit pages;
+review moderation API;
+payout request API.
+
+Use targeted search only to confirm these known occurrences.
+
+6. Remove the development auth page
+
+Remove the publicly routable:
+
+app/dev-test/page.tsx
+
+if it is solely the development credential/session tester identified in Module 1C-4A.
+
+Do not replace it.
+
+OUT OF SCOPE
+
+Do NOT implement during this task:
+
+buyer onboarding;
+seller onboarding;
+password recovery;
+RLS policies;
+database foreign keys;
+product changes;
+KYC redesign;
+messaging encryption redesign;
+middleware redesign;
+Neon/Replit database removal;
+wishlist;
+role/capability tables;
+application-wide auth refactoring;
+removal of deprecated packages unless the changed code makes one completely unused and removal is trivial.
+Targeted validation
+
+Run only:
+
+TypeScript/typecheck for the changed code or normal project typecheck if that is the only available command;
+build only if reasonably necessary;
+targeted search confirming server authorization no longer relies on user_metadata.role;
+targeted search confirming the affected server gates use getUser();
+confirm the Admin client is server-only;
+confirm no service-role key appears in browser/client code;
+confirm /dev-test is gone.
+
+Do not create test Auth users.
+Do not change Supabase database data.
+
+Final response — KEEP SHORT
+
+Return only:
+
+files changed;
+what was fixed;
+tests/results;
+unresolved blocker, if any.
+
+Do not propose the next task automatically.
+Stop.

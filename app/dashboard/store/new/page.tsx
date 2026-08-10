@@ -8,11 +8,11 @@ export default async function NewProductPage() {
   const supabase = createServerSupabase();
 
   const {
-    data: { session },
+    data: { user },
     error,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
-  if (error || !session) {
+  if (error || !user) {
     redirect("/auth/sign-in");
   }
 

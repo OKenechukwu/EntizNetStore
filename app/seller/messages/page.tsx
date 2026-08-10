@@ -7,8 +7,8 @@ export default async function SellerMessagesPage() {
   const supabase = createServerComponentClient({ cookies })
   
   // Check authentication
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/auth/signin?redirect=/seller/messages')
   }
 
@@ -16,7 +16,7 @@ export default async function SellerMessagesPage() {
   const { data: sellerProfile } = await supabase
     .from('profiles_seller')
     .select('*')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
 
   if (!sellerProfile) {
@@ -26,7 +26,7 @@ export default async function SellerMessagesPage() {
   return (
     <div className="h-screen">
       <MessageCenter 
-        currentUserId={session.user.id}
+        currentUserId={user.id}
         userType="seller"
       />
     </div>

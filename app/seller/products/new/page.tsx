@@ -7,8 +7,8 @@ export default async function NewProductPage() {
   const supabase = createServerComponentClient({ cookies })
   
   // Check authentication
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/auth/signin?redirect=/seller/products/new')
   }
 
@@ -16,7 +16,7 @@ export default async function NewProductPage() {
   const { data: sellerProfile } = await supabase
     .from('profiles_seller')
     .select('*')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
 
   if (!sellerProfile) {
@@ -49,7 +49,7 @@ export default async function NewProductPage() {
         <ProductForm 
           categories={categoriesData.data || []}
           brands={brandsData.data || []}
-          sellerId={session.user.id}
+          sellerId={user.id}
           mode="create"
         />
       </div>

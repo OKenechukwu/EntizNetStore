@@ -13,14 +13,14 @@ export async function POST(request: NextRequest) {
 
     // Verify authentication
     const supabase = createServerComponentClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Verify seller ownership
-    if (session.user.id !== seller_id) {
+    if (user.id !== seller_id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

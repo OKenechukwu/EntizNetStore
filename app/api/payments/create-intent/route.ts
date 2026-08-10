@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
 
     // Verify authentication
     const supabase = createServerComponentClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           name: customer_info.name,
           address: shipping_required ? customer_info.address : undefined,
           metadata: {
-            user_id: session.user.id,
+            user_id: user.id,
             marketplace_brand: metadata?.marketplace_brand || 'entiznetstore'
           }
         })
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         ...metadata,
         customer_id: customer?.id,
-        user_id: session.user.id,
+        user_id: user.id,
         platform_fee_amount: platformFee.toString()
       },
       application_fee_amount: platformFee,
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const { error: orderError } = await supabase
       .from('orders')
       .insert({
-        buyer_id: session.user.id,
+        buyer_id: user.id,
         seller_id: metadata?.seller_id,
         product_id: metadata?.product_id,
         variant_id: metadata?.variant_id || null,

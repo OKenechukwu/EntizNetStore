@@ -119,15 +119,12 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
         const { data: userRes } = await supabase.auth.getUser();
         const uid = userRes.user?.id;
         if (uid) {
+          // Store contact details only. Role/capability is never client-assigned:
+          // it comes from server-created profiles or trusted app_metadata.
           const { error: metaErr } = await supabase.auth.updateUser({
-            data: { role, phone, address },
+            data: { phone, address },
           });
           if (metaErr) append(`Warn: metadata update failed: ${metaErr.message}`);
-
-          const { error: roleErr } = await supabase
-            .from('user_roles')
-            .upsert({ user_id: uid, role }, { onConflict: 'user_id' });
-          if (roleErr) append(`Warn: user_roles upsert failed: ${roleErr.message}`);
         }
 
         append('Account created. Please verify your email, then sign in.');

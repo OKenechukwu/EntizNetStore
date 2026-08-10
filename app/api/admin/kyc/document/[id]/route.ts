@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { ObjectStorageService } from '@/server/objectStorage'
 
 export async function GET(
@@ -8,20 +8,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check authentication and admin role
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { user, errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const documentId = params.id
 
     // Get document details using admin client
-    const { data: document, error: docError } = await supabaseAdmin
+    const { data: document, error: docError } = await getSupabaseAdmin()
       .from('kyc_documents')
       .select('*')
       .eq('id', documentId)

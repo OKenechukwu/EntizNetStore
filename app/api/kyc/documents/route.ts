@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUser } from '@/lib/auth'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { ObjectStorageService } from '@/server/objectStorage'
 import { setObjectAclPolicy, ObjectAccessGroupType, ObjectPermission } from '@/server/objectAcl'
 import { sanitizeInput } from '@/lib/security'
@@ -18,14 +18,20 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const user = await getCurrentUser()
-    if (!user) {
+    // Validate the user server-side
+    const serverSupabase = createServerSupabase()
+    const { data: { user }, error: authError } = await serverSupabase.auth.getUser()
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only sellers can submit KYC documents
-    if (user.user_metadata?.role !== 'seller') {
+    // Only sellers can submit KYC documents (capability = seller profile presence)
+    const { data: sellerProfile } = await serverSupabase
+      .from('profiles_seller')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+    if (!sellerProfile) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 

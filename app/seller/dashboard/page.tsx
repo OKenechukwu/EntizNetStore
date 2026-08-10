@@ -8,14 +8,14 @@ export default async function SellerDashboardPage() {
   const supabase = createServerComponentClient({ cookies })
 
   // Check authentication (Supabase is auth-only; app data lives in Neon — see lib/db.ts)
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/auth/signin?redirect=/seller/dashboard')
   }
 
   // Load seller profile + analytics data from the live database
   const { sellerProfile, products, orders, reviews } =
-    await getSellerDashboardData(session.user.id)
+    await getSellerDashboardData(user.id)
 
   if (!sellerProfile) {
     redirect('/seller/apply')

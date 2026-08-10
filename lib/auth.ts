@@ -57,12 +57,14 @@ function normalizeCountryInput(value?: string | null): string | undefined {
 export async function signUp(
   email: string,
   password: string,
-  role: UserRole = "buyer",
+  // NOTE: role is intentionally NOT written to user_metadata. Capability is
+  // determined server-side (profile presence / trusted app_metadata), never
+  // by client-supplied metadata.
+  _role: UserRole = "buyer",
 ) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role } },
   });
   if (error) throw error;
   return data;

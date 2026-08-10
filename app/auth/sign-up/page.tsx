@@ -9,7 +9,6 @@ import {
   createSellerProfile,
   type UserRole,
 } from "@/lib/auth";
-import { supabase } from "@/lib/supabase/client";
 import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function SignUpPage() {
@@ -75,14 +74,9 @@ export default function SignUpPage() {
           });
         }
 
-        // 2) Save role into user_roles table
-        await supabase
-          .from("user_roles")
-          .upsert([{ user_id: user.id, role }], { onConflict: "user_id" });
-
-        // 3) Mirror role into user_metadata for instant availability
-        await supabase.auth.updateUser({ data: { role } });
-
+        // Role/capability is never client-assigned via user_metadata or a
+        // client-writable role table; it is derived from profile presence
+        // (or trusted app_metadata for admin) on the server.
         setSuccess(true);
       }
     } catch (err: any) {

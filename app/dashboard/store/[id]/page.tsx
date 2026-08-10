@@ -10,10 +10,10 @@ export default async function StoreItemPage({ params }: PageProps) {
   // Protect the page (requires signed-in user)
   const supabase = createServerSupabase();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/auth/sign-in");
   }
 

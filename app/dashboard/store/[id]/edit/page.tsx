@@ -13,9 +13,9 @@ type Product = {
 export default async function EditProductPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabase();
   
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  
-  if (sessionError || !session) {
+  const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+
+  if (sessionError || !user) {
     redirect('/auth/sign-in');
   }
 
@@ -23,7 +23,7 @@ export default async function EditProductPage({ params }: { params: { id: string
     .from('products')
     .select('id, title, description, price, owner')
     .eq('id', params.id)
-    .eq('owner', session.user.id)
+    .eq('owner', user.id)
     .single();
 
   if (productError || !product) {

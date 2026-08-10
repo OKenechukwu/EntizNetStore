@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
@@ -6,15 +7,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     // Get all categories with subcategory structure
     const { data, error } = await supabase
@@ -41,15 +36,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { name, slug, description, parent_id, is_active, sort_order } = body
@@ -113,15 +102,9 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { id, name, slug, description, parent_id, is_active, sort_order } = body
@@ -186,15 +169,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const supabase = createServerComponentClient({ cookies })
     
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('id')

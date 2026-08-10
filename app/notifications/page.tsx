@@ -7,8 +7,8 @@ export default async function NotificationsPageWrapper() {
   const supabase = createServerComponentClient({ cookies })
   
   // Check authentication
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/auth/signin?redirect=/notifications')
   }
 

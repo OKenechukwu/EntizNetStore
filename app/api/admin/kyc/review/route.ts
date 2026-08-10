@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/auth/requireAdmin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { validateMessageContent } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication and admin role
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user is admin
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
-    }
+    // Verify trusted admin (server-validated user + app_metadata role)
+    const { user, errorResponse } = await requireAdmin()
+    if (errorResponse) return errorResponse
 
     const { action, documentId, requestId, status, reason, notes } = await request.json()
 
@@ -56,7 +49,7 @@ export async function POST(request: NextRequest) {
           updateData.rejection_reason = reason
         }
 
-        const { error: docError } = await supabaseAdmin
+        const { error: docError } = await getSupabaseAdmin()
           .from('kyc_documents')
           .update(updateData)
           .eq('id', documentId)
@@ -83,7 +76,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get the seller ID for this request using admin client
-        const { data: requestData } = await supabaseAdmin
+        const { data: requestData } = await getSupabaseAdmin()
           .from('kyc_verification_requests')
           .select('seller_id')
           .eq('id', requestId)
@@ -94,7 +87,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update verification request using admin client
-        const { error: requestError } = await supabaseAdmin
+        const { error: requestError } = await getSupabaseAdmin()
           .from('kyc_verification_requests')
           .update({
             verification_status: status,
@@ -106,7 +99,7 @@ export async function POST(request: NextRequest) {
         if (requestError) throw requestError
 
         // Update seller profile using admin client
-        const { error: sellerError } = await supabaseAdmin
+        const { error: sellerError } = await getSupabaseAdmin()
           .from('profiles_seller')
           .update({ verification_status: status })
           .eq('id', requestData.seller_id)
@@ -139,7 +132,7 @@ export async function POST(request: NextRequest) {
 // Helper function to log admin actions to audit table
 async function logAdminAction(adminId: string, action: string, metadata: any) {
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('admin_audit_logs')
       .insert({
         admin_id: adminId,
