@@ -1,0 +1,254 @@
+EntizNetStore — Module 1C-4A Production Auth, Profile & RLS Foundation Inspection
+
+The canonical Supabase backend is established.
+
+Current production Supabase state:
+
+24 application tables;
+16 categories;
+6 brands;
+0 Auth users;
+0 sellers;
+0 buyers;
+0 products;
+0 orders/reviews;
+0 Storage buckets;
+RLS enabled on all 24 application tables;
+0 RLS policies.
+
+This task is INSPECTION AND ARCHITECTURE PLANNING ONLY.
+
+Do not create users.
+Do not insert/update/delete marketplace data.
+Do not create RLS policies yet.
+Do not add foreign keys yet.
+Do not create Storage buckets.
+Do not change runtime database connections.
+
+1. Inspect current authentication flows
+
+Locate every active:
+
+sign-up page;
+sign-in page;
+logout flow;
+password reset/recovery flow;
+Supabase client/server auth helper;
+middleware/auth guard;
+session retrieval method;
+route requiring authentication.
+
+Report exact files and current behavior.
+
+Determine whether the application currently uses:
+
+getSession;
+getUser;
+server-side validated Auth identity;
+client-only session checks.
+
+Identify unsafe or obsolete auth patterns.
+
+2. Inspect current buyer/seller onboarding
+
+Determine how the current application intends to create:
+
+buyer accounts;
+seller accounts;
+profiles_buyer;
+profiles_seller;
+profiles_seller_private;
+seller verification/KYC records.
+
+Determine whether profile rows are currently:
+
+created automatically after signup;
+created manually from forms;
+created by triggers;
+missing entirely.
+
+Do not change anything.
+
+3. Determine the canonical identity model
+
+Based only on current repository evidence and the approved Supabase architecture, recommend the correct relationship between:
+
+auth.users
+
+and:
+
+profiles_buyer;
+profiles_seller;
+profiles_seller_private;
+addresses;
+notifications;
+messages;
+conversation_keys;
+kyc_documents;
+kyc_verification_requests;
+admin_audit_logs;
+products;
+orders;
+reviews;
+escrow_transactions.
+
+Prefer auth.users.id as the immutable authentication identity.
+
+Do not introduce a second competing user-ID system.
+
+4. Buyer vs seller capability model
+
+Inspect whether EntizNetStore currently allows one authenticated user to be:
+
+buyer only;
+seller only;
+both buyer and seller.
+
+Identify all repository assumptions about roles.
+
+Determine whether profile-table presence is currently sufficient to represent capability or whether a separate role/capability table already exists or is genuinely required.
+
+Do not invent a role table merely because other systems use one.
+
+Report what the repository actually supports.
+
+5. Seller eligibility and verification
+
+Inspect the current seller-verification model:
+
+verification_status;
+KYC request flow;
+KYC document flow;
+seller dashboard guards;
+seller product-creation guards.
+
+Determine the safest production rule for:
+
+creating a seller profile;
+accessing the seller dashboard;
+creating draft products;
+making products publicly visible;
+verified vs pending vs rejected sellers.
+
+Do not implement.
+
+6. Admin authorization
+
+Determine how admins are currently represented and authenticated.
+
+Search for:
+
+admin role tables;
+Auth metadata;
+hard-coded emails;
+service-role checks;
+admin pages/API routes;
+middleware.
+
+Identify any privilege-escalation risk.
+
+Do not create an admin system yet.
+
+7. Design deferred foreign keys
+
+Design the exact FKs that should now be added, including deletion behavior.
+
+At minimum assess:
+
+profiles_buyer.id → auth.users.id
+profiles_seller.id → auth.users.id
+addresses.user_id → auth.users.id
+notifications.user_id → auth.users.id
+messages.sender_id → auth.users.id
+messages.recipient_id → auth.users.id
+conversation participant/key identities
+kyc_documents.seller_id → profiles_seller.id
+kyc_verification_requests.seller_id → profiles_seller.id
+products.seller_id → profiles_seller.id
+orders.seller_id → profiles_seller.id
+orders.buyer_id → profiles_buyer.id
+reviews.buyer_id → profiles_buyer.id
+escrow_transactions.seller_id → profiles_seller.id
+
+Remember:
+
+products.seller_id must remain nullable for now unless there is a newly approved reason to change it.
+
+8. Design production RLS
+
+Design—but do not apply—the first production RLS policy set.
+
+Cover all 24 tables.
+
+Requirements include:
+
+categories/brands publicly readable only as appropriate;
+users may access only their private data;
+sellers may modify only their own seller resources;
+seller-sensitive data must never be public;
+buyers must never access another buyer's private profile/addresses;
+one seller must never modify another seller's products;
+product public visibility must respect product status and seller verification;
+messages require participant membership and sender identity enforcement;
+users may not spoof sender_id, seller_id, buyer_id, or user_id;
+KYC/private seller data must not be public;
+financial/escrow data must not be broadly client-writable;
+admin privileges must not come from client-supplied metadata.
+9. Registration/profile creation strategy
+
+Recommend whether profile creation should use:
+
+explicit trusted server-side application code;
+Supabase database trigger(s);
+another existing mechanism.
+
+Explain tradeoffs and recommend one approach for this codebase.
+
+Do not implement.
+
+10. Application cutover implications
+
+Identify what still uses:
+
+DATABASE_URL;
+NEON_DATABASE_URL;
+lib/db.ts;
+pg;
+direct Replit PostgreSQL;
+stale direct Supabase product CRUD.
+
+Identify the safest order for eventually removing those paths once Supabase Auth/RLS is ready.
+
+Do not cut over yet.
+
+Required report
+
+Return:
+
+A. Current Auth architecture
+
+B. Current onboarding/profile architecture
+
+C. Canonical production identity model
+
+D. Buyer/seller capability findings
+
+E. Seller verification/eligibility model
+
+F. Admin authorization findings
+
+G. Exact deferred-FK plan
+
+H. Full RLS policy design
+
+I. Registration/profile-creation recommendation
+
+J. Remaining Replit/Neon dependencies
+
+K. Security risks ranked Critical / High / Medium / Low
+
+L. Exact first implementation task
+
+Stop after reporting.
+
+Do not implement any of the recommendations yet.
