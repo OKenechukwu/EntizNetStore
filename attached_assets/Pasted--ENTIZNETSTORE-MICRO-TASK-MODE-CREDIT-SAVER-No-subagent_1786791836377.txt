@@ -1,0 +1,190 @@
+**ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER**
+
+No subagents.
+No repository-wide audit.
+No Git history.
+No application refactor.
+Inspect only the canonical Supabase migration/schema needed to confirm column names.
+
+Previous architecture decisions are approved baseline facts.
+
+---
+
+# Module 1C-4B4 — Core Marketplace RLS
+
+Create **one new Supabase migration**.
+
+Do NOT edit previously applied migrations.
+
+Implement RLS policies only for:
+
+* `categories`
+* `brands`
+* `profiles_buyer`
+* `profiles_seller`
+* `profiles_seller_private`
+* `products`
+* `product_variants`
+* `product_media`
+* `product_categories`
+
+Leave every other table unchanged and deny-by-default with its current zero-policy state.
+
+## 1. Categories
+
+Allow `anon` and `authenticated` to SELECT active categories.
+
+No client INSERT/UPDATE/DELETE.
+
+Admin/server service-role handles writes.
+
+## 2. Brands
+
+Allow `anon` and `authenticated` to SELECT brands.
+
+No client INSERT/UPDATE/DELETE.
+
+## 3. Buyer profiles
+
+Allow authenticated users to SELECT only:
+
+`profiles_buyer.id = auth.uid()`
+
+Do not add client INSERT policy; onboarding already uses trusted server code.
+
+Do not add broad UPDATE policy in this task.
+
+## 4. Seller profiles
+
+Allow authenticated seller to SELECT their own row:
+
+`profiles_seller.id = auth.uid()`
+
+Allow public/authenticated users to SELECT seller profiles only where:
+
+`verification_status = 'verified'`
+
+Do not add client INSERT policy.
+
+Do not allow clients to change `verification_status`.
+
+Do not add broad seller UPDATE capability in this task.
+
+Seller profile creation remains trusted-server only.
+
+## 5. Seller private profile
+
+Allow authenticated seller to SELECT only:
+
+`profiles_seller_private.seller_id = auth.uid()`
+
+No public access.
+
+No client INSERT/UPDATE/DELETE.
+
+## 6. Products — public read
+
+Allow `anon` and `authenticated` to SELECT products only when:
+
+* product status = `active`
+* `seller_id` is not null
+* owning `profiles_seller.verification_status = 'verified'`
+
+NULL-seller products must not become publicly visible.
+
+## 7. Products — seller ownership
+
+Authenticated seller may SELECT their own products regardless of public status where:
+
+`products.seller_id = auth.uid()`
+
+Seller INSERT must require:
+
+* `seller_id = auth.uid()`
+* authenticated user has a `profiles_seller` row
+* seller status is `pending` or `verified`
+* pending seller may create only `draft`
+* verified seller may create `draft` or `active`
+
+Seller UPDATE must enforce the same ownership/status rules with both `USING` and `WITH CHECK`.
+
+Seller DELETE only their own products.
+
+Do not permit seller to assign a product to another seller.
+
+Keep `products.seller_id` nullable at schema level.
+
+## 8. Product children
+
+For:
+
+* `product_variants`
+* `product_media`
+* `product_categories`
+
+Public SELECT only when the parent product satisfies the public product rule.
+
+Seller SELECT/INSERT/UPDATE/DELETE only when the parent product belongs to:
+
+`auth.uid()`
+
+Do not allow manipulating children of another seller's product.
+
+## OUT OF SCOPE
+
+Do NOT add policies for:
+
+* orders
+* order_items
+* escrow_transactions
+* reviews
+* messages
+* conversations
+* conversation_keys
+* notifications
+* addresses
+* KYC tables
+* featured products
+* content pages
+* admin audit logs
+* any other table
+
+Those remain RLS-enabled and inaccessible to normal clients unless separately approved later.
+
+Do NOT create users or test marketplace data.
+
+Do NOT alter application code.
+
+Do NOT modify categories/brands data.
+
+## Apply + targeted verification only
+
+Apply the migration to EntizNetStore Supabase.
+
+Verify:
+
+* policies exist only on the 9 approved tables;
+* every public application table still has RLS enabled;
+* categories remain 16;
+* brands remain 6;
+* Auth users remain 0;
+* all other application tables remain empty;
+* no policies accidentally grant writes to `anon`;
+* `profiles_seller_private` has no public policy;
+* NULL-seller products cannot satisfy public product policy;
+* `products.seller_id` remains nullable.
+
+Final response maximum 10 lines:
+
+* migration filename
+* applied yes/no
+* policy count
+* tables receiving policies
+* RLS enabled 24/24 yes/no
+* categories/brands counts
+* auth users
+* unintended data changes yes/no
+* security verification passed yes/no
+* blocker
+
+Stop. Do not propose another task.
