@@ -3,13 +3,12 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/requireRole";
 
 // ---------- Supabase server client ----------
 function sb() {
-  return createServerClient(cookies());
+  return createClient();
 }
 
 // ---------- Role gate (BSM only) ----------

@@ -1,6 +1,6 @@
 // app/dashboard/vendor/bsm/[id]/page.tsx
 import Link from "next/link";
-import { supabaseServer } from "@/lib/supabase/server";
+import { createServerSupabase as supabaseServer } from "@/lib/supabase/server";
 
 // Types
 type Company = {

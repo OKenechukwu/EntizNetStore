@@ -6,7 +6,7 @@ export async function requireRole(roles: string[] | Set<string>) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, redirectTo: "/auth" as const };
+  if (!user) return { ok: false as const, redirectTo: "/auth" as const };
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -19,6 +19,6 @@ export async function requireRole(roles: string[] | Set<string>) {
     : (roles as Set<string>).has(profile?.role ?? "");
 
   return allow
-    ? { ok: true, user, role: profile?.role }
-    : { ok: false, redirectTo: "/dashboard/seller" as const };
+    ? { ok: true as const, user, role: profile?.role }
+    : { ok: false as const, redirectTo: "/dashboard/seller" as const };
 }

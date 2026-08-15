@@ -10,6 +10,18 @@ interface ChatWindowProps {
   onSendMessage: (content: string, attachments?: string[]) => void
 }
 
+type ChatMessage = {
+  id?: string
+  sender_id?: string
+  content?: string
+  attachments?: string[]
+  created_at: string
+}
+
+type ChatFeedItem =
+  | { type: 'date'; date: string; formatted: string }
+  | ({ type: 'message' } & ChatMessage)
+
 export default function ChatWindow({ 
   conversation, 
   currentUserId, 
@@ -65,7 +77,7 @@ export default function ChatWindow({
   const getMessageGroups = () => {
     if (!conversation.messages) return []
     
-    const groups = []
+    const groups: ChatFeedItem[] = []
     let currentDate = ''
     
     for (const message of conversation.messages) {
@@ -222,8 +234,7 @@ export default function ChatWindow({
               style={{
                 backgroundColor: theme.colors.background,
                 borderColor: theme.colors.glass.border,
-                color: theme.colors.text.primary,
-                focusRingColor: theme.colors.accent
+                color: theme.colors.text.primary
               }}
               rows={1}
             />

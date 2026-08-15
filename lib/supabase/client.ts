@@ -1,5 +1,8 @@
-"use client";
-
+// NOTE: intentionally NOT marked "use client" — this module is imported by
+// both client components and API route handlers. A "use client" directive
+// turns its exports into client-reference proxies inside route handlers,
+// which crashes the production build at page-data collection.
+// It contains no client-only code (window/localStorage access is guarded).
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient, Session } from "@supabase/supabase-js";
 

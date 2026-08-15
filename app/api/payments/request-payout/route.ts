@@ -3,12 +3,19 @@ import Stripe from 'stripe'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil'
-})
+// Lazy init: constructing Stripe at module scope crashes the production
+// build (page-data collection) when STRIPE_SECRET_KEY is not configured.
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
+  return new Stripe(key, {
+    apiVersion: '2025-08-27.basil'
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe()
     const { seller_id } = await request.json()
 
     // Verify authentication

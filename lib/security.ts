@@ -80,7 +80,7 @@ export class MessageEncryption {
   // Export key to store in database (encrypted with user's master key)
   static async exportKey(key: CryptoKey): Promise<string> {
     const exported = await crypto.subtle.exportKey('raw', key)
-    return btoa(String.fromCharCode(...new Uint8Array(exported)))
+    return btoa(String.fromCharCode(...Array.from(new Uint8Array(exported))))
   }
 
   // Import key from database
@@ -119,8 +119,8 @@ export class MessageEncryption {
     )
 
     return {
-      encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-      iv: btoa(String.fromCharCode(...iv))
+      encrypted: btoa(String.fromCharCode(...Array.from(new Uint8Array(encrypted)))),
+      iv: btoa(String.fromCharCode(...Array.from(iv)))
     }
   }
 

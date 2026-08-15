@@ -1,5 +1,5 @@
 import { Storage, File } from "@google-cloud/storage";
-import { Response } from "express";
+import type { Response } from "express";
 import { randomUUID } from "crypto";
 import {
   ObjectAclPolicy,

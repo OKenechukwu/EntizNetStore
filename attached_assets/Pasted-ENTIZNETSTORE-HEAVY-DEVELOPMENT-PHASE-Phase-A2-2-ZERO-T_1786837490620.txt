@@ -1,0 +1,239 @@
+ENTIZNETSTORE — HEAVY DEVELOPMENT PHASE
+Phase A2.2 — ZERO TypeScript Errors + Green Production Build
+
+Implementation is authorized.
+
+Current verified baseline:
+
+blocking ESLint errors: 0
+TypeScript error lines: 40
+core/public marketplace smoke routes: passing
+npm run build: currently fails at TypeScript validation
+
+Primary objective:
+
+npx tsc --noEmit → 0 errors
+
+and
+
+npm run build → exit 0
+
+This task may fix type/structure problems inside deferred subsystems, but it must NOT redesign those subsystems.
+
+CURRENT ERROR CLUSTERS
+
+Previous run identified approximately:
+
+messaging / ChatWindow: ~15
+wishlist API: ~6
+ObjectUploader / Storage typing: ~5
+Vendor/BSM: ~8
+lib/security: ~3
+payments: ~2
+BSM/search: ~1
+
+Re-run npx tsc --noEmit first and use the current compiler output as source of truth.
+
+Do NOT perform another architecture audit.
+
+RULE 1 — FIX TYPE/STRUCTURAL ERRORS, NOT PRODUCT ARCHITECTURE
+
+You may fix:
+
+invalid Next.js page/layout exports;
+incorrect imports/exports;
+prop/interface mismatches;
+null/undefined handling;
+incorrect Supabase result typing;
+incorrect Stripe SDK type/version declarations;
+stale generated types;
+malformed TypeScript generics;
+valid narrow type assertions;
+incompatible callback types;
+browser/File typing;
+obvious dead imports;
+errors caused by code that cannot compile as written.
+
+Do NOT redesign:
+
+messaging architecture;
+payments architecture;
+escrow;
+wallet;
+payouts;
+wishlist database architecture;
+Storage architecture;
+Vendor/BSM business model.
+
+Runtime architectural problems will be handled in their own phases.
+
+RULE 2 — VENDOR / BSM
+
+Fix only enough to make the routes structurally valid Next.js/TypeScript.
+
+For the current first blocker:
+
+app/dashboard/vendor/page.tsx
+
+inspect whether it is incorrectly written as a layout component accepting children.
+
+If so, make it a valid page.tsx component while preserving whatever visible page content exists.
+
+Do NOT invent Vendor/BSM functionality.
+
+Do NOT create phantom database tables.
+
+Do NOT restore the obsolete generic profiles architecture.
+
+If a route cannot work because its backing subsystem does not exist, it may remain functionally deferred — but it must compile cleanly.
+
+RULE 3 — MESSAGING TYPE ERRORS
+
+Fix TypeScript/React errors only.
+
+Examples:
+
+incorrect message/attachment types;
+nullable conversation properties;
+incompatible callbacks;
+invalid JSX typing;
+stale interface definitions.
+
+Do NOT merge the three messaging systems yet.
+
+Do NOT change encryption architecture.
+
+Do NOT add RLS policies.
+
+Do NOT restore or expand Neon usage.
+
+Messaging may remain functionally broken after this task; it must simply compile correctly.
+
+RULE 4 — WISHLIST
+
+Fix API/component TypeScript errors only.
+
+The live database currently does not have the canonical wishlist table.
+
+Do NOT create a wishlist migration in this phase.
+
+Do NOT fake database success.
+
+The feature may remain runtime-deferred.
+
+RULE 5 — STORAGE / OBJECT UPLOADER
+
+Fix TypeScript problems without pretending Storage is configured.
+
+Supabase currently has zero Storage buckets.
+
+Do NOT create buckets or policies in this phase.
+
+Do NOT introduce fake upload success.
+
+RULE 6 — PAYMENTS
+
+Fix harmless compile-time SDK typing only.
+
+For example, if Stripe apiVersion is invalid for the installed SDK version, use the version supported by the installed Stripe SDK.
+
+Do NOT:
+
+change amount authority;
+alter Connect routing;
+implement payment logic;
+implement escrow;
+implement payouts;
+configure Stripe secrets.
+
+Those belong to the financial-engineering phase.
+
+RULE 7 — SECURITY HELPERS
+
+Fix legitimate TypeScript errors in lib/security without weakening cryptography.
+
+Do NOT replace crypto errors with any.
+
+Do NOT suppress them using @ts-ignore.
+
+Do NOT redesign conversation encryption.
+
+QUALITY RULES
+
+Forbidden:
+
+typescript.ignoreBuildErrors
+disabling ESLint build checks
+broad any
+@ts-ignore
+@ts-nocheck
+deleting active features merely to reduce errors
+weakening tsconfig
+commenting out functionality to make compilation pass
+
+Narrow, justified type assertions are allowed.
+
+Dead code may be removed ONLY after confirming zero importers/references.
+
+ITERATION
+
+Work through the compiler errors in batches.
+
+After each meaningful batch run:
+
+npx tsc --noEmit
+
+Continue until:
+
+0 TypeScript errors
+
+unless you encounter a genuine architectural blocker that cannot be resolved without redesigning a subsystem.
+
+Do not stop merely because an error lives in a deferred subsystem if it is only a typing/structure issue.
+
+FINAL BUILD
+
+When TypeScript reaches 0:
+
+run:
+
+npm run build
+
+Fix any remaining build-only error that is genuinely code/build related and does not require subsystem redesign.
+
+Goal:
+
+production build exit code 0
+
+Do not modify deployment configuration merely to fake success.
+
+FINAL SMOKE TEST
+
+After the successful build, restart the Replit workflow if necessary.
+
+Verify:
+
+/
+/store
+/auth/sign-in
+/auth/sign-up
+/dashboard/store unauthenticated guard
+/seller/dashboard unauthenticated guard
+/api/admin/stats unauthenticated → 401
+
+Do not create users/data.
+
+FINAL REPORT
+
+Return:
+
+TypeScript: 40 → X
+npm run build: PASS/FAIL
+files changed
+error clusters fixed
+any dead files removed and proof they were unreferenced
+smoke-test result
+deferred runtime features that compile but remain functionally unfinished
+genuine blocker, if any
+
+Do not begin the next feature-development phase automatically.

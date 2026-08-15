@@ -156,9 +156,22 @@ export function useI18n() {
   return ctx;
 }
 
-/** Tiny text component: <T k="nav.signIn" fallback="Sign in" /> */
-export function T({ k, fallback }: { k: string; fallback?: string }) {
+/** Tiny text component: <T k="nav.signIn" fallback="Sign in" vars={{ count: 3 }} /> */
+export function T({
+  k,
+  fallback,
+  vars,
+}: {
+  k: string;
+  fallback?: string;
+  vars?: Record<string, string | number>;
+}) {
   const { t } = useI18n();
-  const txt = t(k);
-  return <>{txt || fallback || ''}</>;
+  let txt = t(k) || fallback || '';
+  if (vars) {
+    for (const [key, val] of Object.entries(vars)) {
+      txt = txt.split(`{${key}}`).join(String(val));
+    }
+  }
+  return <>{txt}</>;
 }

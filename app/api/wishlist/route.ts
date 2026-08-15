@@ -49,16 +49,21 @@ export async function GET(request: NextRequest) {
       throw new Error('Failed to fetch wishlist')
     }
 
-    // Process the items to add computed fields
-    const processedItems = (wishlistItems || []).map(item => ({
-      ...item,
-      product: item.product ? {
-        ...item.product,
-        image_url: item.product.media?.[0]?.url || null,
-        current_price: item.variant?.price || item.product.base_price,
-        original_price: item.variant?.compare_at_price || item.product.compare_at_price
-      } : null
-    }))
+    // Process the items to add computed fields.
+    // Supabase types embedded to-one relations as arrays; normalize both shapes.
+    const processedItems = (wishlistItems || []).map(item => {
+      const product = Array.isArray(item.product) ? item.product[0] : item.product
+      const variant = Array.isArray(item.variant) ? item.variant[0] : item.variant
+      return {
+        ...item,
+        product: product ? {
+          ...product,
+          image_url: product.media?.[0]?.url || null,
+          current_price: variant?.price || product.base_price,
+          original_price: variant?.compare_at_price || product.compare_at_price
+        } : null
+      }
+    })
 
     return NextResponse.json({
       items: processedItems,
@@ -143,12 +148,15 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to add item to wishlist')
     }
 
-    // Process the item
+    // Process the item (normalize array-typed embedded relation)
+    const newProduct = Array.isArray(newItem.product)
+      ? newItem.product[0]
+      : newItem.product
     const processedItem = {
       ...newItem,
-      product: newItem.product ? {
-        ...newItem.product,
-        image_url: newItem.product.media?.[0]?.url || null
+      product: newProduct ? {
+        ...newProduct,
+        image_url: newProduct.media?.[0]?.url || null
       } : null
     }
 

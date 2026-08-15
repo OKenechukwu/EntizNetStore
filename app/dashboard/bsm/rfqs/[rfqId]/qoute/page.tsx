@@ -19,7 +19,18 @@ export default async function Page({ params }: { params: { rfqId: string } }) {
           RFQ: {rfq.title} • Status: {rfq.status}
         </p>
       </div>
-      <QuoteForm rfq={rfq} />
+      <QuoteForm
+        rfqId={rfq.id}
+        items={[
+          {
+            id: rfq.id,
+            name: rfq.title ?? null,
+            spec: rfq.details ?? null,
+            quantity: rfq.quantity ?? null,
+            unit: null,
+          },
+        ]}
+      />
     </div>
   );
 }
