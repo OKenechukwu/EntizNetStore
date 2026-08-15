@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { routeByRole } from "@/lib/auth/routeByRole";
+import { completePendingOnboarding } from "@/lib/auth/pendingOnboarding";
 
 /**
  * Returns a safe internal redirect path.
@@ -59,6 +60,9 @@ export default function AuthCallbackPage() {
         const { data: sessionRes } = await supabase.auth.getSession();
         const session = sessionRes.session;
         if (session) {
+          // Authenticated: complete any pending buyer/seller onboarding
+          // (idempotent trusted endpoint; identity derived server-side).
+          await completePendingOnboarding();
           const role =
             (session.user as any)?.user_metadata?.role ??
             (session.user as any)?.role ??
@@ -76,6 +80,9 @@ export default function AuthCallbackPage() {
           // Some providers return to callback without code (e.g., user cancels)
           throw error;
         }
+
+        // Authenticated via code exchange: complete any pending onboarding.
+        await completePendingOnboarding();
 
         const role =
           (exchanged.session?.user as any)?.user_metadata?.role ??

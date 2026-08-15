@@ -6,6 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { routeByRole } from '@/lib/auth/routeByRole';
 import { signInWithPassword, signUpEmailPassword } from '@/lib/auth/actions';
+import {
+  setPendingOnboarding,
+  completePendingOnboarding,
+} from '@/lib/auth/pendingOnboarding';
 
 type Role = 'buyer' | 'seller' | 'bsm';
 type Mode = 'signin' | 'signup';
@@ -78,6 +82,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
   };
 
   const goAfterAuth = async () => {
+    // Authenticated: complete any pending buyer/seller onboarding
+    // (idempotent trusted endpoint; identity derived server-side).
+    await completePendingOnboarding();
     const { data } = await supabase.auth.getUser();
     const r = (data.user?.user_metadata?.role as string | undefined) ?? undefined;
     const next = routeByRole(r) || '/dashboard';
@@ -127,6 +134,8 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
           if (metaErr) append(`Warn: metadata update failed: ${metaErr.message}`);
         }
 
+        // Preserve the registration choice for after email verification.
+        setPendingOnboarding(role === 'seller' ? 'seller' : 'buyer');
         append('Account created. Please verify your email, then sign in.');
         if (variant === 'combined') setMode('signin');
       }

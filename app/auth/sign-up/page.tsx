@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signUp, type UserRole } from "@/lib/auth";
+import { supabase } from "@/lib/supabase/client";
+import {
+  setPendingOnboarding,
+  completePendingOnboarding,
+} from "@/lib/auth/pendingOnboarding";
 import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function SignUpPage() {
@@ -55,18 +60,14 @@ export default function SignUpPage() {
       const { user } = await signUp(email, password, role);
 
       if (user) {
-        // Canonical onboarding: trusted server endpoint derives the profile ID
-        // from the authenticated session — never from a client-supplied ID.
-        // If email verification is required there is no session yet; the
-        // endpoint returns 401 and onboarding completes after first sign-in.
-        try {
-          await fetch(`/api/onboarding/${role === "seller" ? "seller" : "buyer"}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
-          });
-        } catch {
-          // Non-fatal: onboarding is idempotent and can run after sign-in.
+        // Persist the registration choice (UX hint only, never authorization)
+        // so onboarding completes after email verification + sign-in. If a
+        // session already exists (email confirmation disabled), run it now —
+        // the trusted endpoint derives the profile ID from the auth user.
+        setPendingOnboarding(role === "seller" ? "seller" : "buyer");
+        const { data: sessionRes } = await supabase.auth.getSession();
+        if (sessionRes.session) {
+          await completePendingOnboarding();
         }
 
         setSuccess(true);
