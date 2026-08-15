@@ -1,0 +1,108 @@
+ENTIZNETSTORE FINAL HANDOVER CHECK — CREDIT SAVER
+
+No subagents.
+No repository-wide audit.
+No Git-history inspection.
+No new features.
+No refactors.
+No database migrations.
+Do not create Auth users or test marketplace data.
+
+Module 1C-7A — Core Handover Smoke Test
+
+This is verification only.
+
+Do NOT attempt to fix deferred functionality.
+
+Test only the core EntizNetStore paths we have already stabilized.
+
+1. Public application
+
+Confirm these render/respond without server crash:
+
+store/home catalogue;
+product search endpoint using its correct HTTP method;
+product detail path;
+seller storefront path;
+sign-in page;
+sign-up page.
+
+Empty product results are expected because production Supabase currently has no products.
+
+2. Authentication guards
+
+Without signing in, confirm:
+
+seller dashboard does not expose seller data;
+seller product create/edit routes require authentication;
+admin API rejects unauthenticated access.
+
+Do not create an Auth user.
+
+3. Database/runtime
+
+Confirm:
+
+Supabase is the canonical runtime DB for core store/catalogue/product/seller-profile paths;
+categories = 16;
+brands = 6;
+Auth users = 0;
+RLS enabled = 24/24;
+core marketplace policies still present;
+no unexpected production data was created.
+4. Core code checks
+
+Targeted grep only.
+
+Confirm core auth/store/seller runtime does not use:
+
+user_roles
+provider_profiles
+entizer_profiles
+products.owner
+products.provider_id
+products.price
+products.images
+
+Confirm seller product CRUD uses:
+
+seller_id
+base_price
+authenticated user identity.
+5. Deferred items
+
+Do not fix these.
+
+Merely confirm them for handover:
+
+messaging send path still retains isolated legacy Neon dependency and requires redesign;
+Supabase Storage/product file upload remains unfinished;
+production orders/payments/escrow/payouts remain for development company;
+review subsystem still contains product_reviews legacy references;
+vendor/BSM subsystem retains old profiles role logic;
+project still has the previously known TypeScript baseline errors.
+Validation rule
+
+If a core path we already stabilized has a new regression, report it.
+
+Do NOT automatically investigate broadly or repair it.
+
+Final response — maximum 12 lines
+
+Return:
+
+public store smoke: pass/fail;
+search: pass/fail;
+auth pages: pass/fail;
+seller guards: pass/fail;
+admin guard: pass/fail;
+Supabase core runtime: pass/fail;
+DB counts;
+core stale-reference check: pass/fail;
+seller CRUD canonical check: pass/fail;
+deferred items confirmed;
+core blocker, if any;
+handover readiness: READY / NOT READY.
+
+Stop.
+Do not propose fixes or another task.
