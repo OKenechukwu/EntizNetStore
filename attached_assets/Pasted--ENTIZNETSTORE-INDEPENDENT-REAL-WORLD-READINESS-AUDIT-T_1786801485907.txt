@@ -1,0 +1,705 @@
+# ENTIZNETSTORE — INDEPENDENT REAL-WORLD READINESS AUDIT
+
+This is a **full inspection and verification audit**.
+
+The purpose is to determine the true condition of EntizNetStore before handing it to an external development company.
+
+## CRITICAL AUDIT RULE
+
+Do **NOT** assume previous work is correct.
+
+Do **NOT** rely on previous audit conclusions merely because they exist.
+
+Do **NOT** say something is “complete,” “working,” “secure,” or “production-ready” unless you have directly verified it from:
+
+* current code;
+* current live Supabase schema/configuration;
+* current runtime behavior;
+* current build/type/lint results;
+* current route/API behavior;
+* current dependencies/environment configuration.
+
+Challenge previous assumptions.
+
+If something cannot actually be tested, label it:
+
+**UNVERIFIED**
+
+—not PASS.
+
+If something is only UI without functioning backend behavior, label it:
+
+**UI ONLY**
+
+If something contains placeholder/mock/demo/stub behavior, label it:
+
+**MOCK/STUB**
+
+If something works partially, label it:
+
+**PARTIAL**
+
+Do not soften findings.
+
+---
+
+# DO NOT MODIFY ANYTHING
+
+Inspection only.
+
+Do NOT:
+
+* edit code;
+* create files;
+* delete files;
+* refactor;
+* install packages;
+* alter migrations;
+* change Supabase;
+* change RLS;
+* create users;
+* create test products/orders/payments;
+* modify environment variables;
+* commit;
+* push;
+* deploy.
+
+Do not “fix while inspecting.”
+
+We need the truth first.
+
+---
+
+# PART 1 — REPOSITORY / APPLICATION HEALTH
+
+Determine:
+
+* framework and exact technology stack;
+* application structure;
+* entry points;
+* active routes/pages;
+* API routes;
+* server/client architecture;
+* current data-access architecture;
+* authentication architecture;
+* runtime dependencies.
+
+Run the project's existing relevant checks, including where available:
+
+* TypeScript;
+* build;
+* lint;
+* existing test suite.
+
+Report:
+
+* exact number of TypeScript errors;
+* exact number of lint failures/warnings where practical;
+* build success/failure;
+* test success/failure;
+* errors that directly affect launch;
+* errors that are dead-code/deferred-area only.
+
+Do not simply say “135 pre-existing errors.”
+
+Tell us what categories those errors actually represent and whether any affect the live/core application.
+
+---
+
+# PART 2 — LIVE SUPABASE STATE
+
+Inspect the actual connected EntizNetStore Supabase project.
+
+Verify:
+
+* migrations applied;
+* application tables;
+* Auth user count;
+* Storage buckets;
+* categories;
+* brands;
+* products;
+* buyer profiles;
+* seller profiles;
+* orders;
+* reviews;
+* messages;
+* KYC;
+* notifications;
+* escrow records;
+* other meaningful application data.
+
+Verify:
+
+* RLS enabled/disabled per table;
+* policy count per table;
+* important FKs;
+* FK delete behavior;
+* unique constraints;
+* nullable identity/ownership columns;
+* important check constraints.
+
+Specifically determine whether the current DB state matches the application code or whether code still references tables/columns that do not exist.
+
+---
+
+# PART 3 — AUTHENTICATION & ACCOUNT SYSTEM
+
+Audit the real user lifecycle:
+
+* signup;
+* email verification;
+* callback;
+* sign-in;
+* sign-out;
+* session persistence;
+* onboarding;
+* buyer capability creation;
+* seller capability creation;
+* buyer + seller dual capability;
+* account/profile routing;
+* seller pending status;
+* admin authorization;
+* password recovery;
+* account deletion if present.
+
+Verify authorization sources.
+
+Confirm whether any important authorization still trusts:
+
+* `user_metadata`;
+* client-supplied IDs;
+* URL IDs;
+* browser state;
+* phantom role tables.
+
+Check for route protection failures.
+
+Clearly identify:
+
+**WORKING / PARTIAL / BROKEN / MISSING / UNVERIFIED**
+
+for each flow.
+
+Do NOT create a real test account merely to claim success.
+
+If authenticated flows cannot be genuinely tested because Auth currently has zero users, state that they remain **UNVERIFIED end-to-end**, even if the code appears correct.
+
+---
+
+# PART 4 — BUYER EXPERIENCE
+
+Determine what a real buyer can actually do today.
+
+Inspect and verify:
+
+* account/profile;
+* browse store;
+* categories;
+* brands;
+* search;
+* filters;
+* product detail;
+* seller storefront;
+* variants;
+* media;
+* wishlist;
+* cart;
+* checkout;
+* address;
+* order creation;
+* order history;
+* order detail;
+* messaging seller;
+* reviews;
+* notifications;
+* payment;
+* refunds/cancellation.
+
+For every item classify:
+
+* PRODUCTION FUNCTIONAL
+* PARTIAL
+* UI ONLY
+* MOCK/STUB
+* BROKEN
+* MISSING
+* UNVERIFIED
+
+---
+
+# PART 5 — SELLER EXPERIENCE
+
+Determine what a real seller can actually do.
+
+Verify:
+
+* seller onboarding;
+* seller profile;
+* seller-private profile;
+* KYC;
+* pending/verified/rejected states;
+* seller dashboard;
+* product creation;
+* draft product;
+* product publish;
+* product editing;
+* product deletion;
+* variants;
+* media;
+* image/file upload;
+* inventory;
+* categories;
+* brand assignment;
+* storefront;
+* orders;
+* fulfillment;
+* tracking;
+* reviews;
+* analytics;
+* earnings;
+* payout setup;
+* payout requests;
+* messaging.
+
+Do not call seller functionality complete merely because a component exists.
+
+Check actual persistence and security paths.
+
+---
+
+# PART 6 — PRODUCT / CATALOGUE SYSTEM
+
+Audit whether the current product system is internally consistent.
+
+Verify use of canonical schema:
+
+* `seller_id`;
+* `base_price`;
+* `product_variants`;
+* `product_media`;
+* product categories;
+* canonical product status;
+* inventory fields.
+
+Search for stale active runtime references such as:
+
+* `owner`;
+* `provider_id`;
+* `products.price`;
+* `products.images`;
+* obsolete product/review tables.
+
+Verify public product visibility rules.
+
+Determine whether:
+
+* pending sellers can publish;
+* unverified sellers can become publicly visible;
+* seller A can modify seller B's product;
+* NULL-seller products can become public.
+
+---
+
+# PART 7 — ORDERS / CHECKOUT / PAYMENTS / ESCROW
+
+Audit all existing code honestly.
+
+Determine whether real production implementations exist for:
+
+* cart;
+* checkout;
+* order creation;
+* order items;
+* pricing validation;
+* inventory reservation;
+* payment intent;
+* payment confirmation;
+* webhook verification;
+* idempotency;
+* escrow;
+* release;
+* refund;
+* cancellation;
+* disputes;
+* wallet;
+* seller balance;
+* payout;
+* reconciliation.
+
+Identify:
+
+* mocked code;
+* fake Stripe/payment behavior;
+* placeholder APIs;
+* incomplete webhook logic;
+* security issues;
+* database tables with no usable policies.
+
+Do NOT call anything production-ready unless money could safely flow through it today.
+
+---
+
+# PART 8 — MESSAGING
+
+Audit the messaging architecture as it really exists.
+
+Include:
+
+* active SendBar path;
+* `/api/chat/send`;
+* `/api/messages/send`;
+* conversations;
+* messages;
+* conversation keys;
+* attachments;
+* recipient identity;
+* translation behavior;
+* encryption;
+* key storage;
+* read state;
+* realtime;
+* authorization;
+* legacy Neon dependency.
+
+Explain which messaging implementation is actually active.
+
+Identify conflicting/duplicate messaging systems.
+
+Determine whether real users could reliably message each other today.
+
+---
+
+# PART 9 — REVIEWS / NOTIFICATIONS / WISHLIST
+
+Audit separately:
+
+### Reviews
+
+Check canonical `reviews` versus any `product_reviews` references.
+
+### Notifications
+
+Check actual creation, delivery, persistence, realtime and read-state behavior.
+
+### Wishlist
+
+Verify whether the table/schema/API/UI actually agree.
+
+Classify each subsystem honestly.
+
+---
+
+# PART 10 — ADMIN
+
+Audit actual admin capability.
+
+Verify:
+
+* admin identity source;
+* server-side authorization;
+* categories;
+* featured products;
+* stats;
+* activity;
+* KYC review;
+* seller approval;
+* order administration;
+* user administration;
+* moderation;
+* audit logs.
+
+Determine what is genuinely working and what is only UI/API scaffolding.
+
+---
+
+# PART 11 — VENDOR / BSM / OTHER LEGACY AREAS
+
+Inspect enough to determine their real status.
+
+Specifically investigate known old role/profile assumptions.
+
+Classify these areas:
+
+* functional;
+* partial;
+* broken;
+* abandoned/dead;
+* should be removed;
+* needs migration.
+
+Do not spend the audit rewriting them.
+
+---
+
+# PART 12 — STORAGE / MEDIA
+
+Verify whether Supabase Storage is actually configured.
+
+Check:
+
+* buckets;
+* bucket privacy;
+* upload policies;
+* seller ownership enforcement;
+* product media upload;
+* image deletion;
+* image replacement;
+* orphan-file handling.
+
+Distinguish URL-based product media from real uploaded media.
+
+---
+
+# PART 13 — SECURITY READINESS
+
+Perform a focused security review.
+
+Check at minimum:
+
+* service-role exposure;
+* client-controlled authorization;
+* IDOR/ownership issues;
+* admin authorization;
+* RLS gaps;
+* unsafe server `getSession`;
+* client-supplied seller/buyer IDs;
+* SQL injection risks;
+* direct Postgres access;
+* webhook verification;
+* payment amount trust;
+* secrets;
+* exposed dev/test routes;
+* logging of sensitive data;
+* KYC privacy;
+* messaging privacy;
+* plaintext/encryption-key issues;
+* unrestricted uploads;
+* rate limiting;
+* CSRF where relevant;
+* open redirect;
+* error information leakage.
+
+Rank findings:
+
+* CRITICAL
+* HIGH
+* MEDIUM
+* LOW
+
+---
+
+# PART 14 — DEPLOYMENT / OPERATIONS
+
+Determine whether this could actually be deployed responsibly today.
+
+Inspect:
+
+* required environment variables;
+* stale environment dependencies;
+* Neon dependency;
+* Supabase dependency;
+* build process;
+* deployment config;
+* CI/CD;
+* monitoring;
+* logging;
+* error tracking;
+* backups;
+* database recovery;
+* migrations process;
+* staging environment;
+* production environment;
+* health checks.
+
+Do not expose secret values.
+
+---
+
+# PART 15 — TEST COVERAGE
+
+Identify what automated tests actually exist.
+
+Report:
+
+* unit tests;
+* integration tests;
+* E2E tests;
+* auth tests;
+* RLS tests;
+* payment tests;
+* messaging tests;
+* seller CRUD tests;
+* buyer-flow tests.
+
+Tell us what important workflows currently have **zero automated verification**.
+
+---
+
+# PART 16 — DEAD / DUPLICATE / LEGACY ARCHITECTURE
+
+Identify meaningful active technical debt including:
+
+* duplicate auth systems;
+* duplicate product flows;
+* duplicate messaging routes;
+* obsolete role models;
+* old table names;
+* Neon runtime remnants;
+* unused DB helpers;
+* dead components/routes;
+* deprecated libraries;
+* stale comments that describe an architecture no longer true.
+
+Do not list every harmless unused variable.
+
+Focus on issues that will confuse or cost the development company time.
+
+---
+
+# PART 17 — REAL-WORLD READINESS MATRIX
+
+Produce a concise matrix containing at least:
+
+| Area | Status | Evidence | Launch Blocking? | Who Should Finish |
+| ---- | ------ | -------- | ---------------- | ----------------- |
+
+Include:
+
+* Database
+* Auth
+* Buyer onboarding
+* Seller onboarding
+* KYC
+* Catalogue
+* Search
+* Product detail
+* Seller storefront
+* Product CRUD
+* Media/Storage
+* Cart
+* Checkout
+* Orders
+* Payments
+* Escrow
+* Wallet
+* Payouts
+* Messaging
+* Reviews
+* Wishlist
+* Notifications
+* Admin
+* Vendor/BSM
+* Security
+* Testing
+* Deployment
+
+Allowed statuses only:
+
+* READY
+* PARTIAL
+* BROKEN
+* MISSING
+* MOCK/STUB
+* UNVERIFIED
+
+---
+
+# PART 18 — WHAT IS REALLY DONE
+
+Give us a section titled:
+
+# GENUINELY COMPLETED AND SHOULD BE PRESERVED
+
+Include only things you can substantiate.
+
+This section will tell the external development company what **not to rebuild**.
+
+---
+
+# PART 19 — WHAT REMAINS
+
+Give us a section titled:
+
+# REMAINING WORK FOR DEVELOPMENT COMPANY
+
+Separate into:
+
+## P0 — Must be completed before any real users / money
+
+## P1 — Required for launch
+
+## P2 — Important but can follow immediately after launch
+
+## P3 — Optional / future enhancement
+
+For every item state briefly:
+
+* current condition;
+* required result;
+* likely affected subsystem/files;
+* dependency on another task, if any.
+
+---
+
+# PART 20 — FINAL VERDICT
+
+Answer these directly:
+
+1. Is EntizNetStore production-ready today?
+2. Is it safe for real customers today?
+3. Is it safe for real sellers today?
+4. Is it safe to process real payments today?
+5. Can it be handed to a development company as an existing codebase rather than a rebuild?
+6. Approximately what percentage of the **technical platform** appears genuinely complete?
+7. Approximately what percentage of **launch-critical work** appears genuinely complete?
+8. What are the top 10 remaining blockers?
+9. What existing work would be wasteful for the company to rebuild?
+10. What should the development company work on first?
+
+Do not inflate percentages.
+
+Explain the basis for them.
+
+---
+
+# EVIDENCE STANDARD
+
+For important findings, provide:
+
+* file path;
+* relevant line/function where practical;
+* database evidence;
+* command/test result where applicable.
+
+Do not fill the report with hundreds of irrelevant file references.
+
+Evidence should support conclusions.
+
+---
+
+# FINAL INSTRUCTION
+
+This audit may contradict earlier Replit reports.
+
+That is acceptable.
+
+We want the **truth**, not consistency with previous reports.
+
+Do not make EntizNetStore sound more complete than it is.
+
+Do not make it sound worse than it is either.
+
+Report the current repository exactly as an experienced external CTO/security engineer would assess it before signing a development contract.
+
+**Do not modify anything.**
+
+End with:
+
+**OVERALL HANDOVER VERDICT:**
+
+* READY FOR DEV-COMPANY HANDOVER
+  or
+* NOT READY FOR DEV-COMPANY HANDOVER
+
+and explain why.
