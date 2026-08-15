@@ -3,12 +3,11 @@
 // Public catalogue/storefront reads use the normal server (anon/session)
 // client so RLS controls visibility — never the service role.
 //
-// TEMPORARY LEGACY: seller-dashboard orders/reviews reads still go through
-// lib/db.ts (Neon) because `orders`, `order_items` and `reviews` are
-// intentionally deny-by-default in Supabase (zero RLS policies) until their
-// policies are separately approved. Review aggregates and sold counts on
-// public reads therefore resolve to empty/0 from Supabase for now.
-import { query } from "@/lib/db";
+// Seller-dashboard orders/reviews return safe empty values until the
+// production order/review implementation lands (Supabase tables are
+// intentionally empty and deny-by-default; legacy Neon demo data must not
+// be surfaced). Review aggregates and sold counts on public reads therefore
+// resolve to empty/0 for now.
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Product } from "@/types/product";
 import { DEFAULT_RETURN_POLICY } from "@/types/product";
@@ -256,7 +255,7 @@ export async function searchProducts(opts: {
 export async function getSellerDashboardData(sellerId: string) {
   const supabase = createServerSupabase();
 
-  const [sellerProfileRes, productsRes, orders, reviews] = await Promise.all([
+  const [sellerProfileRes, productsRes] = await Promise.all([
     // Authenticated Supabase reads: RLS owner policies apply (auth.uid()).
     supabase.from("profiles_seller").select("*").eq("id", sellerId).limit(1).maybeSingle(),
     supabase
@@ -267,31 +266,6 @@ export async function getSellerDashboardData(sellerId: string) {
       )
       .eq("seller_id", sellerId)
       .order("created_at", { ascending: false }),
-    // TEMPORARY LEGACY (Neon): orders/order_items and reviews are still
-    // deny-by-default in Supabase (zero RLS policies), so these two reads
-    // remain on lib/db.ts until their policies are separately approved.
-    query(
-      `SELECT o.id, o.order_number, o.status, o.total_cents, o.created_at,
-         COALESCE(
-           (SELECT json_agg(json_build_object('product_title', oi.product_title, 'quantity', oi.quantity))
-              FROM order_items oi WHERE oi.order_id = o.id),
-           '[]'::json) AS order_items
-       FROM orders o
-       WHERE o.seller_id = $1
-       ORDER BY o.created_at DESC
-       LIMIT 10`,
-      [sellerId]
-    ),
-    query(
-      `SELECT r.id, r.rating, r.title, r.content, r.created_at,
-         json_build_object('title', p.title, 'marketplace_brand', p.marketplace_brand) AS products
-       FROM reviews r
-       JOIN products p ON p.id = r.product_id
-       WHERE p.seller_id = $1
-       ORDER BY r.created_at DESC
-       LIMIT 5`,
-      [sellerId]
-    ),
   ]);
 
   return {
@@ -301,8 +275,11 @@ export async function getSellerDashboardData(sellerId: string) {
       product_variants: p.product_variants ?? [],
       product_media: p.product_media ?? [],
     })),
-    orders,
-    reviews,
+    // Orders and reviews await the production order/review implementation;
+    // safe empty values keep the dashboard UI rendering without surfacing
+    // legacy demo data.
+    orders: [] as any[],
+    reviews: [] as any[],
   };
 }
 

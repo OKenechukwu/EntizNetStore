@@ -1,0 +1,82 @@
+ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER
+
+No subagents.
+No repository-wide audit.
+No Git history.
+No migrations.
+No RLS changes.
+No unrelated refactors.
+
+Module 1C-5B — Remove Seller Dashboard Legacy Neon Reads
+
+Current approved state:
+
+core product/store/storefront/search reads use Supabase;
+seller profile/products use Supabase;
+seller dashboard orders/order_items/reviews still use legacy lib/db.ts;
+production Supabase orders/reviews are intentionally empty and deny-by-default;
+historical Neon transactions/reviews are demo data and must not be surfaced in production.
+
+Objective:
+
+Remove ONLY the seller-dashboard dependency on legacy Neon/Postgres.
+
+Inspect only:
+
+lib/data/products.ts
+the direct seller-dashboard consumer if necessary.
+
+Requirements:
+
+Remove the remaining legacy query / lib/db.ts usage from the seller-dashboard data function.
+Continue loading seller profile and seller products from Supabase as already implemented.
+For orders/order_items/reviews:
+do NOT query Neon;
+do NOT use service-role to bypass current Supabase RLS;
+do NOT add RLS policies;
+do NOT expose old demo transactions;
+return the existing contract's safe empty values ([], 0, etc.) so existing dashboard UI continues rendering without crashing.
+
+Add only a short code comment that these transactional sections await the production order/review implementation.
+
+Preserve existing seller-dashboard function return shape.
+Do not change UI wording unless required to prevent an error.
+
+Out of scope
+
+Do not touch:
+
+order implementation;
+checkout;
+escrow;
+payments;
+reviews implementation;
+chat;
+app/api/chat/send;
+lib/db.ts itself;
+pg dependency;
+product CRUD;
+RLS;
+database schema.
+
+Validation
+
+Confirm:
+
+lib/data/products.ts no longer imports or uses lib/db.ts;
+seller dashboard still returns expected data structure;
+no Neon query is used for seller dashboard;
+no old demo order/review data can surface there;
+changed files introduce no new TypeScript errors.
+
+Final response maximum 7 lines:
+
+files changed;
+seller profile/products Supabase yes/no;
+dashboard Neon dependency removed yes/no;
+orders/reviews safe-empty yes/no;
+return contract preserved yes/no;
+TypeScript result;
+blocker.
+
+Stop. Do not propose another task.
