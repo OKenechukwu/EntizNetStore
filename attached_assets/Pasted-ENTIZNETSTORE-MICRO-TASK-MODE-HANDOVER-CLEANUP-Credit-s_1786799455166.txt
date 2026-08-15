@@ -1,0 +1,87 @@
+ENTIZNETSTORE MICRO-TASK MODE — HANDOVER CLEANUP
+
+Credit saver.
+No subagents.
+No repository-wide audit.
+No Git history.
+No database changes.
+No new features.
+
+Module 1C-6B — Known Stale Schema Reference Cleanup
+
+Objective:
+
+Identify and remove only known stale/phantom database references that are still active in core EntizNetStore runtime paths.
+
+Do a targeted search ONLY for these exact names/patterns:
+
+user_roles
+profiles.role
+provider_profiles
+entizer_profiles
+buyer_profile
+seller_profile
+product_reviews
+products.owner
+products.provider_id
+.from('profiles')
+
+Do NOT search broadly for unrelated issues.
+
+For every match, classify it as:
+
+active core runtime path
+unused/dead legacy code
+non-core/deferred feature
+
+Core runtime means:
+
+authentication/sign-in/onboarding;
+buyer/seller dashboard routing;
+seller profile;
+seller product CRUD;
+public store/product/storefront/search.
+Fix rule
+
+If an exact stale reference is in an active core runtime path and the canonical replacement is already known, make the smallest safe correction.
+
+Examples:
+
+capability check → profiles_buyer / profiles_seller presence;
+canonical reviews table → reviews;
+seller identity → seller_id.
+
+Do NOT invent new tables.
+
+If the match belongs to wishlist, advanced reviews, BSM/vendor, messaging, payments, or another deferred/non-core feature, do not fix it. Report it as handover work.
+
+If code is clearly dead and unreferenced, do not spend time refactoring it unless deletion is trivial and completely safe.
+
+Do NOT touch:
+
+messaging;
+Neon chat dependency;
+payments/escrow;
+Storage;
+RLS;
+database migrations;
+admin redesign;
+new functionality.
+Validation
+
+After any corrections, confirm:
+
+no known stale schema reference remains in the core auth/seller/store runtime paths;
+changed files introduce no new TypeScript errors.
+
+Final report maximum 10 lines:
+
+exact stale names found;
+core-runtime matches;
+files changed;
+core stale references remaining yes/no;
+deferred/non-core references and files;
+new TypeScript errors yes/no;
+blocker.
+
+Stop. Do not propose another task.

@@ -5,26 +5,28 @@ import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { routeByRole } from "@/lib/auth/routeByRole";
 
-type RoleRow = { role: string };
-
 async function fetchRole(): Promise<string | undefined> {
   const { data: userRes } = await supabase.auth.getUser();
   const user = userRes.user;
   if (!user) return undefined;
 
-  // Adjust this table/select to match your schema:
-  // e.g. table: user_roles, columns: user_id, role
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
+  // Capability model: role is derived from canonical profile-row presence
+  // (profiles_seller / profiles_buyer), never from a roles table or metadata.
+  const { data: seller } = await supabase
+    .from("profiles_seller")
+    .select("id")
+    .eq("id", user.id)
     .maybeSingle();
+  if (seller) return "seller";
 
-  if (error) {
-    console.warn("fetchRole error:", error.message);
-    return undefined;
-  }
-  return (data as RoleRow | null)?.role;
+  const { data: buyer } = await supabase
+    .from("profiles_buyer")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (buyer) return "buyer";
+
+  return undefined;
 }
 
 export default function SessionWatcher() {

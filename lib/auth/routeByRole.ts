@@ -37,7 +37,9 @@ export function routeByRole(role?: string | null): string {
     case "buyer":
       return "/dashboard/buyer";
     case "seller":
-      return "/dashboard/vendor";
+      // Canonical seller dashboard (the /dashboard/vendor area is a
+      // deferred BSM feature gated by a non-core role check).
+      return "/seller/dashboard";
     case "bsm":
       return "/dashboard/bsm";
     case "client":

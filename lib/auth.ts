@@ -111,7 +111,7 @@ export async function getBuyerProfile(
   userId: string,
 ): Promise<BuyerProfile | null> {
   const { data, error } = await supabase
-    .from("entizer_profiles")
+    .from("profiles_buyer")
     .select("*")
     .eq("id", userId)
     .single();
@@ -124,7 +124,7 @@ export async function getSellerProfile(
   userId: string,
 ): Promise<SellerProfile | null> {
   const { data, error } = await supabase
-    .from("provider_profiles")
+    .from("profiles_seller")
     .select("*")
     .eq("id", userId)
     .single();
@@ -146,7 +146,7 @@ export async function updateBuyerProfile(
   };
 
   const { data, error } = await supabase
-    .from("entizer_profiles")
+    .from("profiles_buyer")
     .update(normalized)
     .eq("id", userId)
     .select()
@@ -166,7 +166,7 @@ export async function updateSellerProfile(
   };
 
   const { data, error } = await supabase
-    .from("provider_profiles")
+    .from("profiles_seller")
     .update(payload)
     .eq("id", userId)
     .select()
@@ -177,36 +177,16 @@ export async function updateSellerProfile(
 }
 
 // -------------------- KYC / Verification -------------------
-
-export async function submitKYCDocuments(
-  userId: string,
-  documents: {
-    documentType: "identity" | "business" | "address";
-    fileUrl: string;
-    metadata?: any;
-  },
-) {
-  const { data, error } = await supabase
-    .from("provider_profiles")
-    .update({
-      verification_documents: documents,
-      verification_status: "pending",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
+// KYC document submission happens via the trusted server endpoints
+// (/api/kyc/*). The legacy client-side submitKYCDocuments helper was
+// removed (unreferenced, targeted a phantom table).
 
 // ------------------------ Roles ----------------------------
 
 export async function getUserRole(userId: string): Promise<UserRole> {
   // Seller wins if both exist
   const { data: seller } = await supabase
-    .from("provider_profiles")
+    .from("profiles_seller")
     .select("id")
     .eq("id", userId)
     .maybeSingle();
@@ -214,7 +194,7 @@ export async function getUserRole(userId: string): Promise<UserRole> {
   if (seller) return "seller";
 
   const { data: buyer } = await supabase
-    .from("entizer_profiles")
+    .from("profiles_buyer")
     .select("id")
     .eq("id", userId)
     .maybeSingle();
