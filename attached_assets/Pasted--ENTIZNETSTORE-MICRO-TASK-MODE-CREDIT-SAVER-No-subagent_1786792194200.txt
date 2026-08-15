@@ -1,0 +1,129 @@
+**ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER**
+
+No subagents.
+No repository-wide audit.
+No Git history.
+No documentation/memory files.
+No unrelated refactors.
+
+Previous audits already established:
+
+* `lib/db.ts` uses legacy `NEON_DATABASE_URL`
+* `lib/data/products.ts` is the main legacy marketplace read layer
+* Supabase is now the canonical EntizNetStore backend
+* core catalogue RLS is already applied
+
+Do not rediscover these facts.
+
+---
+
+# Module 1C-5A — Core Store Runtime Cutover to Supabase
+
+Objective:
+
+Move the existing **core product/catalogue/storefront read layer** from legacy Neon/Postgres to the canonical Supabase database.
+
+Do NOT remove `lib/db.ts` or `pg` yet because other code may still depend on it.
+
+## Scope
+
+Inspect only:
+
+* `lib/data/products.ts`
+* its direct store/search/storefront/seller-dashboard consumers as necessary
+* existing Supabase server/client helpers
+
+Replace the legacy `pg/query` data reads in `lib/data/products.ts` with Supabase-based reads against the canonical tables.
+
+Preserve existing function names and return shapes wherever reasonably possible to minimize downstream changes.
+
+## Required read paths
+
+Cover only the existing functions used for:
+
+* store product listing
+* individual product detail
+* seller storefront
+* search/product discovery
+* seller dashboard product/order/review summary reads currently provided by this file
+
+Use canonical column names such as:
+
+* `products.seller_id`
+* `products.base_price`
+* `product_media`
+* canonical `reviews`
+* canonical `order_items`
+
+Do not reintroduce:
+
+* `owner`
+* `provider_id`
+* `products.price`
+* `products.images`
+
+## Supabase access rules
+
+For public catalogue/storefront reads, use the normal Supabase server/anon path so existing RLS controls visibility.
+
+Do NOT use service-role to bypass public product RLS.
+
+For authenticated seller-only reads, use the authenticated server Supabase client so `auth.uid()` and seller RLS can apply where supported.
+
+If an existing seller-dashboard query requires tables that still intentionally have zero RLS policies (for example orders/reviews), do NOT weaken RLS and do NOT add policies in this task.
+
+Instead, preserve that specific legacy read temporarily and clearly identify it in the final report.
+
+## Important boundaries
+
+Do NOT touch:
+
+* `app/api/chat/send`
+* messaging
+* payments
+* escrow
+* KYC
+* admin
+* onboarding
+* database migrations
+* RLS policies
+* Storage
+* product create/edit forms
+* wishlist
+* reviews redesign
+* phantom-table cleanup
+* `lib/db.ts` deletion
+* `pg` package removal
+
+Do not migrate or seed product data.
+
+## Validation
+
+Run only targeted checks.
+
+Confirm:
+
+1. public core store/product reads no longer require `NEON_DATABASE_URL`;
+2. product reads use canonical Supabase tables/columns;
+3. public queries do not use service-role;
+4. existing function return contracts are preserved sufficiently for direct consumers;
+5. changed files introduce no new TypeScript errors;
+6. list any function intentionally left on legacy Postgres because its required Supabase table is still deny-by-default.
+
+Do not run a broad audit or expensive full test suite unless required by the changed code.
+
+## Final response — maximum 10 lines
+
+Return only:
+
+* files changed
+* product/store read layer on Supabase yes/no
+* storefront on Supabase yes/no
+* search on Supabase yes/no
+* product detail on Supabase yes/no
+* seller dashboard portions still legacy, if any
+* new TypeScript errors yes/no
+* legacy `lib/db.ts` still retained yes/no
+* blocker
+
+Stop. Do not propose another task.
