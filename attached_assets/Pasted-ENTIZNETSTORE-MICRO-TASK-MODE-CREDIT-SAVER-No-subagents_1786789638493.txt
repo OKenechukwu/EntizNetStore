@@ -1,0 +1,88 @@
+ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER
+
+No subagents.
+No repository-wide audit.
+No Git-history inspection.
+No documentation/memory files.
+Inspect only directly relevant auth/onboarding files.
+Previous Module 1C findings are approved baseline facts.
+
+Module 1C-4B3 — Minimal Production Buyer/Seller Onboarding
+
+Objective: make authenticated Supabase users able to establish the canonical EntizNetStore buyer or seller profile safely.
+
+Implement only the minimum production onboarding foundation.
+
+Canonical rules
+
+auth.users.id is the identity.
+Buyer capability = existing profiles_buyer row with id = auth user id.
+Seller capability = existing profiles_seller row with id = auth user id.
+A user may eventually have both profiles.
+Do not create or restore user_roles.
+Do not use user_metadata.role for authorization.
+Do not create another roles/capabilities table.
+
+Buyer onboarding
+
+Create one trusted server endpoint/action that:
+
+validates the user with server-side supabase.auth.getUser();
+derives the profile ID exclusively from user.id;
+creates profiles_buyer only for the authenticated user;
+is idempotent: if the profile already exists, do not duplicate it;
+never accepts a client-supplied user ID.
+
+Seller onboarding
+
+Create one trusted server endpoint/action that:
+
+validates with getUser();
+derives seller ID from user.id;
+creates profiles_seller with verification_status='pending';
+creates the matching profiles_seller_private row;
+is idempotent;
+never allows the client to choose verification status;
+never accepts another user's UUID.
+
+Do not implement the full seller application/KYC UI in this task.
+
+Update only the minimum existing registration/onboarding code needed so signup no longer attempts phantom user_roles/legacy profile behavior and can enter the canonical buyer/seller onboarding path.
+
+Do NOT implement
+
+RLS policies;
+password recovery;
+KYC redesign;
+product changes;
+payments;
+messaging;
+admin changes;
+Neon removal;
+new role tables;
+full onboarding redesign.
+
+Validation
+
+Do not create permanent production test users.
+
+Verify through targeted code/tests that:
+
+client cannot specify another user's profile ID;
+seller verification defaults to pending;
+duplicate onboarding is safe;
+no user_roles write was reintroduced;
+no authorization uses user_metadata.role;
+changed code introduces no new TypeScript errors.
+
+Final report maximum 10 lines:
+
+files changed;
+buyer onboarding implemented yes/no;
+seller onboarding implemented yes/no;
+identity derived server-side yes/no;
+idempotent yes/no;
+tests/result;
+blocker.
+
+Stop. Do not propose another task.

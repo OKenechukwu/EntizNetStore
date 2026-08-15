@@ -100,47 +100,10 @@ export async function getCurrentSession(): Promise<Session | null> {
 
 // ------------------------ Profiles -------------------------
 
-// CREATE / UPSERT
-
-export async function createBuyerProfile(
-  userId: string,
-  profile: Partial<BuyerProfile>,
-) {
-  const normalized = {
-    ...profile,
-    id: userId,
-    country: normalizeCountryInput(profile.country),
-  };
-
-  const { data, error } = await supabase
-    .from("entizer_profiles") // <- buyers table
-    .upsert(normalized, { onConflict: "id" })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createSellerProfile(
-  userId: string,
-  profile: Partial<SellerProfile>,
-) {
-  const payload = {
-    ...profile,
-    id: userId,
-    verification_status: profile.verification_status ?? "pending",
-  };
-
-  const { data, error } = await supabase
-    .from("provider_profiles") // <- sellers table
-    .upsert(payload, { onConflict: "id" })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
+// CREATE
+// Profile creation happens ONLY via the trusted server onboarding endpoints
+// (/api/onboarding/buyer and /api/onboarding/seller). Client-side profile
+// creation against legacy tables was removed intentionally.
 
 // READ
 

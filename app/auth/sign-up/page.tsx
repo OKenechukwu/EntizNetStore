@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  signUp,
-  createBuyerProfile,
-  createSellerProfile,
-  type UserRole,
-} from "@/lib/auth";
+import { signUp, type UserRole } from "@/lib/auth";
 import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function SignUpPage() {
@@ -60,23 +55,20 @@ export default function SignUpPage() {
       const { user } = await signUp(email, password, role);
 
       if (user) {
-        // 1) Create initial profile based on role
-        if (role === "buyer") {
-          await createBuyerProfile(user.id, {
-            display_name: email.split("@")[0],
-            communication_preferences: {},
-            interests: [],
+        // Canonical onboarding: trusted server endpoint derives the profile ID
+        // from the authenticated session — never from a client-supplied ID.
+        // If email verification is required there is no session yet; the
+        // endpoint returns 401 and onboarding completes after first sign-in.
+        try {
+          await fetch(`/api/onboarding/${role === "seller" ? "seller" : "buyer"}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
           });
-        } else {
-          await createSellerProfile(user.id, {
-            storefront_name: `${email.split("@")[0]}'s Store`,
-            business_type: "individual",
-          });
+        } catch {
+          // Non-fatal: onboarding is idempotent and can run after sign-in.
         }
 
-        // Role/capability is never client-assigned via user_metadata or a
-        // client-writable role table; it is derived from profile presence
-        // (or trusted app_metadata for admin) on the server.
         setSuccess(true);
       }
     } catch (err: any) {
