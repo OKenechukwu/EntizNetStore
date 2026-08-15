@@ -2,8 +2,16 @@
 import { NextResponse } from "next/server";
 import { deeplTranslate } from "@/lib/i18n/deepl";
 import { getDynamic, putDynamic, hashDynamic } from "@/lib/i18n/store";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export async function POST(req: Request) {
+  // Internal maintenance endpoint: writes translations via service-role-backed
+  // storage, so it must never be callable anonymously.
+  const { errorResponse } = await requireAdmin();
+  if (errorResponse) {
+    return errorResponse;
+  }
+
   try {
     const { text, target, source } = await req.json();
     if (!text || !target) {

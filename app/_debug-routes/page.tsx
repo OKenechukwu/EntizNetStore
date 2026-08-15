@@ -1,5 +1,11 @@
 // app/_debug-routes/page.tsx
+import { notFound } from "next/navigation";
+
 export default function DebugRoutes() {
+  // Debug surface: never available in production deployments.
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
   return (
     <main style={{ padding: 24, lineHeight: 1.6 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12 }}>

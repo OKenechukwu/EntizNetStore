@@ -1,0 +1,127 @@
+ENTIZNETSTORE — HEAVY DEVELOPMENT PHASE
+
+Phase A1 — P0 Core Regression & Security Cleanup
+
+Implementation is authorized.
+
+We already completed a full independent audit. Do NOT perform another repository-wide audit and do NOT use subagents unless absolutely necessary.
+
+Work only on the three known issues below.
+
+Goal 1 — Fix canonical seller product list
+
+The independent audit confirmed:
+
+app/dashboard/store/page.tsx
+
+still queries obsolete product fields:
+
+owner
+price
+images
+
+Update this seller product-list page to the canonical Supabase architecture:
+
+seller_id
+base_price
+product_media
+
+Requirements:
+
+Seller identity must come from authenticated user.id.
+
+Query only products belonging to that seller.
+
+Do not use service-role.
+
+Preserve the existing page UX as much as practical.
+
+Product image/thumb should come from canonical product_media.
+
+Do not reintroduce owner, provider_id, products.price, or products.images.
+
+Make loading/empty/error behavior safe.
+
+Goal 2 — Close unauthenticated service-role i18n writes
+
+The audit identified:
+
+/api/i18n/auto
+
+/api/i18n/key
+
+as unauthenticated routes capable of performing writes through service-role-backed i18n storage.
+
+These routes must NOT permit arbitrary public service-role-backed writes.
+
+Inspect only these routes and their immediate i18n store dependency.
+
+Preferred behavior:
+
+if these are internal/admin maintenance operations, require trusted server-side admin authorization using the existing canonical requireAdmin() pattern.
+
+Do NOT authorize from user_metadata.
+
+Do NOT expose the service-role key to browser/client code.
+
+Preserve legitimate internal functionality behind authorization.
+
+If either route genuinely needs a public read operation, separate public read behavior from privileged write behavior rather than allowing anonymous writes.
+
+Goal 3 — Gate production debug/development surfaces
+
+Inspect only:
+
+app/_debug-routes
+
+app/dev/*
+
+and their immediate layouts if present.
+
+These must not be publicly accessible in a production deployment.
+
+Prefer the smallest safe implementation:
+
+production → return 404/notFound or deny access;
+
+development → existing developer functionality may remain.
+
+Do not create a new admin/debug framework.
+
+Leave /internal/* alone in this task unless one of these files directly depends on it.
+
+Do NOT touch in Phase A1
+
+Payments, Stripe, orders, escrow, wallet, payouts, messaging, reviews, wishlist, Storage, KYC architecture, database migrations, RLS policies, BSM/vendor, or the 135 TypeScript errors generally.
+
+Do not broadly refactor auth.
+
+Validation
+
+Run targeted TypeScript checks for changed files.
+
+Verify the seller product page contains no active references to owner, provider_id, products.price, or products.images.
+
+Verify anonymous requests cannot perform writes through /api/i18n/auto or /api/i18n/key.
+
+Verify debug/dev pages are unavailable when production gating is active.
+
+Do not create users, products or production data.
+
+Then run npx tsc --noEmit only to determine whether the global baseline changed; do not start fixing unrelated errors.
+
+Report:
+
+files changed;
+
+seller product list result;
+
+i18n security result;
+
+debug-route result;
+
+TypeScript before/after count;
+
+any blocker.
+
+Stop after this batch. Do not begin another phase automatically.
