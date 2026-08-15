@@ -6,8 +6,8 @@ type Product = {
   id: string;
   title: string | null;
   description: string | null;
-  price: number | null;
-  owner: string;
+  base_price: number | null;
+  seller_id: string;
 };
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
@@ -19,11 +19,13 @@ export default async function EditProductPage({ params }: { params: { id: string
     redirect('/auth/sign-in');
   }
 
+  // Ownership check: only the authenticated seller's own product is loaded.
+  // RLS remains the final database security boundary.
   const { data: product, error: productError } = await supabase
     .from('products')
-    .select('id, title, description, price, owner')
+    .select('id, title, description, base_price, seller_id')
     .eq('id', params.id)
-    .eq('owner', user.id)
+    .eq('seller_id', user.id)
     .single();
 
   if (productError || !product) {

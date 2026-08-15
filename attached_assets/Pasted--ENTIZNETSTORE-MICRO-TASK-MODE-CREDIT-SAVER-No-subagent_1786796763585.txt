@@ -1,0 +1,153 @@
+**ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER**
+
+No subagents.
+No repository-wide audit.
+No Git history.
+No migrations.
+No messaging work.
+No unrelated refactors.
+
+The remaining Neon dependency belongs only to the unfinished messaging send path and is intentionally deferred to the development company.
+
+---
+
+# Module 1C-6A — Canonical Seller Product CRUD
+
+Objective:
+
+Ensure the existing seller **create/edit/delete product flow** uses the canonical Supabase schema and authenticated seller identity.
+
+Inspect ONLY the directly relevant files for:
+
+* seller product creation;
+* seller product editing;
+* seller product deletion;
+* their immediate product-form components.
+
+Known likely files include:
+
+* `app/dashboard/store/new/*`
+* `app/dashboard/store/[id]/edit/*`
+* `components/products/ProductForm.tsx`
+
+Do not inspect unrelated store features.
+
+## Canonical product rules
+
+Use:
+
+* `products.seller_id`
+* `products.base_price`
+* `product_media`
+* canonical product fields from the live Supabase schema.
+
+Do NOT use/reintroduce:
+
+* `owner`
+* `provider_id`
+* `products.price`
+* `products.images`
+
+## Seller identity
+
+Seller identity must come from the authenticated Supabase user.
+
+Do not trust a seller UUID supplied by:
+
+* form body;
+* query parameter;
+* hidden input;
+* browser metadata.
+
+For create:
+
+`seller_id = authenticated user.id`
+
+and the user must have a `profiles_seller` row.
+
+For edit/delete:
+
+verify the existing product belongs to:
+
+`auth user.id`
+
+before modifying it.
+
+RLS remains the final database security boundary.
+
+## Seller verification rules
+
+Respect the existing approved RLS behavior:
+
+* pending seller may create/save `draft`;
+* pending seller must not publish `active`;
+* verified seller may use `draft` or `active`.
+
+Do not bypass RLS with service-role for ordinary seller product CRUD.
+
+Use the authenticated Supabase client.
+
+## Product media
+
+If current create/edit code writes nonexistent `products.images`, remove that behavior.
+
+Do not build Storage in this task.
+
+If product-media upload requires Storage that does not exist yet, preserve the UI safely but do not fake uploads.
+
+Report that Storage remains a handover/pre-launch item.
+
+## Delete
+
+Seller may delete only their own product.
+
+Do not use service-role.
+
+## OUT OF SCOPE
+
+Do NOT touch:
+
+* messaging;
+* Neon/lib/db;
+* payments;
+* orders;
+* escrow;
+* reviews;
+* wishlist;
+* KYC;
+* admin;
+* RLS migrations;
+* Storage bucket creation;
+* catalogue redesign;
+* new marketplace features.
+
+## Validation
+
+Targeted checks only.
+
+Confirm:
+
+1. product create uses `seller_id = authenticated user.id`;
+2. edit/delete verify ownership;
+3. no seller CRUD code uses `owner` or `provider_id`;
+4. no seller CRUD writes `products.price` or `products.images`;
+5. no seller CRUD uses service-role;
+6. pending seller cannot publish active through normal flow;
+7. no new TypeScript errors in changed files.
+
+Do not run expensive broad tests.
+
+## Final response — maximum 8 lines
+
+Return only:
+
+* files changed;
+* create canonical yes/no;
+* edit canonical yes/no;
+* delete canonical yes/no;
+* authenticated seller ownership enforced yes/no;
+* obsolete product fields remaining in scoped CRUD yes/no;
+* TypeScript result;
+* blocker/handover item.
+
+Stop. Do not propose another task.

@@ -107,11 +107,17 @@ export default function ProductForm({
           .trim()
       }
 
-      // Set status based on publish parameter
+      // Set status based on publish parameter. Pending sellers cannot publish
+      // 'active' — RLS rejects it (final security boundary).
       const status = publish ? 'active' : 'draft'
-      
+
+      // Seller identity comes from the authenticated Supabase user,
+      // never from props/form input.
+      const { data: au } = await supabase.auth.getUser()
+      if (!au.user) throw new Error('You must be signed in to save a product.')
+
       const productData = {
-        seller_id: sellerId,
+        seller_id: au.user.id,
         brand_id: formData.brand_id || null,
         marketplace_brand: formData.marketplace_brand,
         title: formData.title,

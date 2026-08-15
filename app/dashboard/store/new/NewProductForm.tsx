@@ -80,18 +80,45 @@ export default function NewProductForm() {
         return;
       }
 
+      // Canonical Supabase schema: seller_id from the authenticated user,
+      // base_price (USD), unique slug. RLS enforces ownership and that
+      // pending sellers can only create drafts.
+      const slug =
+        title
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .replace(/\s+/g, "-")
+          .replace(/-+/g, "-") +
+        "-" +
+        Math.random().toString(36).slice(2, 8);
+
       const payload = {
+        seller_id: userId,
         title: title.trim(),
+        slug,
         description: description.trim() || null,
-        price: priceUSD, // USD in DB
-        images: imageUrl ? [imageUrl.trim()] : [],
-        provider_id: userId, // RLS
+        base_price: priceUSD, // USD in DB
+        status: "draft",
       };
 
-      const { error: insertErr } = await supabase
+      const { data: created, error: insertErr } = await supabase
         .from("products")
-        .insert(payload);
+        .insert(payload)
+        .select("id")
+        .single();
       if (insertErr) throw insertErr;
+
+      // Store the optional image URL as canonical product_media.
+      if (imageUrl.trim() && created?.id) {
+        const { error: mediaErr } = await supabase.from("product_media").insert({
+          product_id: created.id,
+          type: "image",
+          url: imageUrl.trim(),
+          position: 0,
+        });
+        if (mediaErr) throw mediaErr;
+      }
 
       router.push("/dashboard/store");
       router.refresh();
@@ -167,7 +194,7 @@ export default function NewProductForm() {
             placeholder="https://…/image.jpg"
           />
           <p className="text-xs text-gray-500">
-            Stored as the first item in <code>images[]</code>.
+            Stored as the product&apos;s main image.
           </p>
         </div>
       </div>

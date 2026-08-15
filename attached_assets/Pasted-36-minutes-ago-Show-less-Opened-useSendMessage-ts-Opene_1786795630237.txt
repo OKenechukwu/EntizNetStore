@@ -1,0 +1,29 @@
+36 minutes ago
+
+Show less
+
+Opened useSendMessage.ts
+
+Opened route.ts
+
+Opened route.ts
+Identifying API integration mismatches
+
+Identifying API integration mismatches
+I'm noticing a mismatch between what the hook sends and what the legacy endpoint expects. The hook passes language information but no sender or recipient IDs, while the legacy route requires those IDs to work — so any call from the hook would fail with a 400 error.
+
+The newer /api/messages/send endpoint also needs a recipientId, which the hook doesn't have access to. The response shapes don't align either: the hook expects { ok, original, translated } but the endpoints return different structures. This isn't a safe compatibility issue — adapting would require redesigning how the hook gets recipient information, which goes beyond a simple adapter. The legacy path is already broken, but since these aren't safely compatible, I should stop here and report the exact incompatibilities rather than attempt changes.
+
+
+Opened SendBar.tsx
+Documenting architectural incompatibility
+
+Documenting architectural incompatibility
+The SendBar hook and /api/messages/send endpoint are fundamentally incompatible — the hook works with language codes and expects translation results, while the API requires a recipientId and returns a different response shape. This isn't something an adapter can bridge since there's no way to derive a recipient identity from just a language code, so I'm reporting the incompatibility without proposing changes.
+
+Routes compatible: no — a small adapter cannot bridge them:
+
+/api/messages/send requires recipientId; the hook/SendBar only receive recipientLang/sourceLang — no recipient identity exists anywhere in this UI path, and it cannot be derived from a language code.
+Response contract differs: hook/SendBar expect { ok, original, translated } (a translation result consumed by onDeliver); the Supabase route returns { success, message } and does no translation.
+Notably the legacy path is already dead-on-arrival: the hook sends { text, recipientLang, sourceLang } but /api/chat/send 400s without senderId/recipientId — every send from this UI currently fails, so nothing working depends on the legacy route either. Files changed: none | SendBar on Supabase: no | Legacy chat route removed: no | lib/db.ts removed: no | Neon dependency removed: no | pg removed: no Blocker: recipient identity + translation are missing from this send path — fixing that is a messaging redesign decision, out of scope per brief.
+

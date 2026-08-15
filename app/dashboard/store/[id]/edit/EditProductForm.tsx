@@ -8,14 +8,14 @@ type Product = {
   id: string;
   title: string | null;
   description: string | null;
-  price: number | null;
-  owner: string;
+  base_price: number | null;
+  seller_id: string;
 };
 
 export default function EditProductForm({ product }: { product: Product }) {
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
-  const [price, setPrice] = useState(product.price?.toString() || '');
+  const [price, setPrice] = useState(product.base_price?.toString() || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -32,14 +32,23 @@ export default function EditProductForm({ product }: { product: Product }) {
         return;
       }
 
+      // Ownership verified: update only the authenticated seller's own row.
+      // RLS remains the final database security boundary.
+      const { data: au } = await supabase.auth.getUser();
+      if (!au.user) {
+        setError('You must be signed in.');
+        return;
+      }
+
       const { error: updateError } = await supabase
         .from('products')
         .update({
           title: title.trim(),
           description: description.trim() || null,
-          price: priceNumber,
+          base_price: priceNumber,
         })
-        .eq('id', product.id);
+        .eq('id', product.id)
+        .eq('seller_id', au.user.id);
 
       if (updateError) {
         setError(`Failed to update product: ${updateError.message}`);
@@ -62,10 +71,18 @@ export default function EditProductForm({ product }: { product: Product }) {
     setError('');
 
     try {
+      // Ownership verified: delete only the authenticated seller's own row.
+      const { data: au } = await supabase.auth.getUser();
+      if (!au.user) {
+        setError('You must be signed in.');
+        return;
+      }
+
       const { error: deleteError } = await supabase
         .from('products')
         .delete()
-        .eq('id', product.id);
+        .eq('id', product.id)
+        .eq('seller_id', au.user.id);
 
       if (deleteError) {
         setError(`Failed to delete product: ${deleteError.message}`);
