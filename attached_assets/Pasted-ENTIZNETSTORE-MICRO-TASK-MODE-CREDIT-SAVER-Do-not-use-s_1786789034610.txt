@@ -1,0 +1,99 @@
+ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER
+
+Do not use subagents.
+Do not audit the repository.
+Do not inspect Git history.
+Do not create documentation or memory files.
+Do not investigate unrelated code.
+
+This task should require only the canonical Supabase schema/migrations and direct database validation.
+
+Module 1C-4B2 — Add Core Identity Foreign Keys
+
+Create one new Supabase migration.
+Do NOT edit the already-applied canonical baseline migration.
+
+Add these approved foreign keys:
+
+profiles_buyer.id
+  -> auth.users(id) ON DELETE CASCADE
+
+profiles_seller.id
+  -> auth.users(id) ON DELETE CASCADE
+
+addresses.user_id
+  -> auth.users(id) ON DELETE CASCADE
+
+notifications.user_id
+  -> auth.users(id) ON DELETE CASCADE
+
+messages.sender_id
+  -> auth.users(id) ON DELETE RESTRICT
+
+messages.recipient_id
+  -> auth.users(id) ON DELETE RESTRICT
+
+admin_audit_logs.admin_id
+  -> auth.users(id) ON DELETE RESTRICT
+
+kyc_documents.seller_id
+  -> profiles_seller(id) ON DELETE CASCADE
+
+kyc_verification_requests.seller_id
+  -> profiles_seller(id) ON DELETE CASCADE
+
+products.seller_id
+  -> profiles_seller(id) ON DELETE SET NULL
+
+orders.seller_id
+  -> profiles_seller(id) ON DELETE RESTRICT
+
+orders.buyer_id
+  -> profiles_buyer(id) ON DELETE RESTRICT
+
+reviews.buyer_id
+  -> profiles_buyer(id) ON DELETE RESTRICT
+
+escrow_transactions.seller_id
+  -> profiles_seller(id) ON DELETE RESTRICT
+
+Important:
+
+products.seller_id MUST remain nullable.
+Do not add conversation participant FKs in this task.
+Do not add RLS policies.
+Do not create Auth users.
+Do not change application code.
+Do not modify categories or brands.
+Do not add profile rows.
+Do not modify source Replit/Neon databases.
+
+Before applying, confirm only that the referenced columns exist and that the affected target tables contain no conflicting rows.
+
+Apply the migration to the existing EntizNetStore Supabase project.
+
+Verify only:
+
+all 14 FKs exist;
+delete behavior matches the specification;
+products.seller_id is still nullable;
+categories remain 16;
+brands remain 6;
+Auth users remain 0;
+no unexpected application rows were created;
+existing RLS remains enabled;
+RLS policies remain 0.
+
+Final response maximum 10 lines.
+
+Return only:
+
+migration filename;
+applied successfully yes/no;
+14 FKs verified yes/no;
+counts;
+blocker if any.
+
+Stop.
+
+Do not propose another task.
