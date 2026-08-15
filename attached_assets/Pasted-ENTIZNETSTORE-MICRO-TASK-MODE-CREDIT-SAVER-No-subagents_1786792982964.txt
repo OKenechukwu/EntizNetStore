@@ -1,0 +1,77 @@
+ENTIZNETSTORE MICRO-TASK MODE — CREDIT SAVER
+
+No subagents.
+No repository-wide audit.
+No Git history.
+No documentation.
+Do not redesign messaging.
+
+Module 1C-5C — Eliminate Final Legacy Database Runtime Dependency
+
+Previous audits established that:
+
+lib/data/products.ts no longer uses lib/db.ts;
+the known remaining application consumer of lib/db.ts is app/api/chat/send/route.ts;
+lib/db.ts connects to legacy NEON_DATABASE_URL.
+
+Objective:
+
+Determine whether the legacy /api/chat/send route is still actively used, and eliminate the legacy database runtime dependency if safely possible.
+
+Inspect ONLY:
+
+app/api/chat/send/route.ts
+lib/db.ts
+direct imports/references to /api/chat/send
+package.json only if cleanup becomes possible.
+
+Do not inspect the full messaging system.
+
+Step 1 — usage check
+
+Run a targeted search for:
+
+imports of lib/db.ts
+requests/fetches to /api/chat/send
+direct references to that route.
+Step 2A — if /api/chat/send is UNUSED/obsolete
+
+Then:
+
+delete the obsolete route;
+verify nothing else imports lib/db.ts;
+delete lib/db.ts;
+remove pg and @types/pg only if they are now completely unused;
+do not delete or change secrets/environment configuration;
+do not touch messaging functionality that uses other Supabase routes.
+Step 2B — if /api/chat/send IS actively used
+
+Do NOT rewrite messaging.
+
+Do NOT add RLS.
+
+Do NOT migrate it automatically.
+
+Stop and report exactly which active consumer still depends on it so we can decide whether to leave it for the development company.
+
+Validation if cleanup occurs
+
+Confirm:
+
+no application imports lib/db.ts;
+no application code references NEON_DATABASE_URL;
+pg removed only if unused;
+existing Supabase messaging routes untouched;
+no new TypeScript errors.
+
+Final response maximum 7 lines:
+
+/api/chat/send actively used yes/no
+files removed/changed
+lib/db.ts dependency remaining yes/no
+application NEON_DATABASE_URL dependency remaining yes/no
+pg remaining yes/no and why
+TypeScript result
+blocker
+
+Stop. Do not propose another task.
