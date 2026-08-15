@@ -61,10 +61,7 @@ const DEMO_DB = Array.from({ length: 12 }, (_, i) => {
     ] as Product["deliveryOptions"],
     returnPolicy: DEFAULT_RETURN_POLICY as Product["returnPolicy"],
     store: undefined as Product["store"],
-    category: "demo",
     originalBasePrice: undefined as number | undefined,
-    longDescription:
-      "Crafted with meticulous attention to detail, this premium item balances style, comfort, and durability. Ideal for discerning customers seeking quality.",
   } satisfies Partial<Product> as Product;
 });
 

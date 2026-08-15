@@ -4,11 +4,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import CurrencyPicker from "@/components/CurrencyPicker";
 import { formatPrice } from "@/lib/format";
-import {
-  getFxRates,
-  convertFromBase,
-  DEFAULT_CURRENCY,
-} from "@/lib/currency";
+import { getFxRates, convertFromBase, toCurrencyCode } from "@/lib/currency";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 type ProductRow = {
@@ -40,8 +36,7 @@ export default async function DashboardStorePage() {
   const products = (data ?? []) as ProductRow[];
 
   // Currency preference + FX rates
-  const userCurrency =
-    cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
+  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
   const rates = await getFxRates();
 
   const header = (

@@ -9,7 +9,9 @@ import { dict as zh } from "./zh";
 
 export type Dict = typeof en;
 
-export const DICTS: Record<string, Dict> = {
+// Locale dictionaries have diverged in shape (en is nested, others are
+// partially flat); consumers must treat values as unknown and narrow.
+export const DICTS: Record<string, Record<string, unknown>> = {
   en,
   de,
   fr,

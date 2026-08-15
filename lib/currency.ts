@@ -36,6 +36,17 @@ export const SUPPORTED_CURRENCIES: CurrencyCode[] = [
   "BRL",
 ];
 
+/**
+ * Normalize an arbitrary string (cookie, query, request body) to a supported
+ * CurrencyCode, falling back to DEFAULT_CURRENCY.
+ */
+export function toCurrencyCode(value?: string | null): CurrencyCode {
+  const v = (value ?? "").toUpperCase().trim();
+  return SUPPORTED_CURRENCIES.includes(v as CurrencyCode)
+    ? (v as CurrencyCode)
+    : DEFAULT_CURRENCY;
+}
+
 // Base is what your DB prices are stored in.
 // Keep this consistent across the whole store.
 export const BASE_CURRENCY: CurrencyCode = "USD";

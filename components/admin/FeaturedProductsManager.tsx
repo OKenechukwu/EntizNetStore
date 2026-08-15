@@ -41,7 +41,7 @@ export default function FeaturedProductsManager() {
   const [creating, setCreating] = useState(false)
   const [formData, setFormData] = useState({
     product_id: '',
-    feature_type: 'spotlight' as const,
+    feature_type: 'spotlight' as 'hero' | 'spotlight' | 'sale' | 'new_arrival' | 'trending',
     title: '',
     description: '',
     image_url: '',

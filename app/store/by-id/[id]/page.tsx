@@ -1,12 +1,7 @@
 // app/store/[id]/page.tsx
 import { cookies } from "next/headers";
 import { formatPrice } from "@/lib/format";
-import {
-  getFxRates,
-  convertFromBase,
-  BASE_CURRENCY,
-  DEFAULT_CURRENCY,
-} from "@/lib/currency";
+import { getFxRates, convertFromBase, toCurrencyCode } from "@/lib/currency";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import AddToCartButton from "../AddToCartButton";
@@ -58,8 +53,7 @@ export default async function ProductDetailPage({
   const hero = gallery[0] ?? "/placeholder.png";
 
   // Currency preference + FX conversion
-  const userCurrency =
-    cookies().get("currency")?.value?.toUpperCase() || DEFAULT_CURRENCY;
+  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
   const rates = await getFxRates();
   const displayAmount = convertFromBase(
     Number(product.price ?? 0),

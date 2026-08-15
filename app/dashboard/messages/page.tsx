@@ -231,6 +231,18 @@ export default function MessagesPage() {
     }
   };
 
+  const activeName = useMemo(() => {
+    const c = conversations.find(
+      (x) => x.other_user.id === selectedConversation,
+    );
+    if (!c) return "";
+    return (
+      c.other_user.profile?.display_name ||
+      c.other_user.profile?.storefront_name ||
+      (c.other_user.email ? c.other_user.email.split("@")[0] : "")
+    );
+  }, [conversations, selectedConversation]);
+
   // -------- Render ----------
   if (loading || isLoading) {
     return (
@@ -246,18 +258,6 @@ export default function MessagesPage() {
   if (!user) {
     return null;
   }
-
-  const activeName = useMemo(() => {
-    const c = conversations.find(
-      (x) => x.other_user.id === selectedConversation,
-    );
-    if (!c) return "";
-    return (
-      c.other_user.profile?.display_name ||
-      c.other_user.profile?.storefront_name ||
-      (c.other_user.email ? c.other_user.email.split("@")[0] : "")
-    );
-  }, [conversations, selectedConversation]);
 
   return (
     <div className="h-[calc(100vh-200px)] flex glass-card overflow-hidden">

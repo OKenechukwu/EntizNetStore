@@ -314,7 +314,7 @@ export default function ProductDetailsTabs({
                     Dispute Resolution
                   </h4>
                   <p>
-                    If there's an issue with your order, our escrow team will mediate and ensure fair
+                    If there&apos;s an issue with your order, our escrow team will mediate and ensure fair
                     resolution. Funds remain protected until disputes are resolved.
                   </p>
                 </div>

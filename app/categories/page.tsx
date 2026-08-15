@@ -194,7 +194,7 @@ export default function CategoriesPage() {
         <div className="mb-12">
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
-              Find What You're Looking For
+              Find What You&apos;re Looking For
             </h2>
             <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
               Search across all categories or browse by category below

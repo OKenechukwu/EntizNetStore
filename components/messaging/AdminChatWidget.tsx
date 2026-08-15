@@ -229,7 +229,7 @@ export const AdminChatWidget = () => {
               {brand === 'primediscreet' ? 'Elite Support' : 'Customer Support'}
             </h3>
             <p className="text-sm text-white/80">
-              We're here to help you
+              We&apos;re here to help you
             </p>
           </div>
 

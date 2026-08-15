@@ -48,6 +48,8 @@ function defaultRates(): FxRates {
     PHP: 58,
     CNY: 7.1,
     JPY: 150,
+    AUD: 1.48,
+    CAD: 1.36,
     NGN: 1600,
     GHS: 15,
     ZAR: 18.5,

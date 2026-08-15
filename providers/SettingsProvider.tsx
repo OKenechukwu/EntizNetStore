@@ -21,7 +21,8 @@ import { dict as ja } from "@/i18n/dictionaries/ja";
 import { dict as vi } from "@/i18n/dictionaries/vi";
 import { dict as th } from "@/i18n/dictionaries/th";
 
-type Dict = Record<string, string>;
+// Dictionaries may contain nested sections; t() only resolves string values.
+type Dict = Record<string, unknown>;
 const DICTS: Record<string, Dict> = { en, zh, ja, vi, th };
 
 export type SettingsState = {
@@ -95,7 +96,10 @@ export function SettingsProvider({
     window.dispatchEvent(new Event("currencyChange"));
   };
 
-  const t = (key: string) => state.dict[key] ?? key;
+  const t = (key: string) => {
+    const v = state.dict[key];
+    return typeof v === "string" ? v : key;
+  };
   const money = (n: number | string) =>
     formatMoney(typeof n === "string" ? parseFloat(n) || 0 : n, state.currency, state.locale);
 

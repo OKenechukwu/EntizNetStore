@@ -143,6 +143,7 @@ export default function BuyerDashboardPage() {
       const countryCode = normalizeCountryToCode(buyerForm.country);
       await updateBuyerProfile(user.id, {
         ...buyerForm,
+        gender: buyerForm.gender || undefined,
         country: countryCode, // store code like "DE"
         updated_at: new Date().toISOString(),
       });

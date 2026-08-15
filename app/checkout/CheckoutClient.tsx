@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
-import { getFxRates, convertFromBase, DEFAULT_CURRENCY } from "@/lib/currency";
+import {
+  getFxRates,
+  convertFromBase,
+  DEFAULT_CURRENCY,
+  toCurrencyCode,
+  type FxRates,
+} from "@/lib/currency";
 import I18nText from "@/components/i18n/I18nText";
 import {
   getCart,
@@ -19,7 +25,7 @@ export default function CheckoutClient() {
   const { t } = useI18n();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userCurrency, setUserCurrency] = useState(DEFAULT_CURRENCY);
-  const [rates, setRates] = useState<Record<string, number>>({});
+  const [rates, setRates] = useState<FxRates>({} as FxRates);
   const [isLoading, setIsLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
@@ -39,7 +45,7 @@ export default function CheckoutClient() {
     const cookieValue = entizCurrency || legacyCurrency;
 
     if (cookieValue) {
-      setUserCurrency(cookieValue.toUpperCase());
+      setUserCurrency(toCurrencyCode(cookieValue));
     }
 
     return () => {
@@ -55,7 +61,7 @@ export default function CheckoutClient() {
         const response = await fetch("/api/fx");
         if (response.ok) {
           const data = await response.json();
-          setRates(data.rates || {});
+          setRates((data.rates || {}) as FxRates);
         }
       } catch (error) {
         console.error("Failed to fetch FX rates:", error);

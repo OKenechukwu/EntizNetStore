@@ -262,7 +262,7 @@ export default function SalePage() {
     }, 500);
   };
 
-  const categories = [...new Set(products.map((p) => p.category))];
+  const categories = Array.from(new Set(products.map((p) => p.category)));
   const filteredProducts =
     filterCategory === "all"
       ? products

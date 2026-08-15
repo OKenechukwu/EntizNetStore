@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     suggestions.push(...popularCompletions.slice(0, 2))
 
     // Remove duplicates and limit
-    const uniqueSuggestions = [...new Set(suggestions)]
+    const uniqueSuggestions = Array.from(new Set(suggestions))
       .filter(s => s.toLowerCase() !== query.toLowerCase())
       .slice(0, 8)
 

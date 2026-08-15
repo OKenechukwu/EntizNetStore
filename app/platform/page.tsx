@@ -120,7 +120,7 @@ export default function PlatformExperience() {
                       Dark Mode
                     </h3>
                     <p className="text-sm" style={{ color: brandTheme.colors.text.secondary }}>
-                      Elegant dark interface that's easy on the eyes
+                      Elegant dark interface that&apos;s easy on the eyes
                     </p>
                     {theme === 'dark' && (
                       <div className="mt-2 flex items-center gap-2">
@@ -151,7 +151,7 @@ export default function PlatformExperience() {
                       System Preference Detection
                     </p>
                     <p className="text-xs" style={{ color: brandTheme.colors.text.secondary }}>
-                      Theme automatically matches your device's system preference when first visiting
+                      Theme automatically matches your device&apos;s system preference when first visiting
                     </p>
                   </div>
                 </div>

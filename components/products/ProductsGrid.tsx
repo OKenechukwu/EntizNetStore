@@ -3,7 +3,7 @@
 
 import ProductCard, {
   ProductCardData,
-} from "@/components/products/ProductsCard";
+} from "@/components/products/ProductCard";
 
 /**
  * A simple responsive grid for displaying product cards.

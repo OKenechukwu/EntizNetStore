@@ -3,7 +3,11 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/currency";
+import {
+  SUPPORTED_CURRENCIES,
+  DEFAULT_CURRENCY,
+  toCurrencyCode,
+} from "@/lib/currency";
 
 function readCookie(name: string) {
   const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -16,12 +20,11 @@ export default function CurrencyPicker() {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    const fromCookie = (readCookie("currency") || DEFAULT_CURRENCY).toUpperCase();
-    setVal(fromCookie);
+    setVal(toCurrencyCode(readCookie("currency")));
   }, []);
 
   async function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const currency = e.target.value;
+    const currency = toCurrencyCode(e.target.value);
     setVal(currency);
     await fetch("/api/prefs/currency", {
       method: "POST",

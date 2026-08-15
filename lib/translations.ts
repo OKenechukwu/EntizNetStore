@@ -25,6 +25,17 @@ export const translations = {
     specifications: "Specifications:",
     continueShopping: "Continue Shopping",
     youSave: "You save",
+    certification: "Certification",
+    warranty: "Warranty",
+    expiryOn: "Expiry On",
+    storePolicy: "Store Policy",
+    escrowPolicy: "Escrow Policy",
+    productSpecifications: "Product Specifications",
+    certificationsSafety: "Certifications & Safety",
+    warrantyInformation: "Warranty Information",
+    productExpiryInformation: "Product Expiry Information",
+    buyNow: "Buy Now",
+    chat: "Chat",
     
     // Cart
     cart: "Cart",
@@ -419,12 +430,16 @@ export type TranslationKey = keyof typeof translations.en
 
 export function getTranslation(key: TranslationKey, language: string = 'en'): string {
   const lang = language.toLowerCase()
-  const langTranslations = translations[lang as keyof typeof translations]
-  
-  if (langTranslations && langTranslations[key]) {
-    return langTranslations[key]
+  // Non-English dictionaries may lag behind English; treat them as partial.
+  const langTranslations = translations[lang as keyof typeof translations] as
+    | Partial<typeof translations.en>
+    | undefined
+
+  const translated = langTranslations?.[key]
+  if (typeof translated === 'string' && translated) {
+    return translated
   }
-  
+
   // Fallback to English
   return translations.en[key] || key
 }

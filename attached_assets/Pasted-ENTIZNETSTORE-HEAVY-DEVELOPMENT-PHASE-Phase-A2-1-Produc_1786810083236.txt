@@ -1,0 +1,175 @@
+ENTIZNETSTORE — HEAVY DEVELOPMENT PHASE
+Phase A2.1 — Production Build Recovery: Lint Gate + Active Core Type Errors
+
+Implementation is authorized.
+
+We now have a reproducible TypeScript baseline:
+
+npx tsc --noEmit 2>&1 | grep -c "error TS" → 96
+
+Use this exact counting method throughout this task.
+
+Do NOT run another architecture audit.
+
+No subagents unless absolutely necessary.
+
+Do NOT touch database migrations, RLS, production data, payments, escrow, wallet, payouts or messaging architecture in this task.
+
+PRIMARY OBJECTIVE
+
+Move EntizNetStore substantially closer to a clean production build.
+
+We want:
+
+npm run build
+
+eventually to exit 0.
+
+This task is the first build-recovery batch.
+
+STEP 1 — Capture the current build blockers
+
+Run:
+
+npm run build
+
+once and preserve the output.
+
+Identify:
+
+blocking ESLint errors;
+TypeScript errors encountered by the build;
+whether compilation itself succeeds before lint/type validation.
+
+Do not spend time cataloguing warnings that do not block the build.
+
+STEP 2 — Fix ALL build-blocking lint errors
+
+Fix actual ESLint errors, not ordinary warnings.
+
+Examples such as:
+
+react/no-unescaped-entities
+invalid JSX;
+invalid hook usage;
+other lint rules that cause next build to exit nonzero.
+
+Requirements:
+
+preserve wording/UX;
+use proper HTML entities/JSX escaping where appropriate;
+do not disable ESLint globally;
+do not add eslint.ignoreDuringBuilds;
+do not weaken Next.js build checks;
+do not hide errors through configuration.
+
+We want the code fixed, not the build gate bypassed.
+
+STEP 3 — Fix ACTIVE CORE TypeScript errors
+
+After lint blockers are resolved, run:
+
+npx tsc --noEmit
+
+Prioritize errors in ACTIVE marketplace/runtime files, especially:
+
+app/page.tsx
+app/store/**
+app/products/**
+app/dashboard/store/**
+app/seller/**
+app/auth/**
+app/checkout/CheckoutClient.tsx
+shared components directly used by those pages
+components/products/**
+canonical Supabase helpers/data layers
+
+Fix as many errors in these active paths as can be safely resolved without redesigning a deferred subsystem.
+
+Important
+
+If an error belongs specifically to:
+
+messaging;
+payments;
+escrow;
+wallet;
+payout;
+wishlist schema;
+reviews schema;
+Vendor/BSM;
+unfinished Storage;
+
+do NOT redesign that subsystem just to satisfy TypeScript.
+
+You may fix a harmless typing/import problem there if trivial, but leave architectural issues for their dedicated phases.
+
+FIXING RULES
+
+Fix the underlying typing/code problem.
+
+Do NOT:
+
+add widespread any;
+use @ts-ignore to hide errors;
+disable TypeScript;
+set ignoreBuildErrors;
+weaken strictness/configuration merely to make build green;
+remove functioning features because typing is inconvenient;
+introduce fake data;
+change the canonical Supabase schema.
+
+Narrow type assertions are acceptable only when genuinely justified.
+
+STEP 4 — Detect stale generated/build artifacts correctly
+
+If .next, tsconfig.tsbuildinfo, or similar generated artifacts interfere with reliable results, clean/recreate only generated artifacts.
+
+Do not modify source architecture for a caching problem.
+
+If running next build disrupts the Replit dev server, restart the workflow afterward as needed.
+
+STEP 5 — Validate
+
+Run:
+
+npx tsc --noEmit 2>&1 | grep -c "error TS"
+
+Record:
+
+before = 96
+after = actual new count
+
+Then run:
+
+npm run build
+
+Record:
+
+exit code;
+first remaining blocker if nonzero.
+
+Also confirm the dev app still serves /, /store, /auth/sign-in, and /auth/sign-up.
+
+STOP CONDITIONS
+
+If reaching the next build blocker would require redesigning payments, messaging, Storage, orders, reviews, wishlist, or BSM/vendor:
+
+stop and report it.
+
+Do not silently redesign those systems.
+
+FINAL REPORT
+
+Keep it concise:
+
+files changed;
+lint errors before/after;
+TypeScript error lines: 96 → X;
+active/core TypeScript areas fixed;
+npm run build: PASS/FAIL;
+if FAIL, exact next blocker/file;
+smoke-route result;
+blocker, if any.
+
+Stop after this phase. Do not automatically begin Phase A2.2.

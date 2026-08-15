@@ -113,7 +113,7 @@ export default function BrandsPage() {
     }, 500)
   }
 
-  const categories = [...new Set(brands.map(b => b.category))]
+  const categories = Array.from(new Set(brands.map(b => b.category)))
   const filteredBrands = filterCategory === 'all' 
     ? brands 
     : brands.filter(b => b.category === filterCategory)

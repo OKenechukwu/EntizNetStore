@@ -33,9 +33,9 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
     ? product.originalBasePrice + (selectedVariant?.priceDeltaBase || 0)
     : undefined;
 
-  const price = convertFromBase(effectiveBasePrice, currency, rates);
+  const price = convertFromBase(effectiveBasePrice, currency, rates ?? undefined);
   const originalPrice = effectiveOriginalPrice 
-    ? convertFromBase(effectiveOriginalPrice, currency, rates)
+    ? convertFromBase(effectiveOriginalPrice, currency, rates ?? undefined)
     : undefined;
 
   // Calculate discount percentage
@@ -159,7 +159,7 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
         <div className="space-y-2">
           {product.deliveryOptions.map((option) => {
             const fee = option.feeBase 
-              ? convertFromBase(option.feeBase, currency, rates)
+              ? convertFromBase(option.feeBase, currency, rates ?? undefined)
               : 0;
             const eta = getDeliveryETA();
 

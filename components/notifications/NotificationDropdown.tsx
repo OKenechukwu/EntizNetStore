@@ -160,7 +160,7 @@ export default function NotificationDropdown() {
                   No notifications
                 </h4>
                 <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                  You're all caught up!
+                  You&apos;re all caught up!
                 </p>
               </div>
             ) : (

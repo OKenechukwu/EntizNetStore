@@ -67,7 +67,7 @@ export default function AgeGate({ children }: { children: React.ReactNode }) {
           </div>
 
           <p className="text-xs opacity-60 mt-6">
-            By clicking "Yes", you certify that you are 18+ years of age and agree 
+            By clicking &quot;Yes&quot;, you certify that you are 18+ years of age and agree 
             to our Terms of Service and Privacy Policy.
           </p>
         </div>

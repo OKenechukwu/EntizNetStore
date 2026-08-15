@@ -17,7 +17,13 @@ export async function GET(request: NextRequest) {
     // In production, this would query an activity/audit log table
     
     const generateMockActivity = () => {
-      const activities = []
+      const activities: Array<{
+        id: string
+        type: 'order' | 'user' | 'product' | 'review'
+        description: string
+        timestamp: string
+        status?: string
+      }> = []
       const types = ['order', 'user', 'product', 'review'] as const
       const baseTime = new Date()
       
@@ -26,7 +32,7 @@ export async function GET(request: NextRequest) {
         const timestamp = new Date(baseTime.getTime() - (i * 30 * 60 * 1000)) // 30 min intervals
         
         let description = ''
-        let status = undefined
+        let status: string | undefined = undefined
         
         switch (type) {
           case 'order':

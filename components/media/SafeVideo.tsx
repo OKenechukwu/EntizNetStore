@@ -13,6 +13,7 @@ type Props = {
   controls?: boolean;
   preload?: "none" | "metadata" | "auto";
   onClick?: () => void;
+  onError?: () => void;
   style?: React.CSSProperties;
 };
 
@@ -28,6 +29,7 @@ export default function SafeVideo({
   controls = false,
   preload = "none",
   onClick,
+  onError: onErrorProp,
   style,
 }: Props) {
   const [failed, setFailed] = useState(false);
@@ -45,7 +47,10 @@ export default function SafeVideo({
     });
   }, [failed, triedOnce, autoPlay]);
 
-  const onError = () => setFailed(true);
+  const onError = () => {
+    setFailed(true);
+    onErrorProp?.();
+  };
 
   if (failed) {
     return (

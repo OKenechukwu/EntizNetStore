@@ -14,6 +14,7 @@ import {
   convertFromBase,
   formatPrice,
   type SupportedCurrency,
+  type FxRates,
 } from "@/lib/currency";
 
 const grad =
@@ -122,7 +123,7 @@ function ProductGrid({
 }: {
   title: string;
   items: Item[];
-  rates: Record<string, number> | null;
+  rates: FxRates | null;
 }) {
   const { t, locale, currency } = useI18n();
 
@@ -214,7 +215,7 @@ export default function StoreHome() {
   const top = useMemo(() => [...items].sort((a, b) => b.priceUSD - a.priceUSD).slice(0, 10), [items]);
   const near = useMemo(() => [...items].reverse().slice(0, 10), [items]);
 
-  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  const [rates, setRates] = useState<FxRates | null>(null);
   useEffect(() => {
     let mounted = true;
     (async () => {

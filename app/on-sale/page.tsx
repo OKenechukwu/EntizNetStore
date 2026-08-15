@@ -159,7 +159,7 @@ export default function OnSalePage() {
     }, 500)
   }
 
-  const categories = [...new Set(products.map(p => p.category))]
+  const categories = Array.from(new Set(products.map(p => p.category)))
   const filteredProducts = filterCategory === 'all' 
     ? products 
     : products.filter(p => p.category === filterCategory)

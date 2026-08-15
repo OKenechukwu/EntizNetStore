@@ -1,15 +1,14 @@
 // app/api/prefs/currency/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/currency";
+import { toCurrencyCode } from "@/lib/currency";
 
 export async function POST(request: Request) {
   const { currency } = (await request.json().catch(() => ({}))) as {
     currency?: string;
   };
 
-  const next = (currency ?? "").toUpperCase().trim();
-  const chosen = SUPPORTED_CURRENCIES.includes(next) ? next : DEFAULT_CURRENCY;
+  const chosen = toCurrencyCode(currency);
 
   // 1 year, readable by client (not httpOnly) so your forms can read it
   cookies().set("currency", chosen, {

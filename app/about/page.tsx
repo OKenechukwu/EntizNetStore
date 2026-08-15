@@ -37,7 +37,7 @@ export default function AboutPage() {
               <p className="mb-6 leading-relaxed" style={{ color: theme.colors.text.primary }}>
                 Our carefully curated collection features only the finest products from trusted brands, 
                 ensuring quality, safety, and satisfaction in every purchase. We understand the importance 
-                of privacy and discretion, which is why we've built our platform with the utmost respect 
+                of privacy and discretion, which is why we&apos;ve built our platform with the utmost respect 
                 for your personal journey.
               </p>
             </div>
@@ -74,7 +74,7 @@ export default function AboutPage() {
                 <div className={`w-2 h-2 rounded-full ${brandColor.replace('text-', 'bg-')} mt-3 flex-shrink-0`}></div>
                 <div>
                   <h4 className="font-semibold mb-2" style={{ color: theme.colors.text.primary }}>Curated Premium Selection</h4>
-                  <p style={{ color: theme.colors.text.secondary }}>Hand-picked products from the world's most respected adult wellness brands.</p>
+                  <p style={{ color: theme.colors.text.secondary }}>Hand-picked products from the world&apos;s most respected adult wellness brands.</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">

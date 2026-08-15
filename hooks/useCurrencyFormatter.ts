@@ -27,7 +27,7 @@ export function useCurrencyFormatter() {
 
   const formatPrice = (amountInBase: number) => {
     // Convert from BASE_CURRENCY (USD) to target currency using current rates
-    const converted = convertFromBase(amountInBase, currency, rates);
+    const converted = convertFromBase(amountInBase, currency, rates ?? undefined);
     return fmt.format(converted);
   };
 
