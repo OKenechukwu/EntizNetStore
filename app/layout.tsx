@@ -5,7 +5,6 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import { LayoutContent } from "./layout-content";
 import SessionWatcher from "@/components/SessionWatcher";
-import ClientBoot from "./ClientBoot";
 
 // ✅ Correct path to the provider we created
 import { BrandProvider } from "@/components/providers/BrandProvider";
@@ -81,13 +80,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {/* Header on every page */}
               <Header />
 
-              <ClientBoot>
-                <LayoutContent>
-                  <main id="main" className="w-full">
-                    {children}
-                  </main>
-                </LayoutContent>
-              </ClientBoot>
+              <LayoutContent>
+                <main id="main" className="w-full">
+                  {children}
+                </main>
+              </LayoutContent>
             </I18nProvider>
           </BrandProvider>
         </SettingsProvider>

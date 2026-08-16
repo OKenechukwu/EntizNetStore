@@ -63,6 +63,22 @@ export default function SellerDashboard({
               <p className="mt-1" style={{ color: theme.colors.text.secondary }}>
                 Welcome back, {sellerProfile.storefront_name}
               </p>
+              {/* Live verification state from profiles_seller.verification_status */}
+              <span
+                className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                  sellerProfile.verification_status === 'verified'
+                    ? 'bg-green-100 text-green-800'
+                    : sellerProfile.verification_status === 'rejected'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                {sellerProfile.verification_status === 'verified'
+                  ? 'Verified seller'
+                  : sellerProfile.verification_status === 'rejected'
+                  ? 'Verification rejected'
+                  : 'Verification pending'}
+              </span>
             </div>
             
             <div className="flex items-center gap-4">

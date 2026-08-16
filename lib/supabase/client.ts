@@ -23,7 +23,10 @@ export function getSupabaseClient() {
       storageKey: "entiznet.auth",
       // Force browser storage (fixes some iframe/preview oddities)
       storage: typeof window !== "undefined" ? window.localStorage : undefined,
-      flowType: "implicit", // best for email+password / magic links in SPA
+      // PKCE code flow: consistent with exchangeCodeForSession() in
+      // /auth/callback and with password-recovery links. detectSessionInUrl
+      // auto-exchanges ?code= on any page for this client.
+      flowType: "pkce",
     },
   });
 

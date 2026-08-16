@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { routeByRole } from "@/lib/auth/routeByRole";
 import { updateBuyerProfile } from "@/lib/auth";
 
 // Country select + data
@@ -105,9 +104,10 @@ export default function BuyerDashboardPage() {
       return;
     }
 
-    // Wrong role (e.g., seller/creator lands here) → bounce by role
-    if (user.role && user.role !== "buyer") {
-      router.replace(routeByRole(user.role) || "/store");
+    // Bounce only users WITHOUT buyer capability. A buyer+seller user
+    // keeps access to buyer pages (capabilities are never collapsed).
+    if (user.isBuyer === false) {
+      router.replace(user.isSeller ? "/seller/dashboard" : "/store");
     }
   }, [loading, user, router]);
 

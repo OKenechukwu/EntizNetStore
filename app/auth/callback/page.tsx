@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { routeByRole } from "@/lib/auth/routeByRole";
+import { destinationAfterAuth } from "@/lib/auth/capabilitiesClient";
 import { completePendingOnboarding } from "@/lib/auth/pendingOnboarding";
 
 /**
@@ -48,34 +48,35 @@ export default function AuthCallbackPage() {
       setTimeout(() => router.replace(path), 300);
     };
 
-    const resolveTarget = (role?: string | null) => {
-      // Prefer explicit ?next= override if safe; otherwise role-based default
+    const resolveTarget = async () => {
+      // Prefer explicit ?next= override if safe; otherwise the canonical
+      // capability-based destination (server-derived; never from
+      // client-mutable user_metadata).
       const nextParam = safeInternalPath(searchParams.get("next"));
-      return nextParam || routeByRole(role || undefined) || "/dashboard";
+      if (nextParam) return nextParam;
+      return await destinationAfterAuth();
     };
 
     const run = async () => {
       try {
-        // 1) If a session already exists, use it
+        // 1) If a session already exists, use it. (With PKCE +
+        // detectSessionInUrl, the client may have already exchanged the
+        // ?code= automatically by the time this effect runs.)
         const { data: sessionRes } = await supabase.auth.getSession();
-        const session = sessionRes.session;
-        if (session) {
+        if (sessionRes.session) {
           // Authenticated: complete any pending buyer/seller onboarding
           // (idempotent trusted endpoint; identity derived server-side).
           await completePendingOnboarding();
-          const role =
-            (session.user as any)?.user_metadata?.role ??
-            (session.user as any)?.role ??
-            null;
-          const target = resolveTarget(role);
+          const target = await resolveTarget();
           setMsg("Success! Redirecting…");
           redirectOnce(target);
           return;
         }
 
-        // 2) Otherwise, try the PKCE code exchange flow
-        const { data: exchanged, error } =
-          await supabase.auth.exchangeCodeForSession(window.location.href);
+        // 2) Otherwise, run the PKCE code exchange explicitly.
+        const { error } = await supabase.auth.exchangeCodeForSession(
+          window.location.href,
+        );
         if (error) {
           // Some providers return to callback without code (e.g., user cancels)
           throw error;
@@ -84,12 +85,7 @@ export default function AuthCallbackPage() {
         // Authenticated via code exchange: complete any pending onboarding.
         await completePendingOnboarding();
 
-        const role =
-          (exchanged.session?.user as any)?.user_metadata?.role ??
-          (exchanged.session?.user as any)?.role ??
-          null;
-
-        const target = resolveTarget(role);
+        const target = await resolveTarget();
         setMsg("Success! Redirecting…");
         redirectOnce(target);
       } catch (e: any) {
@@ -141,7 +137,7 @@ export default function AuthCallbackPage() {
 
       <p className="text-xs opacity-60">
         If nothing happens,{" "}
-        <a href="/auth" className="underline">
+        <a href="/auth/sign-in" className="underline">
           return to sign in
         </a>
         .

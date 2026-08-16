@@ -2,9 +2,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { routeByRole } from '@/lib/auth/routeByRole';
+import { destinationAfterAuth } from '@/lib/auth/capabilitiesClient';
 import { signInWithPassword, signUpEmailPassword } from '@/lib/auth/actions';
 import {
   setPendingOnboarding,
@@ -85,10 +86,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
     // Authenticated: complete any pending buyer/seller onboarding
     // (idempotent trusted endpoint; identity derived server-side).
     await completePendingOnboarding();
-    const { data } = await supabase.auth.getUser();
-    const r = (data.user?.user_metadata?.role as string | undefined) ?? undefined;
-    const next = routeByRole(r) || '/dashboard';
-    router.push(next);
+    // Canonical capability-based destination (server-derived; never from
+    // client-mutable user_metadata).
+    router.push(await destinationAfterAuth());
   };
 
   const handleSubmit = async () => {
@@ -262,6 +262,16 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
                 {showPw ? 'Hide' : 'Show'}
               </button>
             </div>
+            {mode === 'signin' && (
+              <div className="mt-1 text-right">
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs underline opacity-70 hover:opacity-100"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Sign-up extras */}

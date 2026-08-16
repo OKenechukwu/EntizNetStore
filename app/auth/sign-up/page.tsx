@@ -9,7 +9,6 @@ import {
   setPendingOnboarding,
   completePendingOnboarding,
 } from "@/lib/auth/pendingOnboarding";
-import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import { routeByRole } from "@/lib/auth/routeByRole";
+import { destinationAfterAuth } from "@/lib/auth/capabilitiesClient";
 
 export default function ProfileIconClient() {
   const router = useRouter();
@@ -21,9 +21,8 @@ export default function ProfileIconClient() {
       if (!data.user) {
         router.push("/auth?mode=signin");
       } else {
-        const role = data.user.user_metadata?.role as string | undefined;
-        const dashboardPath = routeByRole(role);
-        router.push(dashboardPath);
+        // Canonical capability-based destination (server-derived).
+        router.push(await destinationAfterAuth());
       }
     } catch (error) {
       router.push("/auth?mode=signin");

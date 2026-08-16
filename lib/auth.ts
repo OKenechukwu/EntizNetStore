@@ -9,6 +9,11 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   profile?: BuyerProfile | SellerProfile;
+  // Capability flags derived from canonical profile-row presence
+  // (profiles_buyer / profiles_seller). A user may hold both — never
+  // collapse capabilities into the single `role` field for routing.
+  isBuyer?: boolean;
+  isSeller?: boolean;
 };
 
 export type BuyerProfile = {

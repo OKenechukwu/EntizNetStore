@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
-import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function Navbar() {
   // IMPORTANT: session === undefined means "still loading"
@@ -20,8 +19,9 @@ export default function Navbar() {
     window.location.href = "/auth";
   };
 
-  const dashboardHref =
-    routeByRole(session?.user?.user_metadata?.role) || "/dashboard";
+  // /dashboard resolves the canonical capability-based destination
+  // server-side; never derive routing from client-mutable user_metadata.
+  const dashboardHref = "/dashboard";
 
   return (
     <nav className="flex items-center px-4 h-14 border-b">

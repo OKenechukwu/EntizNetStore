@@ -5,7 +5,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
-import { routeByRole } from "@/lib/auth/routeByRole";
 
 export default function SellerDashboardPage() {
   const { user, loading } = useAuth();
@@ -17,12 +16,14 @@ export default function SellerDashboardPage() {
       router.replace("/auth/sign-in");
       return;
     }
-    if (user.role !== "seller") {
-      router.replace(routeByRole(user.role) || "/store");
+    // Bounce only users WITHOUT seller capability (canonical profile
+    // presence), never based on client-mutable metadata.
+    if (user.isSeller === false) {
+      router.replace("/store");
     }
   }, [loading, user, router]);
 
-  if (loading || !user || user.role !== "seller") {
+  if (loading || !user || user.isSeller === false) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">

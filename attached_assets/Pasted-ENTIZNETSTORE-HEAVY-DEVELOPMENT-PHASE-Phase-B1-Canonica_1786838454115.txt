@@ -1,0 +1,311 @@
+ENTIZNETSTORE — HEAVY DEVELOPMENT PHASE
+Phase B1 — Canonical Authentication & Capability Routing
+
+Implementation is authorized.
+
+Current baseline:
+
+TypeScript = 0 errors
+npm run build = PASS
+Supabase Auth is canonical
+canonical capabilities currently represented by profile presence:
+buyer → profiles_buyer
+seller → profiles_seller
+a user may hold both profiles
+seller verification state lives in profiles_seller.verification_status
+admin authority = trusted app_metadata.role === 'admin'
+
+Do NOT run another broad audit.
+
+Inspect only the auth/routing files directly needed for this phase.
+
+OBJECTIVE
+
+Create one coherent authentication and post-login routing architecture.
+
+Remove remaining reliance on mutable user_metadata.role for capability decisions.
+
+Do not redesign Supabase Auth itself.
+
+1 — CREATE ONE CANONICAL CAPABILITY RESOLVER
+
+Introduce or consolidate a server-safe capability resolver that determines the authenticated user's actual capabilities from:
+
+profiles_buyer
+profiles_seller
+trusted admin app_metadata
+
+It should be capable of representing:
+
+buyer only
+seller only
+buyer + seller
+admin
+no marketplace capability yet
+
+Seller result should also expose:
+
+verification_status
+
+where relevant.
+
+Do NOT infer capability from:
+
+user_metadata.role
+localStorage
+URL query parameters
+caller-supplied user IDs
+
+Browser pending-onboarding state may remain only as an onboarding UX hint and must never become authorization.
+
+2 — CONSOLIDATE POST-LOGIN ROUTING
+
+Inspect the current competing routing logic in:
+
+components/SessionWatcher.tsx
+lib/auth/routeByRole.ts
+app/auth/callback/page.tsx
+components/auth/AuthCard.tsx
+app/layout-content.tsx
+components/Navbar.tsx
+
+Replace capability-based routing derived from user_metadata.role with the canonical capability resolver.
+
+Desired default routing:
+
+admin
+
+→ /admin
+
+seller only
+
+→ /seller/dashboard
+
+buyer only
+
+→ /store
+
+buyer + seller
+
+Do NOT collapse or delete either capability.
+
+Choose a stable default destination, preferably:
+
+→ /seller/dashboard
+
+while preserving the ability to access buyer/store functionality.
+
+no capability
+
+→ onboarding/registration choice if an appropriate existing route exists;
+
+otherwise /store.
+
+Do not invent a complicated role switcher in this phase.
+
+3 — REMOVE user_metadata.role AS ROUTING AUTHORITY
+
+Search ONLY the auth/navigation files listed above plus immediate dependencies.
+
+Remove remaining marketplace routing decisions based on:
+
+user_metadata.role
+
+or equivalent client-controlled role metadata.
+
+User metadata may still be used for non-security profile information such as phone/display preferences if legitimately needed.
+
+Never use it for:
+
+buyer authorization;
+seller authorization;
+admin authorization;
+protected-route access.
+4 — AUTH CALLBACK FLOW
+
+Inspect:
+
+lib/supabase/client.ts
+lib/supabase/server.ts
+app/auth/callback/page.tsx
+signup redirect configuration
+
+The independent audit identified:
+
+exchangeCodeForSession() being used while the browser client was configured with flowType: 'implicit'.
+
+Make the Supabase Auth flow internally consistent.
+
+Prefer the modern Supabase PKCE/code flow expected by SSR/callback handling.
+
+Do not invent custom tokens.
+
+Preserve safe internal next redirect validation.
+
+5 — PASSWORD RECOVERY
+
+Implement the missing production password-reset flow using Supabase Auth.
+
+Add:
+
+Forgot Password page/form
+reset email request using resetPasswordForEmail
+callback/redirect handling
+Reset Password page
+authenticated recovery-session password update using updateUser
+
+Requirements:
+
+no password logging;
+generic success response for reset requests so account existence is not exposed;
+password validation should reuse the application's existing password rules where practical;
+redirect destination must be internal/safe.
+
+Add a visible Forgot password? link to the canonical sign-in UI.
+
+6 — DUPLICATE AUTH ROUTES
+
+Inspect:
+
+app/auth/signin
+app/auth/sign-in
+/auth
+
+Determine which one is actually linked and canonical.
+
+Consolidate obvious duplicate sign-in pages only if safe.
+
+Prefer one canonical route:
+
+/auth/sign-in
+
+Old route may redirect to the canonical route if external links may already exist.
+
+Do not maintain two independent login implementations.
+
+7 — SELLER VERIFICATION STATE
+
+Seller dashboard/navigation must derive the actual:
+
+pending
+verified
+rejected
+
+state from profiles_seller.verification_status.
+
+Remove hardcoded "Pending" displays.
+
+Do not change the existing database/RLS rules.
+
+Behavior:
+
+pending
+
+dashboard accessible;
+
+draft products allowed;
+
+publishing remains restricted by current RLS.
+
+verified
+
+show verified/approved state;
+
+existing RLS publication ability remains.
+
+rejected
+
+show rejected status clearly;
+
+do not grant additional marketplace permissions.
+
+Do not create a public “Verified badge” system in this task.
+
+OUT OF SCOPE
+
+Do NOT touch:
+
+payments;
+orders;
+escrow;
+wallet;
+payouts;
+messaging architecture;
+wishlist schema;
+reviews;
+Storage;
+KYC architecture;
+Vendor/BSM;
+RLS migrations;
+product schema.
+
+Do not create Auth users during this phase.
+
+SECURITY REQUIREMENTS
+
+Protected server authorization must use:
+
+auth.getUser()
+
+not untrusted browser session claims alone.
+
+Admin remains:
+
+app_metadata.role === 'admin'
+
+Never authorize from:
+
+user_metadata.role.
+
+Do not use service-role client merely for normal authenticated profile reads if the authenticated Supabase/RLS path works.
+
+VALIDATION
+
+Run:
+
+npx tsc --noEmit
+
+Required:
+
+0 errors
+
+Run:
+
+npm run build
+
+Required:
+
+PASS
+
+Without creating users, verify:
+
+/auth/sign-in
+/auth/sign-up
+forgot-password page
+reset-password page
+unauthenticated seller guards
+unauthenticated admin API
+
+Run targeted grep confirming no routing/authorization decisions in the scoped auth/navigation files use:
+
+user_metadata.role
+
+If end-to-end login/reset cannot be verified because Auth has 0 users, report it as E2E UNVERIFIED, not PASS.
+
+FINAL REPORT
+
+Return:
+
+files changed;
+canonical capability resolver created/used yes/no;
+user_metadata.role routing removed yes/no;
+callback PKCE/auth flow consistent yes/no;
+password recovery implemented yes/no;
+duplicate sign-in routes consolidated yes/no;
+seller verification status now live-data-driven yes/no;
+TypeScript result;
+production build result;
+E2E items still unverified because no Auth users exist;
+blocker, if any.
+
+Stop after Phase B1.

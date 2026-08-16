@@ -13,7 +13,6 @@ import AgeGate from "@/components/AgeGate";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { AdminChatWidget } from "@/components/messaging/AdminChatWidget";
-import { routeByRole } from "@/lib/auth/routeByRole";
 
 function BrandSwitcher() {
   const { brand, setBrand } = useBrand();
@@ -49,10 +48,9 @@ function Navigation() {
   const { user, signOut } = useAuth();
   const { t } = useTranslation();
 
-  // Try to infer a role for smarter dashboard routing (fallback to /dashboard)
-  const role =
-    (user as any)?.user_metadata?.role || (user as any)?.role || undefined;
-  const dashboardHref = routeByRole(role) || "/dashboard";
+  // /dashboard resolves the canonical capability-based destination
+  // server-side; never derive routing from client-mutable user_metadata.
+  const dashboardHref = "/dashboard";
 
   return (
     <header className="glass-card sticky top-0 z-40 border-b border-opacity-20 backdrop-blur supports-[backdrop-filter]:bg-black/40">

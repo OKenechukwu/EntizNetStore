@@ -42,7 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: currentUser.id,
         email: currentUser.email!,
         role,
-        profile: profile || undefined
+        profile: profile || undefined,
+        // Capability flags from canonical profile presence; a user may
+        // hold both (buyer+seller) — routing must not collapse them.
+        isBuyer: !!buyer,
+        isSeller: !!seller,
       })
     } catch (error) {
       console.error('Error refreshing profile:', error)

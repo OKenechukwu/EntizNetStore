@@ -1,1 +1,2 @@
 - [Live DB topology](live-db-topology.md) — live data is in Neon (`NEON_DATABASE_URL`), Supabase project is empty; products ownership = seller_id only, RLS effectively off.
+- [Auth capability routing](auth-capability-routing.md) — capability is server-derived only (/api/auth/capabilities); PKCE flow; SIGNED_IN redirects must skip reset-password/callback pages.
