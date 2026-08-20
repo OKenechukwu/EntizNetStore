@@ -91,12 +91,12 @@ export default function SellerDashboardPage() {
         </div>
       </div>
 
-      <SellerDashboardCards />
+      <SellerDashboardCards profile={user.profile} />
     </div>
   );
 }
 
-function SellerDashboardCards() {
+function SellerDashboardCards({ profile }: { profile: unknown }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Quick Actions */}
@@ -141,7 +141,7 @@ function SellerDashboardCards() {
             <div className="flex items-center justify-between p-4 rounded-lg bg-charcoal/20">
               <span>Verification Status</span>
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 capitalize">
-                {(user.profile as any)?.verification_status || "pending"}
+                {(profile as any)?.verification_status || "pending"}
               </span>
             </div>
             <Link
@@ -165,7 +165,7 @@ function SellerDashboardCards() {
               <label className="block text-sm font-medium mb-1">
                 Business Type
               </label>
-              <p className="capitalize opacity-80">{(user.profile as any)?.business_type || "individual"}</p>
+              <p className="capitalize opacity-80">{(profile as any)?.business_type || "individual"}</p>
             </div>
             <Link
               href="/dashboard/profile"
