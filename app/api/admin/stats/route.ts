@@ -1,80 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+
+const PERIOD_DAYS: Record<string, number> = {
+  '1d': 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    const { searchParams } = new URL(request.url)
-    const period = searchParams.get('period') || '7d'
-    const brand = searchParams.get('brand') || 'entiznetstore'
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    // For now, return mock data since we're building the foundation
-    // In a real implementation, this would query the actual database
-    
-    const getDaysFromPeriod = (period: string): number => {
-      switch (period) {
-        case '1d': return 1
-        case '7d': return 7
-        case '30d': return 30
-        case '90d': return 90
-        default: return 7
-      }
-    }
+    const { searchParams } = new URL(request.url)
+    const period = searchParams.get('period') || '7d'
+    const brand = searchParams.get('brand') || 'entiznetstore'
+    const days = PERIOD_DAYS[period] ?? PERIOD_DAYS['7d']
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+    const supabase = getSupabaseAdmin()
 
-    const days = getDaysFromPeriod(period)
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-
-    // Mock calculations based on period and brand
-    const baseMultiplier = brand === 'primediscreet' ? 2.5 : 1.0
-    const periodMultiplier = days / 7 // Scale by period length
-
-    const mockStats = {
-      totalRevenue: Math.round(25000 * baseMultiplier * periodMultiplier),
-      totalOrders: Math.round(450 * periodMultiplier),
-      totalUsers: Math.round(2800 * baseMultiplier),
-      totalProducts: Math.round(150 * baseMultiplier),
-      pendingOrders: Math.round(23 * Math.min(periodMultiplier, 2)),
-      activeUsers: Math.round(890 * baseMultiplier * Math.min(periodMultiplier, 1.5)),
-      conversionRate: brand === 'primediscreet' ? 4.2 : 3.1,
-      avgOrderValue: Math.round(180 * baseMultiplier)
-    }
-
-    try {
-      // Try to get some real data from the database where possible
-      
-      // Get total products count
-      const { count: productsCount } = await supabase
+    const [ordersResult, productsResult, buyersResult, sellersResult] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('total_cents, payment_status, status')
+        .gte('created_at', startDate)
+        .contains('metadata', { marketplace_brand: brand }),
+      supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
         .eq('marketplace_brand', brand)
-        .eq('status', 'active')
+        .eq('status', 'active'),
+      supabase.from('profiles_buyer').select('id'),
+      supabase.from('profiles_seller').select('id'),
+    ])
 
-      if (productsCount !== null) {
-        mockStats.totalProducts = productsCount
-      }
+    const firstError = [
+      ordersResult.error,
+      productsResult.error,
+      buyersResult.error,
+      sellersResult.error,
+    ].find(Boolean)
+    if (firstError) throw firstError
 
-      // Get total users count (approximate from auth.users)
-      // Note: In production, you'd want a dedicated analytics table
-      
-    } catch (dbError) {
-      console.error('Database query error:', dbError)
-      // Continue with mock data if database queries fail
-    }
+    const orders = ordersResult.data ?? []
+    const paidOrders = orders.filter((order) => order.payment_status === 'paid')
+    const totalRevenueCents = paidOrders.reduce(
+      (sum, order) => sum + Number(order.total_cents ?? 0),
+      0,
+    )
+    const userIds = new Set([
+      ...(buyersResult.data ?? []).map((profile) => profile.id),
+      ...(sellersResult.data ?? []).map((profile) => profile.id),
+    ])
 
-    return NextResponse.json(mockStats)
-
+    return NextResponse.json({
+      totalRevenue: totalRevenueCents / 100,
+      totalOrders: orders.length,
+      totalUsers: userIds.size,
+      totalProducts: productsResult.count ?? 0,
+      pendingOrders: orders.filter((order) => order.status === 'pending').length,
+      // These require analytics/session instrumentation. Report zero until collected.
+      activeUsers: 0,
+      conversionRate: 0,
+      avgOrderValue: paidOrders.length
+        ? totalRevenueCents / paidOrders.length / 100
+        : 0,
+    })
   } catch (error: any) {
     console.error('Admin stats error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to fetch admin stats' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

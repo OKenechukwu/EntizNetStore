@@ -6,6 +6,7 @@ import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import I18nText from "@/components/i18n/I18nText";
+import { addItem } from "@/lib/cart";
 
 // --- Types ---
 type SellerRow = {
@@ -111,13 +112,15 @@ export default function PublicStorefrontPage() {
     updateQuery({ page: String(p) });
   };
 
-  // Simple Add-to-Cart (stub) – replace with your real cart action
   const addToCart = async (product: Product) => {
     try {
-      const key = "cart";
-      const data = JSON.parse(localStorage.getItem(key) || "[]");
-      data.push({ productId: product.id, qty: 1 });
-      localStorage.setItem(key, JSON.stringify(data));
+      addItem({
+        id: product.id,
+        title: product.title,
+        priceBase: product.price,
+        image: product.image_url ?? undefined,
+        qty: 1,
+      });
       alert("Added to cart");
     } catch (e) {
       console.error(e);

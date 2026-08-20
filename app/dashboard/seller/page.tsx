@@ -107,13 +107,13 @@ function SellerDashboardCards() {
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <Link
-              href="/dashboard/products/add"
+              href="/dashboard/store/new"
               className="luxury-button text-center py-4"
             >
               Add Product
             </Link>
             <Link
-              href="/dashboard/products"
+              href="/dashboard/store"
               className="luxury-button-outline text-center py-4"
             >
               Manage Products
@@ -125,7 +125,7 @@ function SellerDashboardCards() {
               View Orders
             </Link>
             <Link
-              href="/dashboard/analytics"
+              href="/dashboard/seller/analytics"
               className="luxury-button-outline text-center py-4"
             >
               Analytics
@@ -140,8 +140,8 @@ function SellerDashboardCards() {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-lg bg-charcoal/20">
               <span>Verification Status</span>
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400">
-                Pending
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 capitalize">
+                {(user.profile as any)?.verification_status || "pending"}
               </span>
             </div>
             <Link
@@ -165,7 +165,7 @@ function SellerDashboardCards() {
               <label className="block text-sm font-medium mb-1">
                 Business Type
               </label>
-              <p className="capitalize opacity-80">Individual</p>
+              <p className="capitalize opacity-80">{(user.profile as any)?.business_type || "individual"}</p>
             </div>
             <Link
               href="/dashboard/profile"
@@ -188,4 +188,3 @@ function SellerDashboardCards() {
     </div>
   );
 }
-

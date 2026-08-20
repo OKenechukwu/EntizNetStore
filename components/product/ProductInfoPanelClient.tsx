@@ -15,10 +15,13 @@ export default function ProductInfoPanelClient({ product }: Props) {
 
   const handleAddToCart = (quantity: number, variantId?: string) => {
     try {
+      const variant = product.variants?.find((item) => item.id === variantId);
       addItem({
         id: product.id,
+        variantId,
+        variantTitle: variant?.name,
         title: product.title,
-        priceBase: product.basePrice,
+        priceBase: product.basePrice + (variant?.priceDeltaBase || 0),
         qty: quantity,
       });
       
@@ -32,10 +35,13 @@ export default function ProductInfoPanelClient({ product }: Props) {
 
   const handleBuyNow = (quantity: number, variantId?: string) => {
     try {
+      const variant = product.variants?.find((item) => item.id === variantId);
       addItem({
         id: product.id,
+        variantId,
+        variantTitle: variant?.name,
         title: product.title,
-        priceBase: product.basePrice,
+        priceBase: product.basePrice + (variant?.priceDeltaBase || 0),
         qty: quantity,
       });
       

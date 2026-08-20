@@ -23,49 +23,6 @@ interface ProductSearchBarProps {
   showSuggestions?: boolean
 }
 
-// Mock search suggestions - in production, these would come from an API
-const mockSuggestions: SearchSuggestion[] = [
-  {
-    id: '1',
-    type: 'category',
-    title: 'Vibrators',
-    href: '/categories/vibrators',
-    image: '/images/categories/vibrators-thumb.jpg'
-  },
-  {
-    id: '2',
-    type: 'category',
-    title: 'Luxury Collection',
-    href: '/collections/luxury',
-    image: '/images/collections/luxury-thumb.jpg'
-  },
-  {
-    id: '3',
-    type: 'product',
-    title: 'Premium Rose Vibrator',
-    category: 'Vibrators',
-    price: 89.99,
-    href: '/products/premium-rose-vibrator',
-    image: '/images/products/rose-vibrator-thumb.jpg'
-  },
-  {
-    id: '4',
-    type: 'category',
-    title: 'Wellness',
-    href: '/categories/wellness',
-    image: '/images/categories/wellness-thumb.jpg'
-  },
-  {
-    id: '5',
-    type: 'product',
-    title: 'Luxury Massage Oil Set',
-    category: 'Wellness',
-    price: 49.99,
-    href: '/products/luxury-massage-oil-set',
-    image: '/images/products/massage-oil-thumb.jpg'
-  }
-]
-
 export default function ProductSearchBar({
   placeholder = "What are you looking for today?",
   className = "",
@@ -95,7 +52,6 @@ export default function ProductSearchBar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Simulate API search
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setSuggestions([])
@@ -104,17 +60,34 @@ export default function ProductSearchBar({
 
     setIsLoading(true)
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    // Filter mock suggestions based on query
-    const filtered = mockSuggestions.filter(item =>
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    
-    setSuggestions(filtered)
-    setIsLoading(false)
+    try {
+      const response = await fetch('/api/search/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: searchQuery,
+          marketplace_brand: 'entiznetstore',
+          limit: 6,
+        }),
+      })
+      if (!response.ok) throw new Error('Search request failed')
+
+      const payload = await response.json()
+      const realSuggestions: SearchSuggestion[] = (payload.products ?? []).map((product: any) => ({
+        id: product.id,
+        type: 'product' as const,
+        title: product.title,
+        price: Number(product.base_price),
+        image: product.image_url,
+        href: `/products/${product.slug}`,
+      }))
+      setSuggestions(realSuggestions)
+    } catch (error) {
+      console.error('Product suggestions failed:', error)
+      setSuggestions([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -210,7 +210,7 @@ export default function ProductForm({
       if (publish) {
         router.push(`/store/${formData.slug}`)
       } else {
-        router.push('/seller/dashboard?tab=products')
+        router.push('/dashboard/store')
       }
       
     } catch (error) {

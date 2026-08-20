@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { updateBuyerProfile } from "@/lib/auth";
 
@@ -107,7 +108,7 @@ export default function BuyerDashboardPage() {
     // Bounce only users WITHOUT buyer capability. A buyer+seller user
     // keeps access to buyer pages (capabilities are never collapsed).
     if (user.isBuyer === false) {
-      router.replace(user.isSeller ? "/seller/dashboard" : "/store");
+      router.replace(user.isSeller ? "/dashboard/seller" : "/store");
     }
   }, [loading, user, router]);
 
@@ -179,7 +180,7 @@ export default function BuyerDashboardPage() {
     );
   }
 
-  if (!user || user.role !== "buyer") {
+  if (!user || user.isBuyer === false) {
     return null; // redirects handled above
   }
 
@@ -200,6 +201,12 @@ export default function BuyerDashboardPage() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Link
+              href="/dashboard/buyer/orders"
+              className="luxury-button-outline px-4 py-2"
+            >
+              My Orders
+            </Link>
             {isEditing ? (
               <>
                 <button

@@ -1,87 +1,52 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
-import { findSubcategoryBySlugs, getAllCategories } from "@/data/taxonomy";
+import { notFound } from "next/navigation";
+import FeaturedSection from "@/components/home/FeaturedSection";
+import { getCatalogCategory } from "@/lib/data/categories";
+import { getProductsByCategory } from "@/lib/data/products";
 
 type Props = { params: { slug: string; subslug: string } };
 
-export async function generateStaticParams() {
-  const params: { slug: string; subslug: string }[] = [];
-  for (const c of getAllCategories()) {
-    for (const s of c.sub ?? []) {
-      params.push({ slug: c.slug, subslug: s.slug });
-    }
-  }
-  return params;
+export async function generateMetadata({ params }: Props) {
+  const category = await getCatalogCategory(params.subslug);
+  return category
+    ? {
+        title: `${category.name} | EntizNetStore`,
+        description: category.description || `Shop ${category.name} at EntizNetStore.`,
+      }
+    : { title: "Category Not Found | EntizNetStore" };
 }
 
-export function generateMetadata({ params }: Props) {
-  const found = findSubcategoryBySlugs(params.slug, params.subslug);
-  const title = found
-    ? `${found.sub.name} – ${found.cat.name} | EntizNetStore`
-    : "Subcategory – EntizNetStore";
-  const description = found
-    ? `Shop ${found.sub.name} under ${found.cat.name} at EntizNetStore.`
-    : "Browse subcategories on EntizNetStore.";
-  return { title, description };
-}
+export default async function SubcategoryPage({ params }: Props) {
+  const [parent, category] = await Promise.all([
+    getCatalogCategory(params.slug),
+    getCatalogCategory(params.subslug),
+  ]);
+  if (!parent || !category || category.parent_id !== parent.id) notFound();
 
-export default function SubcategoryPage({ params }: Props) {
-  const found = findSubcategoryBySlugs(params.slug, params.subslug);
-  if (!found) return notFound();
-
-  const { cat, sub } = found;
+  const products = await getProductsByCategory(category.id, "entiznetstore", 50);
+  const items = products.map((product) => ({
+    id: product.id,
+    title: product.title,
+    price: product.basePrice,
+    rating: product.rating,
+    href: `/products/${product.slug}`,
+    image: product.images[0]?.url,
+  }));
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <section className="mx-auto max-w-screen-2xl px-4 py-6">
-        {/* Breadcrumbs */}
-        <nav className="mb-4 text-sm text-foreground/70">
-          <Link href="/" className="hover:underline">
-            Home
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href="/categories" className="hover:underline">
-            Categories
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={`/categories/${cat.slug}`} className="hover:underline">
-            {cat.name}
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">{sub.name}</span>
-        </nav>
-
-        <header className="mb-6">
-          <h1 className="text-2xl font-extrabold flex items-center gap-2">
-            <span className="text-2xl">{cat.icon}</span>
-            {sub.name}
-          </h1>
-          <p className="mt-1 text-sm text-foreground/80">
-            Handpicked selection in <strong>{sub.name}</strong> from the{" "}
-            {cat.name} collection.
-          </p>
-        </header>
-
-        {/* Placeholder product grid */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-            >
-              <div className="aspect-[4/3] bg-white/[0.06]" />
-              <div className="p-3">
-                <div className="text-sm font-semibold">
-                  {sub.name} Item {i + 1}
-                </div>
-                <div className="text-xs text-foreground/70">
-                  Premium • In stock
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+    <main className="min-h-screen bg-background py-8 text-foreground">
+      <nav className="mx-auto max-w-7xl px-4 text-sm text-foreground/60">
+        <Link href="/categories" className="hover:underline">Categories</Link>
+        <span className="mx-2">/</span>
+        <Link href={`/categories/${parent.slug}`} className="hover:underline">{parent.name}</Link>
+        <span className="mx-2">/</span>
+        <span>{category.name}</span>
+      </nav>
+      <header className="mx-auto max-w-3xl px-4 py-8 text-center">
+        <h1 className="text-3xl font-bold md:text-4xl">{category.name}</h1>
+        {category.description && <p className="mt-3 text-foreground/65">{category.description}</p>}
+      </header>
+      <FeaturedSection title={`${category.name} products`} items={items} viewAllHref="/categories" />
     </main>
   );
 }

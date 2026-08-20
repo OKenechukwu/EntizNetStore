@@ -54,7 +54,7 @@ export default function ProductCard({ product }: Props) {
       {/* Media */}
       <div className="relative aspect-[4/3]">
         <Image
-          src={image || "/demo/products/p1.jpg"}
+          src={image || "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg"}
           alt={name}
           fill
           className="object-cover transition will-change-transform group-hover:scale-[1.02]"

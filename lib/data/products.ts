@@ -79,7 +79,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     .select(
       `${SUMMARY_COLS}, seller_id, short_description,
        profiles_seller(storefront_name),
-       product_variants(inventory_quantity, is_active)`
+       product_variants(id, title, price, inventory_quantity, inventory_policy, track_inventory, is_active, position)`
     )
     .eq("slug", slug)
     .eq("status", "active")
@@ -95,6 +95,18 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const stockRemaining = ((row as any).product_variants ?? [])
     .filter((v: any) => v.is_active)
     .reduce((s: number, v: any) => s + Number(v.inventory_quantity ?? 0), 0);
+  const variants = ((row as any).product_variants ?? [])
+    .filter((variant: any) => variant.is_active)
+    .sort((a: any, b: any) => Number(a.position ?? 0) - Number(b.position ?? 0))
+    .map((variant: any) => ({
+      id: variant.id,
+      name: variant.title,
+      priceDeltaBase: Number(variant.price) - summary.basePrice,
+      stockRemaining:
+        variant.track_inventory && variant.inventory_policy === "deny"
+          ? Number(variant.inventory_quantity ?? 0)
+          : undefined,
+    }));
 
   return {
     ...summary,
@@ -102,6 +114,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     // until its RLS is separately approved.
     soldCount: 0,
     stockRemaining,
+    variants,
     category: summary.brand?.name ?? "general",
     shippingOrigin: { country: "United States", isOverseas: false },
     deliveryOptions: [
@@ -149,14 +162,63 @@ export async function getRelatedProducts(
 }
 
 /** Generic featured/sponsored products. */
-export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
+export async function getFeaturedProducts(
+  limit = 6,
+  marketplaceBrand?: string,
+): Promise<Product[]> {
   const supabase = createServerSupabase();
-  const { data } = await supabase
+  let query = supabase
     .from("products")
     .select(SUMMARY_COLS)
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (marketplaceBrand) {
+    query = query.eq("marketplace_brand", marketplaceBrand);
+  }
+
+  const { data } = await query;
+
+  return ((data ?? []) as unknown as SummaryRow[]).map(toProductSummary);
+}
+
+/** Active products assigned to a canonical category. */
+export async function getProductsByCategory(
+  categoryId: string,
+  marketplaceBrand = "entiznetstore",
+  limit = 50,
+): Promise<Product[]> {
+  const supabase = createServerSupabase();
+  const { data } = await supabase
+    .from("product_categories")
+    .select(`products!inner(${SUMMARY_COLS})`)
+    .eq("category_id", categoryId)
+    .eq("products.status", "active")
+    .eq("products.marketplace_brand", marketplaceBrand)
+    .limit(Math.min(limit, 100));
+
+  return (data ?? [])
+    .map((link: any) => link.products)
+    .filter(Boolean)
+    .map((row: unknown) => toProductSummary(row as SummaryRow));
+}
+
+/** Active products belonging to a catalog brand. */
+export async function getProductsByBrand(
+  brandId: string,
+  marketplaceBrand = "entiznetstore",
+  limit = 50,
+): Promise<Product[]> {
+  const supabase = createServerSupabase();
+  const { data } = await supabase
+    .from("products")
+    .select(SUMMARY_COLS)
+    .eq("brand_id", brandId)
+    .eq("status", "active")
+    .eq("marketplace_brand", marketplaceBrand)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(limit, 100));
 
   return ((data ?? []) as unknown as SummaryRow[]).map(toProductSummary);
 }
@@ -248,39 +310,14 @@ export async function searchProducts(opts: {
   if (opts.minRating != null) {
     mapped = mapped.filter((r) => Number(r.rating ?? 0) >= opts.minRating!);
   }
+  if (opts.onSale) {
+    mapped = mapped.filter(
+      (r) =>
+        r.compare_at_price != null &&
+        Number(r.compare_at_price) > Number(r.base_price),
+    );
+  }
   return mapped;
-}
-
-/** Seller dashboard data (products w/ inventory + media, orders, reviews). */
-export async function getSellerDashboardData(sellerId: string) {
-  const supabase = createServerSupabase();
-
-  const [sellerProfileRes, productsRes] = await Promise.all([
-    // Authenticated Supabase reads: RLS owner policies apply (auth.uid()).
-    supabase.from("profiles_seller").select("*").eq("id", sellerId).limit(1).maybeSingle(),
-    supabase
-      .from("products")
-      .select(
-        `id, title, marketplace_brand, status, base_price, created_at,
-         product_variants(inventory_quantity), product_media(url)`
-      )
-      .eq("seller_id", sellerId)
-      .order("created_at", { ascending: false }),
-  ]);
-
-  return {
-    sellerProfile: sellerProfileRes.data ?? null,
-    products: (productsRes.data ?? []).map((p: any) => ({
-      ...p,
-      product_variants: p.product_variants ?? [],
-      product_media: p.product_media ?? [],
-    })),
-    // Orders and reviews await the production order/review implementation;
-    // safe empty values keep the dashboard UI rendering without surfacing
-    // legacy demo data.
-    orders: [] as any[],
-    reviews: [] as any[],
-  };
 }
 
 /** Public storefront: seller profile + paged active products. */
