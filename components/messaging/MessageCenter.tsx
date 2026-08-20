@@ -108,12 +108,9 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         messages: data || []
       }))
 
-      // Mark messages as read
-      await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('conversation_id', conversationId)
-        .neq('sender_id', currentUserId)
+      await supabase.rpc('mark_conversation_read', {
+        target_conversation_id: conversationId
+      })
     } catch (error) {
       console.error('Error loading messages:', error)
     }
@@ -137,28 +134,24 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         }
       }
 
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: activeConversation.id,
-          sender_id: currentUserId,
-          content: translatedText,
-          attachments: attachments,
-          is_read: false,
-          original_text: content.trim(), // store original too if desired
-          source_lang: sourceLang,
-          target_lang: targetLang
-        })
+      const recipientId = activeConversation.participants?.find(
+        (id: string) => id !== currentUserId
+      )
+      if (!recipientId) throw new Error('Conversation recipient is missing')
 
-      if (error) throw error
-
-      await supabase
-        .from('conversations')
-        .update({ 
-          last_message_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+      const response = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: translatedText,
+          threadId: activeConversation.id,
+          recipientId
         })
-        .eq('id', activeConversation.id)
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to send message')
+      }
 
       loadMessages(activeConversation.id)
 
@@ -175,8 +168,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
           type: orderT ? 'order_chat' : 'general',
           participants: [currentUserId, otherUserId],
           subject: subject,
-          order_id: orderT || null,
-          status: 'active'
+          metadata: orderT ? { order_id: orderT } : {}
         })
         .select()
         .single()

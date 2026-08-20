@@ -3,7 +3,11 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import EnhancedMessageCenter from '@/components/messaging/EnhancedMessageCenter'
 
-export default async function MessagesPage() {
+export default async function MessagesPage({
+  searchParams,
+}: {
+  searchParams?: { conversation?: string };
+}) {
   const supabase = createServerComponentClient({ cookies })
   
   // Check authentication
@@ -33,6 +37,7 @@ export default async function MessagesPage() {
       <EnhancedMessageCenter 
         currentUserId={user.id}
         userType={userType}
+        initialConversationId={searchParams?.conversation}
       />
     </div>
   )

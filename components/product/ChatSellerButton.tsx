@@ -28,7 +28,7 @@ export default function ChatSellerButton({ sellerId, productId, productTitle }: 
 
       const data = await res.json();
       if (data.threadId) {
-        router.push(`/messages/${data.threadId}`);
+        router.push(`/messages?conversation=${encodeURIComponent(data.threadId)}`);
       }
     } catch (error) {
       console.error("Failed to start chat:", error);

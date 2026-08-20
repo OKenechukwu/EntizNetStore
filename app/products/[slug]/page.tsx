@@ -66,7 +66,7 @@ const DEMO_DB = Array.from({ length: 12 }, (_, i) => {
 });
 
 /* ---------------------------------- */
-/* DB fetchers (Neon Postgres via lib/data/products) */
+/* Canonical Supabase product fetchers */
 /* ---------------------------------- */
 async function getProductFromDb(slug: string): Promise<Product | null> {
   try {

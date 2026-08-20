@@ -7,7 +7,7 @@ import { getSellerDashboardData } from '@/lib/data/products'
 export default async function SellerDashboardPage() {
   const supabase = createServerComponentClient({ cookies })
 
-  // Check authentication (Supabase is auth-only; app data lives in Neon — see lib/db.ts)
+  // Check authentication before loading seller-owned Supabase data.
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     redirect('/auth/signin?redirect=/seller/dashboard')

@@ -29,13 +29,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Check if thread already exists between this user and seller
-    const { data: existingThread } = await supabase
-      .from("chat_threads")
+    if (sellerId === user.id) {
+      return NextResponse.json(
+        { error: "You cannot start a conversation with yourself" },
+        { status: 400 }
+      );
+    }
+
+    const { data: seller } = await supabase
+      .from("profiles_seller")
       .select("id")
-      .eq("buyer_id", user.id)
-      .eq("seller_id", sellerId)
-      .single();
+      .eq("id", sellerId)
+      .eq("verification_status", "verified")
+      .maybeSingle();
+    if (!seller) {
+      return NextResponse.json(
+        { error: "Verified seller not found" },
+        { status: 404 }
+      );
+    }
+
+    // Reuse an existing two-party conversation when possible.
+    const { data: existingThread } = await supabase
+      .from("conversations")
+      .select("id")
+      .contains("participants", [user.id, sellerId])
+      .eq("type", "product_inquiry")
+      .limit(1)
+      .maybeSingle();
 
     if (existingThread) {
       return NextResponse.json({ threadId: existingThread.id });
@@ -43,11 +64,12 @@ export async function POST(request: NextRequest) {
 
     // Create new thread
     const { data: newThread, error } = await supabase
-      .from("chat_threads")
+      .from("conversations")
       .insert({
-        buyer_id: user.id,
-        seller_id: sellerId,
-        product_id: productId || null,
+        type: "product_inquiry",
+        participants: [user.id, sellerId],
+        subject: "Product inquiry",
+        metadata: productId ? { product_id: productId } : {},
       })
       .select("id")
       .single();

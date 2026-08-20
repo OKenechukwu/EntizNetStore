@@ -3,8 +3,7 @@ import { getStorefront } from "@/lib/data/products";
 
 export const dynamic = "force-dynamic";
 
-// Public storefront data (seller profile + active products) from the live
-// Neon Postgres database (see lib/db.ts).
+// Public storefront data (seller profile + active products) from Supabase.
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
