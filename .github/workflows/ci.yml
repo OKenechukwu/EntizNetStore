@@ -53,9 +53,9 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          # Pin the latest stable release verified for this M0 baseline.
+          # Pin the stable release verified for this production baseline.
           # Avoid `latest`: resolving it consumes GitHub release API quota and
-          # made otherwise valid reproduction runs fail nondeterministically.
+          # can make otherwise valid reproduction runs fail nondeterministically.
           version: 2.111.0
 
       - name: Start fresh local Supabase stack
@@ -66,6 +66,9 @@ jobs:
 
       - name: Verify reproduced database invariants
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-local-database.sql
+
+      - name: Run P0 commerce and authorization regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
       - name: Stop local Supabase stack
         if: always()
