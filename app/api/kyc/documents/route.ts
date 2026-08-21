@@ -11,17 +11,14 @@ const VALID_DOCUMENT_TYPES = [
   'address_proof',
   'bank_statement',
 ] as const
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-] as const
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number]
-type AllowedMime = (typeof ALLOWED_MIME_TYPES)[number]
+
+type InspectedFile = {
+  size: number
+  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp'
+}
 
 function pathFromSignedUploadUrl(value: string): string | null {
   try {
@@ -35,36 +32,61 @@ function pathFromSignedUploadUrl(value: string): string | null {
   }
 }
 
-function splitStoragePath(filePath: string) {
-  const slash = filePath.lastIndexOf('/')
-  if (slash <= 0 || slash === filePath.length - 1) return null
-  return {
-    folder: filePath.slice(0, slash),
-    name: filePath.slice(slash + 1),
+function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null {
+  if (size <= 0 || size > MAX_FILE_SIZE) return null
+
+  if (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  ) {
+    return { size, mimeType: 'application/pdf' }
   }
+
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { size, mimeType: 'image/jpeg' }
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return { size, mimeType: 'image/png' }
+  }
+
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { size, mimeType: 'image/webp' }
+  }
+
+  return null
 }
 
-function storageMetadata(value: unknown): { size: number | null; mimeType: string | null } {
-  const metadata =
-    value && typeof value === 'object' && 'metadata' in value
-      ? (value as { metadata?: unknown }).metadata
-      : null
-
-  if (!metadata || typeof metadata !== 'object') {
-    return { size: null, mimeType: null }
+async function deleteRejectedUpload(filePath: string) {
+  try {
+    await getSupabaseAdmin().storage.from(KYC_BUCKET).remove([filePath])
+  } catch (error) {
+    console.error('Failed to remove rejected KYC upload:', error)
   }
-
-  const raw = metadata as Record<string, unknown>
-  const sizeValue = raw.size
-  const size =
-    typeof sizeValue === 'number'
-      ? sizeValue
-      : typeof sizeValue === 'string' && /^\d+$/.test(sizeValue)
-        ? Number(sizeValue)
-        : null
-  const mimeValue = raw.mimetype ?? raw.mime_type ?? raw.contentType
-  const mimeType = typeof mimeValue === 'string' ? mimeValue.toLowerCase() : null
-  return { size, mimeType }
 }
 
 export async function POST(request: NextRequest) {
@@ -94,8 +116,8 @@ export async function POST(request: NextRequest) {
       filePath?: string
       uploadURL?: string
       fileName?: string
-      // Legacy client hints are accepted in the request shape for compatibility
-      // but are never trusted as the stored source of truth.
+      // Legacy client hints remain accepted for compatibility, but the server
+      // never uses them as the source of truth.
       fileSize?: number
       mimeType?: string
     }
@@ -120,50 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid KYC storage path' }, { status: 400 })
     }
 
-    const location = splitStoragePath(filePath)
-    if (!location) {
-      return NextResponse.json({ error: 'Invalid KYC storage path' }, { status: 400 })
-    }
-
     const admin = getSupabaseAdmin()
-
-    // Do not let a client register an arbitrary path or lie about upload
-    // metadata. The object must already exist inside this seller's private KYC
-    // prefix. Bucket-level restrictions are the primary size/MIME enforcement;
-    // the observed object metadata is checked again here before DB registration.
-    const { data: objects, error: listError } = await admin.storage
-      .from(KYC_BUCKET)
-      .list(location.folder, {
-        limit: 100,
-        search: location.name,
-      })
-
-    if (listError) {
-      console.error('Unable to verify KYC storage object:', listError)
-      return NextResponse.json({ error: 'Unable to verify secure upload' }, { status: 503 })
-    }
-
-    const storageObject = objects?.find((entry) => entry.name === location.name)
-    if (!storageObject) {
-      return NextResponse.json(
-        { error: 'Uploaded KYC object was not found; upload must complete before registration' },
-        { status: 409 },
-      )
-    }
-
-    const observed = storageMetadata(storageObject)
-    if (observed.size != null && (observed.size <= 0 || observed.size > MAX_FILE_SIZE)) {
-      await admin.storage.from(KYC_BUCKET).remove([filePath]).catch(() => undefined)
-      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 })
-    }
-
-    if (
-      observed.mimeType &&
-      !ALLOWED_MIME_TYPES.includes(observed.mimeType as AllowedMime)
-    ) {
-      await admin.storage.from(KYC_BUCKET).remove([filePath]).catch(() => undefined)
-      return NextResponse.json({ error: 'Unsupported KYC document type' }, { status: 400 })
-    }
 
     const { data: existing } = await admin
       .from('kyc_documents')
@@ -179,6 +158,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Registration is the authoritative security boundary. Download the
+    // private object with service-role access, use Blob.size for the real byte
+    // count, and identify supported formats from magic bytes rather than the
+    // browser-provided Content-Type or filename extension.
+    const { data: blob, error: downloadError } = await admin.storage
+      .from(KYC_BUCKET)
+      .download(filePath)
+
+    if (downloadError || !blob) {
+      console.error('Unable to verify KYC storage object:', downloadError)
+      return NextResponse.json(
+        { error: 'Uploaded KYC object was not found; upload must complete before registration' },
+        { status: 409 },
+      )
+    }
+
+    if (blob.size <= 0 || blob.size > MAX_FILE_SIZE) {
+      await deleteRejectedUpload(filePath)
+      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 })
+    }
+
+    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer())
+    const inspected = inspectSignature(signature, blob.size)
+    if (!inspected) {
+      await deleteRejectedUpload(filePath)
+      return NextResponse.json(
+        { error: 'Unsupported KYC document. Upload a real PDF, JPEG, PNG, or WebP file.' },
+        { status: 400 },
+      )
+    }
+
     const { data: document, error: insertError } = await admin
       .from('kyc_documents')
       .insert({
@@ -186,8 +196,8 @@ export async function POST(request: NextRequest) {
         document_type: documentType,
         file_path: filePath,
         file_name: fileName,
-        file_size: observed.size,
-        mime_type: observed.mimeType,
+        file_size: inspected.size,
+        mime_type: inspected.mimeType,
         verification_status: 'pending',
       })
       .select()
