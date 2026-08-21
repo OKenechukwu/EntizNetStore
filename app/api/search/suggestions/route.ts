@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createServerSupabase } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,9 +9,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ suggestions: [] })
     }
 
-    const supabase = createServerComponentClient({ cookies })
+    const supabase = await createServerSupabase()
 
-    // Get product title suggestions
     const { data: productSuggestions } = await supabase
       .from('products')
       .select('title, tags, search_keywords')
@@ -21,27 +19,24 @@ export async function POST(request: NextRequest) {
       .ilike('title', `%${query}%`)
       .limit(5)
 
-    // Get category suggestions (static for now)
     const categoryKeywords = [
       'vibrators', 'dildos', 'toys', 'men', 'anal', 'couples', 'bdsm', 'fetish',
       'lubes', 'essentials', 'lingerie', 'apparel', 'gift sets', 'bundles'
     ]
-    
+
     const categorySuggestions = categoryKeywords
       .filter(keyword => keyword.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 3)
 
-    // Get brand suggestions
     const brandKeywords = [
       'LELO', 'We-Vibe', 'Satisfyer', 'CalExotics', 'Dame', 'MysteryVibe',
       ...(marketplace_brand === 'primediscreet' ? ['Elite Artisan', 'Premium Select'] : [])
     ]
-    
+
     const brandSuggestions = brandKeywords
       .filter(brand => brand.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 2)
 
-    // Get trending search terms (static for now)
     const trendingTerms = marketplace_brand === 'primediscreet' ? [
       'elite vibrators', 'premium couples toys', 'luxury lingerie', 'artisan collections',
       'discrete shipping', 'high-end massagers', 'premium materials', 'exclusive designs'
@@ -54,10 +49,8 @@ export async function POST(request: NextRequest) {
       .filter(term => term.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 2)
 
-    // Combine suggestions with priorities
-    let suggestions: string[] = []
+    const suggestions: string[] = []
 
-    // Add exact product title matches first
     if (productSuggestions) {
       const productTitles = productSuggestions
         .map(p => p.title)
@@ -66,29 +59,16 @@ export async function POST(request: NextRequest) {
       suggestions.push(...productTitles)
     }
 
-    // Add category suggestions
     suggestions.push(...categorySuggestions)
-
-    // Add brand suggestions
     suggestions.push(...brandSuggestions)
-
-    // Add trending suggestions
     suggestions.push(...trendingSuggestions)
+    suggestions.push(...generatePopularCompletions(query, marketplace_brand).slice(0, 2))
 
-    // Add popular search completions
-    const popularCompletions = generatePopularCompletions(query, marketplace_brand)
-    suggestions.push(...popularCompletions.slice(0, 2))
-
-    // Remove duplicates and limit
     const uniqueSuggestions = Array.from(new Set(suggestions))
       .filter(s => s.toLowerCase() !== query.toLowerCase())
       .slice(0, 8)
 
-    return NextResponse.json({
-      suggestions: uniqueSuggestions,
-      query
-    })
-
+    return NextResponse.json({ suggestions: uniqueSuggestions, query })
   } catch (error: any) {
     console.error('Search suggestions error:', error)
     return NextResponse.json(
@@ -100,7 +80,7 @@ export async function POST(request: NextRequest) {
 
 function generatePopularCompletions(query: string, marketplace_brand: string): string[] {
   const queryLower = query.toLowerCase()
-  
+
   const completions = marketplace_brand === 'primediscreet' ? {
     'vib': ['vibrators elite', 'vibrator premium', 'vibrating luxury'],
     'toy': ['toys for couples elite', 'toy premium collection', 'toys luxury'],
