@@ -64,36 +64,50 @@ The secret contract is documented. Before launch, real production credentials mu
 
 ## P0-03 — Stripe end-to-end commerce verification
 
-**Status: OPEN**
+**Status: IN PROGRESS**
 
-Verify in Stripe test mode, then controlled production readiness:
-- authenticated checkout;
-- server-side price recalculation;
-- idempotent payment-intent creation;
-- successful webhook signature validation;
-- duplicate/replayed webhook behavior;
-- failed/cancelled payment cleanup;
-- inventory reservation/release;
-- order creation across seller boundaries;
-- fulfillment transition authorization;
+Verified repository/database layer:
+- CI run #68 rebuilt a fresh PostgreSQL 17/Supabase environment and passed the P0 commerce/security regression suite;
+- server-side price recalculation and multi-seller order splitting;
+- checkout idempotency and changed-cart idempotency-key rejection;
+- inventory reservation, consumption and cancellation/release;
+- Stripe event replay deduplication and out-of-order `payment_failed`/`payment_intent.succeeded` safety;
+- paid-state protection against late failure events;
+- cross-account cancellation denial and seller fulfillment ownership/state transitions;
+- live production P0 migrations applied and repository migration versions synchronized to production history.
+
+Still required before real card processing:
+- Stripe test-mode API/payment-intent exercise through the deployed application;
+- webhook signature verification against actual Stripe test webhook delivery;
+- controlled failure/retry verification at the HTTP boundary;
 - refund/partial-refund behavior if exposed at launch;
-- auditability/reconciliation.
-
-No real card processing until this gate is signed off.
+- production reconciliation/audit procedure.
 
 ## P0-04 — Authorization/RLS regression suite
 
-**Status: OPEN**
+**Status: IN PROGRESS**
 
-Automated tests must prove representative anon/buyer/seller/cross-account/admin/service-role boundaries for catalog, profiles, products, orders, payment sessions, inventory, messages, KYC, uploads, and privileged RPCs. Manual inspection alone is not enough for launch.
+CI run #68 now provides automated buyer/seller/cross-account/service-role coverage for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Live verification confirms all 27 public tables remain RLS-enabled, authenticated transaction readers have SELECT-only table privileges, raw webhook records remain API-inaccessible, `finalize_checkout_payment` remains service-role-only, and the service role has an explicit trusted-worker DML contract across the canonical schema.
+
+Still required: representative automated anon/buyer/seller/cross-account/admin boundaries for catalog, profiles, messages, KYC, product uploads and remaining privileged routes/RPCs.
 
 ## P0-05 — Seller/admin/KYC/storage security completion
 
 **Status: IN PROGRESS**
 
-KYC storage is now on a private Supabase Storage bucket with a 10MB limit and an explicit PDF/JPEG/PNG/WebP allow-list. Signed upload/view URLs are issued server-side only after seller/admin authorization, and fresh-environment CI reproduces and verifies the private bucket configuration.
+Verified implementation now includes:
+- private `kyc-documents` Supabase Storage bucket with 10MB and PDF/JPEG/PNG/WebP restrictions;
+- seller-scoped signed KYC upload/view brokerage through server authorization;
+- KYC registration verifies the object exists, enforces actual downloaded byte size, and validates PDF/JPEG/PNG/WebP file signatures rather than trusting browser MIME/size claims;
+- KYC approval maps correctly to seller `verified` state and requires all mandatory documents to be approved;
+- public `product-media` Supabase Storage bucket with a 10MB JPEG/PNG/WebP contract;
+- seller-scoped signed product-image upload initialization;
+- product save verifies media belongs to the authenticated seller, is stored in the canonical bucket, exists, and has a valid image signature;
+- the seller editor uses real signed Storage uploads instead of arbitrary external URLs/placeholders;
+- the legacy direct browser multi-table product-write path redirects into the canonical atomic editor;
+- removed images and deleted products clean owned Storage objects.
 
-Still required before launch: complete route-level ownership regression coverage for all seller/admin/KYC/upload flows; verify deletion/recovery behavior; define malware/content handling; and verify public-vs-signed boundaries for all non-KYC product/media uploads.
+Still required before launch: complete route-level ownership regression coverage for all seller/admin/KYC/upload flows; verify recovery behavior under storage/database partial failures; define malware/content moderation handling; and verify remaining public-vs-signed media boundaries.
 
 ## P0-06 — Production deployment hardening
 
