@@ -72,6 +72,7 @@ jobs:
           cache: npm
 
       - name: Apply non-breaking audit fixes
+        continue-on-error: true
         run: npm audit fix --package-lock-only
 
       - name: Commit refreshed lockfile
