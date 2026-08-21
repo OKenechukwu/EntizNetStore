@@ -2,10 +2,14 @@
   "name": "entiznetstore",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "typecheck": "tsc --noEmit",
+    "verify:foundation": "node scripts/verify-production-foundation.mjs",
     "start": "PORT=${PORT:-3000} next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint"
   },
