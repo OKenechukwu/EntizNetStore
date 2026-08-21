@@ -27,10 +27,16 @@ function walk(relativePath) {
   });
 }
 
+function stripComments(content) {
+  return content
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
 // ---------------------------------------------------------------------------
 // Runtime/template residue that must never re-enter the production branch.
-// Historical provenance inside already-applied migrations is intentionally not
-// scanned because applied migrations are immutable.
+// Historical provenance inside already-applied migrations and explanatory code
+// comments is intentionally excluded: this gate targets executable assumptions.
 // ---------------------------------------------------------------------------
 const forbiddenPaths = [
   ".replit",
@@ -67,9 +73,9 @@ const forbiddenRuntimePatterns = [
 
 for (const relativePath of runtimeFiles) {
   if (!/\.(?:[cm]?[jt]sx?|json)$/.test(relativePath)) continue;
-  const content = read(relativePath);
+  const executableContent = stripComments(read(relativePath));
   for (const { label, regex } of forbiddenRuntimePatterns) {
-    if (regex.test(content)) fail(`${label} runtime assumption found in ${relativePath}`);
+    if (regex.test(executableContent)) fail(`${label} runtime assumption found in ${relativePath}`);
   }
 }
 
