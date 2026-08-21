@@ -8,7 +8,7 @@ export async function signUpEmailPassword(email: string, password: string) {
     email,
     password,
     options: {
-      // send user back to the SAME host they used (dev/prod/Replit/Bolt)
+      // Return to the same application origin used for the auth request.
       emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
