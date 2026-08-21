@@ -6,11 +6,12 @@ export const dynamic = "force-dynamic";
 // Public storefront data (seller profile + active products) from Supabase.
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const data = await getStorefront(params.id, {
+    const data = await getStorefront(id, {
       q: searchParams.get("q") ?? undefined,
       page: Number(searchParams.get("page") ?? 1) || 1,
       pageSize: Number(searchParams.get("pageSize") ?? 24) || 24,

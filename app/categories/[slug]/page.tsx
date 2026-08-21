@@ -7,9 +7,9 @@ import { getProductsByCategory } from "@/lib/data/products";
 export default async function CategoryPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const { slug } = params;
+  const { slug } = await params;
   const category = await getCatalogCategory(slug);
   if (!category) notFound();
 

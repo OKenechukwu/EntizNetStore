@@ -5,14 +5,14 @@ import { ObjectStorageService } from '@/server/objectStorage'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify trusted admin (server-validated user + app_metadata role)
     const { user, errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    const documentId = params.id
+    const { id: documentId } = await params
 
     // Get document details using admin client
     const { data: document, error: docError } = await getSupabaseAdmin()

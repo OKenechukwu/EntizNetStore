@@ -4,8 +4,9 @@ import { sellerProductSchema } from "../validation";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,7 +21,7 @@ export async function PATCH(
 
   const input = parsed.data;
   const { data, error } = await supabase.rpc("seller_save_product_v2", {
-    p_product_id: params.id,
+    p_product_id: id,
     p_title: input.title,
     p_description: input.description,
     p_base_price: input.basePrice,
@@ -37,8 +38,9 @@ export async function PATCH(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,7 +48,7 @@ export async function DELETE(
   const { data, error } = await supabase
     .from("products")
     .delete()
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("seller_id", user.id)
     .select("id")
     .maybeSingle();

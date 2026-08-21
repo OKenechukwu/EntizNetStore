@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '../../../../../lib/supabase/server';
 import ProductEditorForm from '@/components/seller/ProductEditorForm';
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createServerSupabase();
   
   const { data: { user }, error: sessionError } = await supabase.auth.getUser();
@@ -17,7 +18,7 @@ export default async function EditProductPage({ params }: { params: { id: string
     supabase
       .from('products')
       .select('id, title, description, base_price, compare_at_price, status, seller_id, product_media(url, position), product_variants(id, title, sku, price, inventory_quantity, is_active, position), product_categories(category_id)')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('seller_id', user.id)
       .single(),
     supabase.from('profiles_seller').select('verification_status').eq('id', user.id).maybeSingle(),

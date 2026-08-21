@@ -16,7 +16,7 @@ import ChatSellerButton from "@/components/product/ChatSellerButton";
 import type { Product } from "@/types/product";
 
 type Props = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 /* ---------------------------------- */
@@ -65,7 +65,8 @@ async function getStoreProducts(storeId: string, excludeId: string): Promise<Pro
 /* Metadata */
 /* ---------------------------------- */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const prod = await getProductFromDb(params.slug);
+  const { slug } = await params;
+  const prod = await getProductFromDb(slug);
 
   if (!prod) {
     return { title: "Product Not Found" };
@@ -81,7 +82,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /* Page */
 /* ---------------------------------- */
 export default async function ProductPage({ params }: Props) {
-  const product = await getProductFromDb(params.slug);
+  const { slug } = await params;
+  const product = await getProductFromDb(slug);
 
   if (!product) {
     notFound();
@@ -89,7 +91,7 @@ export default async function ProductPage({ params }: Props) {
 
   // Data for rows/tabs
   const [recommendations, sponsored, storeProducts] = await Promise.all([
-    getRecommendationsFromDb(params.slug),
+    getRecommendationsFromDb(slug),
     getSponsoredProductsDb(),
     product!.store ? getStoreProducts(product!.store.id, product!.id) : Promise.resolve([] as Product[]),
   ]);

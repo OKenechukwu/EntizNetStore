@@ -5,8 +5,9 @@ import FeaturedSection from "@/components/home/FeaturedSection";
 import { getCatalogBrand } from "@/lib/data/brands";
 import { getProductsByBrand } from "@/lib/data/products";
 
-export default async function BrandPage({ params }: { params: { slug: string } }) {
-  const brand = await getCatalogBrand(params.slug);
+export default async function BrandPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const brand = await getCatalogBrand(slug);
   if (!brand) notFound();
 
   const products = await getProductsByBrand(brand.id, "entiznetstore", 50);

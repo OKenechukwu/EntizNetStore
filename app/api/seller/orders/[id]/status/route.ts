@@ -10,9 +10,10 @@ const inputSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const orderId = z.string().uuid().safeParse(params.id);
+  const { id } = await params;
+  const orderId = z.string().uuid().safeParse(id);
   const input = inputSchema.safeParse(await request.json().catch(() => null));
   if (!orderId.success || !input.success) {
     return NextResponse.json({ error: "Invalid fulfillment update" }, { status: 400 });

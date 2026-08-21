@@ -4,10 +4,11 @@ import FeaturedSection from "@/components/home/FeaturedSection";
 import { getCatalogCategory } from "@/lib/data/categories";
 import { getProductsByCategory } from "@/lib/data/products";
 
-type Props = { params: { slug: string; subslug: string } };
+type Props = { params: Promise<{ slug: string; subslug: string }> };
 
 export async function generateMetadata({ params }: Props) {
-  const category = await getCatalogCategory(params.subslug);
+  const { subslug } = await params;
+  const category = await getCatalogCategory(subslug);
   return category
     ? {
         title: `${category.name} | EntizNetStore`,
@@ -17,9 +18,10 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function SubcategoryPage({ params }: Props) {
+  const { slug, subslug } = await params;
   const [parent, category] = await Promise.all([
-    getCatalogCategory(params.slug),
-    getCatalogCategory(params.subslug),
+    getCatalogCategory(slug),
+    getCatalogCategory(subslug),
   ]);
   if (!parent || !category || category.parent_id !== parent.id) notFound();
 

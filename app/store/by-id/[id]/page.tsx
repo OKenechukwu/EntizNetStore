@@ -18,8 +18,9 @@ type Product = {
 export default async function ProductDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   // Supabase fetch (server)
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +30,7 @@ export default async function ProductDetailPage({
   const { data, error } = await supabase
     .from("products")
     .select("id, title, description, price, images")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !data) {

@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 
-type PageProps = { params: { id: string } };
+type PageProps = { params: Promise<{ id: string }> };
 
 export default async function StoreItemPage({ params }: PageProps) {
-  const { id } = params;
+  const { id } = await params;
 
   // Protect the page (requires signed-in user)
   const supabase = await createServerSupabase();
