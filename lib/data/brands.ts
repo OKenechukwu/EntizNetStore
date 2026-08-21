@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export async function getCatalogBrands(marketplaceBrand = "entiznetstore") {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("brands")
     .select("id, name, slug, description, logo_url, is_verified, products!inner(id)")
@@ -22,7 +22,7 @@ export async function getCatalogBrands(marketplaceBrand = "entiznetstore") {
 }
 
 export async function getCatalogBrand(slug: string) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("brands")
     .select("id, name, slug, description, logo_url, banner_url, is_verified")

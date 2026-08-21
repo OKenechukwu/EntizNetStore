@@ -10,7 +10,7 @@ function money(cents: number) {
 }
 
 export default async function SellerAnalyticsPage() {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();

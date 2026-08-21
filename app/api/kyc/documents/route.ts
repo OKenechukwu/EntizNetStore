@@ -19,7 +19,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 export async function POST(request: NextRequest) {
   try {
     // Validate the user server-side
-    const serverSupabase = createServerSupabase()
+    const serverSupabase = await createServerSupabase()
     const { data: { user }, error: authError } = await serverSupabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

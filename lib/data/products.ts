@@ -73,7 +73,7 @@ function toProductSummary(row: SummaryRow): Product {
 
 /** Full product detail for the product page, including seller "store" info. */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: row } = await supabase
     .from("products")
     .select(
@@ -140,7 +140,7 @@ export async function getRelatedProducts(
   slug: string,
   limit = 8
 ): Promise<Product[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: base } = await supabase
     .from("products")
     .select("marketplace_brand")
@@ -166,7 +166,7 @@ export async function getFeaturedProducts(
   limit = 6,
   marketplaceBrand?: string,
 ): Promise<Product[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   let query = supabase
     .from("products")
     .select(SUMMARY_COLS)
@@ -189,7 +189,7 @@ export async function getProductsByCategory(
   marketplaceBrand = "entiznetstore",
   limit = 50,
 ): Promise<Product[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("product_categories")
     .select(`products!inner(${SUMMARY_COLS})`)
@@ -210,7 +210,7 @@ export async function getProductsByBrand(
   marketplaceBrand = "entiznetstore",
   limit = 50,
 ): Promise<Product[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("products")
     .select(SUMMARY_COLS)
@@ -229,7 +229,7 @@ export async function getSellerProducts(
   excludeId?: string,
   limit = 8
 ): Promise<Product[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   let q = supabase
     .from("products")
     .select(SUMMARY_COLS)
@@ -258,7 +258,7 @@ export async function searchProducts(opts: {
   onSale?: boolean;
   limit?: number;
 }) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   let q = supabase
     .from("products")
     .select(`${SUMMARY_COLS}, seller_id, created_at, updated_at, tags`)
@@ -325,7 +325,7 @@ export async function getStorefront(
   sellerIdOrSlug: string,
   opts: { q?: string; page?: number; pageSize?: number } = {}
 ) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const isUuid =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       sellerIdOrSlug

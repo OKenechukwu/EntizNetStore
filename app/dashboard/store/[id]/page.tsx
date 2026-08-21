@@ -9,7 +9,7 @@ export default async function StoreItemPage({ params }: PageProps) {
   const { id } = params;
 
   // Protect the page (requires signed-in user)
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();

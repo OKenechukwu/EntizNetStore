@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 // auth user; the client can never choose an ID or a verification status.
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabase()
+    const supabase = await createServerSupabase()
     const {
       data: { user },
       error: authError,

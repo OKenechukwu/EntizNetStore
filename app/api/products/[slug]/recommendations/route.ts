@@ -14,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { slug } = params;
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get the product to find its category
     const { data: product } = await supabase

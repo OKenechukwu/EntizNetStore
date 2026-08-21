@@ -11,7 +11,7 @@ import type {
 } from "./capabilityRouting";
 
 export async function resolveCapabilities(): Promise<Capabilities | null> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
     error,

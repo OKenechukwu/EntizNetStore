@@ -53,7 +53,8 @@ export default async function ProductDetailPage({
   const hero = gallery[0] ?? "/placeholder.png";
 
   // Currency preference + FX conversion
-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
+  const cookieStore = await cookies();
+  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
   const rates = await getFxRates();
   const displayAmount = convertFromBase(
     Number(product.price ?? 0),

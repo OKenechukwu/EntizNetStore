@@ -63,7 +63,7 @@ export function middleware(request: NextRequest) {
   // Light API telemetry headers (informational example)
   if (pathname.startsWith("/api/")) {
     const forwardedFor = request.headers.get("x-forwarded-for");
-    const ip = forwardedFor ? forwardedFor.split(",")[0] : request.ip;
+    const ip = forwardedFor ? forwardedFor.split(",")[0] : undefined;
     response.headers.set("X-RateLimit-Limit", "100");
     response.headers.set("X-RateLimit-Remaining", "99"); // placeholder
     response.headers.set("X-Client-IP", ip || "unknown");

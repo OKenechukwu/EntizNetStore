@@ -3,7 +3,7 @@ import { createServerSupabase } from '../../../../../lib/supabase/server';
 import ProductEditorForm from '@/components/seller/ProductEditorForm';
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   
   const { data: { user }, error: sessionError } = await supabase.auth.getUser();
 

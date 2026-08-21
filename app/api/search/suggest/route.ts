@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ suggestions: [] });
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Search for products by title (case-insensitive, prefix match)
     const { data: products, error } = await supabase

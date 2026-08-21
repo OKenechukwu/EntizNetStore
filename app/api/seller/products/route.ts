@@ -3,7 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { sellerProductSchema } from "./validation";
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

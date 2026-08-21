@@ -12,7 +12,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLandingPage() {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
     error,

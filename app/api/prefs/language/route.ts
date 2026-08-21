@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const chosen = SUPPORTED_LANGUAGES.find(l => l.code === next)?.code || DEFAULT_LANGUAGE;
 
   // 1 year, readable by client (not httpOnly) so your forms can read it
-  cookies().set("language", chosen, {
+  const cookieStore = await cookies();
+  cookieStore.set("language", chosen, {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",

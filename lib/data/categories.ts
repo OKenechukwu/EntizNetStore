@@ -12,7 +12,7 @@ export type CatalogCategory = {
 export async function getCatalogCategories(
   marketplaceBrand = "entiznetstore",
 ): Promise<CatalogCategory[]> {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const [categoriesResult, linksResult] = await Promise.all([
     supabase
       .from("categories")
@@ -47,7 +47,7 @@ export async function getCatalogCategories(
 }
 
 export async function getCatalogCategory(slug: string) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("categories")
     .select("id, parent_id, name, slug, description, image_url")

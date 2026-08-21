@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 // auth user — client-supplied IDs are never accepted.
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabase()
+    const supabase = await createServerSupabase()
     const {
       data: { user },
       error: authError,

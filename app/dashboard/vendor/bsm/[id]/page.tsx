@@ -73,7 +73,7 @@ export default async function BSMDetail({
 }: {
   params: { id: string };
 }) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
 
   // Viewer info (for role-based UI)
   const {

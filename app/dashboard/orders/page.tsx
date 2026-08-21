@@ -4,7 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import SellerOrderActions from "@/components/seller/SellerOrderActions";
 
 export default async function SellerOrdersPage() {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/sign-in");
 

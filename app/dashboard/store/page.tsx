@@ -18,7 +18,7 @@ type ProductRow = {
 
 export default async function DashboardStorePage() {
   // Auth (server-side)
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
     error: sessErr,
@@ -37,7 +37,8 @@ export default async function DashboardStorePage() {
   const products = (data ?? []) as ProductRow[];
 
   // Currency preference + FX rates
-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
+  const cookieStore = await cookies();
+  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
   const rates = await getFxRates();
 
   const header = (

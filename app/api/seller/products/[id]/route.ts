@@ -6,7 +6,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -39,7 +39,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
