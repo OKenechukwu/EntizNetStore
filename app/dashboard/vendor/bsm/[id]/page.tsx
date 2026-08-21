@@ -22,7 +22,7 @@ type RFQ = {
 // Try to fetch RFQs aimed at this BSM via a join table (rfq_targets),
 // then fall back to a direct column (rfqs.bsm_id).
 async function fetchRFQsForBSM(
-  supabase: ReturnType<typeof supabaseServer>,
+  supabase: Awaited<ReturnType<typeof supabaseServer>>,
   bsmCompanyId: string,
 ) {
   // 1) Attempt join-table pattern: rfq_targets (rfq_id, bsm_id) -> rfqs
@@ -71,8 +71,9 @@ async function fetchRFQsForBSM(
 export default async function BSMDetail({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await supabaseServer();
 
   // Viewer info (for role-based UI)
@@ -89,7 +90,7 @@ export default async function BSMDetail({
   const { data: company, error: companyErr } = await supabase
     .from("bsm_profile")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle<Company>();
 
   if (companyErr) {
