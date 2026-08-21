@@ -34,11 +34,42 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify production foundation
+        run: npm run verify:foundation
+
       - name: Type-check application
         run: npm run typecheck
 
       - name: Build production application
         run: npm run build
+
+  database-reproduction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Pin the latest stable release verified for this M0 baseline.
+          # Avoid `latest`: resolving it consumes GitHub release API quota and
+          # made otherwise valid reproduction runs fail nondeterministically.
+          version: 2.111.0
+
+      - name: Start fresh local Supabase stack
+        run: supabase start
+
+      - name: Reset from repository migrations and seed
+        run: supabase db reset --local
+
+      - name: Verify reproduced database invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-local-database.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
 
   dependency-audit:
     runs-on: ubuntu-latest

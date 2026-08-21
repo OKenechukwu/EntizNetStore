@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    // Get all categories with subcategory structure
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseAdmin()
       .from('categories')
       .select('*')
       .order('sort_order')
-    
-    if (error) {
-      throw error
-    }
 
+    if (error) throw error
     return NextResponse.json({ categories: data || [] })
-
   } catch (error: any) {
     console.error('Error fetching categories:', error)
     return NextResponse.json(
@@ -34,61 +25,57 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { name, slug, description, parent_id, is_active, sort_order } = body
 
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Category name is required' },
-        { status: 400 }
-      )
+    if (!name || typeof name !== 'string') {
+      return NextResponse.json({ error: 'Category name is required' }, { status: 400 })
     }
 
-    // Generate slug if not provided
-    const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const finalSlug = String(slug || name)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
 
-    // Check if slug already exists
-    const { data: existingCategory } = await supabase
+    if (!finalSlug) {
+      return NextResponse.json({ error: 'Category slug is invalid' }, { status: 400 })
+    }
+
+    const admin = getSupabaseAdmin()
+    const { data: existingCategory } = await admin
       .from('categories')
       .select('id')
       .eq('slug', finalSlug)
-      .single()
+      .maybeSingle()
 
     if (existingCategory) {
       return NextResponse.json(
         { error: 'A category with this slug already exists' },
-        { status: 400 }
+        { status: 409 }
       )
     }
 
-    // Create category
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('categories')
       .insert({
-        name,
+        name: name.trim(),
         slug: finalSlug,
         description: description || null,
         parent_id: parent_id || null,
-        is_adult: true, // Adult marketplace
-        sort_order: sort_order || 0,
+        is_adult: true,
+        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
         is_active: is_active ?? true,
         metadata: {}
       })
       .select()
       .single()
 
-    if (error) {
-      throw error
-    }
-
-    return NextResponse.json({ category: data })
-
+    if (error) throw error
+    return NextResponse.json({ category: data }, { status: 201 })
   } catch (error: any) {
     console.error('Error creating category:', error)
     return NextResponse.json(
@@ -100,49 +87,52 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { id, name, slug, description, parent_id, is_active, sort_order } = body
 
-    if (!id || !name) {
+    if (!id || !name || typeof name !== 'string') {
       return NextResponse.json(
         { error: 'Category ID and name are required' },
         { status: 400 }
       )
     }
 
-    // Generate slug if not provided
-    const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const finalSlug = String(slug || name)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
 
-    // Check if slug already exists (excluding current category)
-    const { data: existingCategory } = await supabase
+    if (!finalSlug) {
+      return NextResponse.json({ error: 'Category slug is invalid' }, { status: 400 })
+    }
+
+    const admin = getSupabaseAdmin()
+    const { data: existingCategory } = await admin
       .from('categories')
       .select('id')
       .eq('slug', finalSlug)
       .neq('id', id)
-      .single()
+      .maybeSingle()
 
     if (existingCategory) {
       return NextResponse.json(
         { error: 'A category with this slug already exists' },
-        { status: 400 }
+        { status: 409 }
       )
     }
 
-    // Update category
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('categories')
       .update({
-        name,
+        name: name.trim(),
         slug: finalSlug,
         description: description || null,
         parent_id: parent_id || null,
-        sort_order: sort_order || 0,
+        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
         is_active: is_active ?? true,
         updated_at: new Date().toISOString()
       })
@@ -150,12 +140,8 @@ export async function PUT(request: NextRequest) {
       .select()
       .single()
 
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
     return NextResponse.json({ category: data })
-
   } catch (error: any) {
     console.error('Error updating category:', error)
     return NextResponse.json(
@@ -167,60 +153,44 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    const { searchParams } = new URL(request.url)
-    const categoryId = searchParams.get('id')
-
+    const categoryId = new URL(request.url).searchParams.get('id')
     if (!categoryId) {
-      return NextResponse.json(
-        { error: 'Category ID is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
     }
 
-    // Check if category has products
-    const { count: productCount } = await supabase
-      .from('product_categories')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', categoryId)
+    const admin = getSupabaseAdmin()
+    const [{ count: productCount }, { count: subcategoryCount }] = await Promise.all([
+      admin
+        .from('product_categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', categoryId),
+      admin
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_id', categoryId)
+    ])
 
-    if (productCount && productCount > 0) {
+    if ((productCount || 0) > 0) {
       return NextResponse.json(
         { error: 'Cannot delete category that has associated products' },
-        { status: 400 }
+        { status: 409 }
       )
     }
 
-    // Check if category has subcategories
-    const { count: subcategoryCount } = await supabase
-      .from('categories')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_id', categoryId)
-
-    if (subcategoryCount && subcategoryCount > 0) {
+    if ((subcategoryCount || 0) > 0) {
       return NextResponse.json(
         { error: 'Cannot delete category that has subcategories' },
-        { status: 400 }
+        { status: 409 }
       )
     }
 
-    // Delete category
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', categoryId)
-
-    if (error) {
-      throw error
-    }
+    const { error } = await admin.from('categories').delete().eq('id', categoryId)
+    if (error) throw error
 
     return NextResponse.json({ success: true })
-
   } catch (error: any) {
     console.error('Error deleting category:', error)
     return NextResponse.json(

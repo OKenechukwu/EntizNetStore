@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    const { searchParams } = new URL(request.url)
-    const brand = searchParams.get('brand') || 'entiznetstore'
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    // Get featured products with product details
-    const { data, error } = await supabase
+    const brand = new URL(request.url).searchParams.get('brand') || 'entiznetstore'
+    const { data, error } = await getSupabaseAdmin()
       .from('featured_products')
       .select(`
         *,
@@ -22,13 +16,9 @@ export async function GET(request: NextRequest) {
       `)
       .eq('marketplace_brand', brand)
       .order('sort_order')
-    
-    if (error) {
-      throw error
-    }
 
+    if (error) throw error
     return NextResponse.json({ featuredProducts: data || [] })
-
   } catch (error: any) {
     console.error('Error fetching featured products:', error)
     return NextResponse.json(
@@ -40,25 +30,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
     const body = await request.json()
-    const { 
-      product_id, 
-      marketplace_brand, 
-      feature_type, 
-      title, 
-      description, 
-      image_url, 
-      link_url, 
-      sort_order, 
-      is_active, 
-      starts_at, 
-      ends_at 
+    const {
+      product_id,
+      marketplace_brand = 'entiznetstore',
+      feature_type,
+      title,
+      description,
+      image_url,
+      link_url,
+      sort_order,
+      is_active,
+      starts_at,
+      ends_at
     } = body
 
     if (!product_id || !feature_type) {
@@ -68,27 +55,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify the product exists and belongs to the correct brand
-    const { data: product, error: productError } = await supabase
+    const admin = getSupabaseAdmin()
+    const { data: product, error: productError } = await admin
       .from('products')
       .select('marketplace_brand, status')
       .eq('id', product_id)
-      .single()
+      .maybeSingle()
 
     if (productError || !product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
-
     if (product.marketplace_brand !== marketplace_brand) {
       return NextResponse.json(
         { error: 'Product does not belong to the specified marketplace brand' },
         { status: 400 }
       )
     }
-
     if (product.status !== 'active') {
       return NextResponse.json(
         { error: 'Only active products can be featured' },
@@ -96,8 +78,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create featured product
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('featured_products')
       .insert({
         product_id,
@@ -107,7 +88,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         image_url: image_url || null,
         link_url: link_url || null,
-        sort_order: sort_order || 0,
+        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
         is_active: is_active ?? true,
         starts_at: starts_at ? new Date(starts_at).toISOString() : new Date().toISOString(),
         ends_at: ends_at ? new Date(ends_at).toISOString() : null,
@@ -116,12 +97,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) {
-      throw error
-    }
-
-    return NextResponse.json({ featuredProduct: data })
-
+    if (error) throw error
+    return NextResponse.json({ featuredProduct: data }, { status: 201 })
   } catch (error: any) {
     console.error('Error creating featured product:', error)
     return NextResponse.json(
@@ -133,25 +110,22 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
     const body = await request.json()
-    const { 
+    const {
       id,
-      product_id, 
-      feature_type, 
-      title, 
-      description, 
-      image_url, 
-      link_url, 
-      sort_order, 
-      is_active, 
-      starts_at, 
-      ends_at 
+      product_id,
+      feature_type,
+      title,
+      description,
+      image_url,
+      link_url,
+      sort_order,
+      is_active,
+      starts_at,
+      ends_at
     } = body
 
     if (!id) {
@@ -161,8 +135,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Update featured product
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseAdmin()
       .from('featured_products')
       .update({
         product_id,
@@ -171,7 +144,7 @@ export async function PUT(request: NextRequest) {
         description: description || null,
         image_url: image_url || null,
         link_url: link_url || null,
-        sort_order: sort_order || 0,
+        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
         is_active: is_active ?? true,
         starts_at: starts_at ? new Date(starts_at).toISOString() : new Date().toISOString(),
         ends_at: ends_at ? new Date(ends_at).toISOString() : null,
@@ -181,12 +154,8 @@ export async function PUT(request: NextRequest) {
       .select()
       .single()
 
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
     return NextResponse.json({ featuredProduct: data })
-
   } catch (error: any) {
     console.error('Error updating featured product:', error)
     return NextResponse.json(
@@ -198,15 +167,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createServerComponentClient({ cookies })
-    
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
-    const { searchParams } = new URL(request.url)
-    const featuredId = searchParams.get('id')
-
+    const featuredId = new URL(request.url).searchParams.get('id')
     if (!featuredId) {
       return NextResponse.json(
         { error: 'Featured product ID is required' },
@@ -214,18 +178,13 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete featured product
-    const { error } = await supabase
+    const { error } = await getSupabaseAdmin()
       .from('featured_products')
       .delete()
       .eq('id', featuredId)
 
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
     return NextResponse.json({ success: true })
-
   } catch (error: any) {
     console.error('Error deleting featured product:', error)
     return NextResponse.json(

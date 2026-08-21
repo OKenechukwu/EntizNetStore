@@ -1,2 +1,4 @@
 [db]
-major_version = 15
+# Keep local/CI database reproduction aligned with the canonical production
+# PostgreSQL major version (production verified on PostgreSQL 17.6 in M0).
+major_version = 17
