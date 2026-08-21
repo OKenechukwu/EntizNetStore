@@ -1,0 +1,713 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index afe1e7d..496d175 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -12,7 +12,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
+ export const dynamic = "force-dynamic";
+ 
+ export default async function AdminLandingPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+     error,
+diff --git a/app/api/bsm/search/route.ts b/app/api/bsm/search/route.ts
+index e0ec676..05deb33 100644
+--- a/app/api/bsm/search/route.ts
++++ b/app/api/bsm/search/route.ts
+@@ -5,7 +5,7 @@ export async function GET(req: Request) {
+   const { searchParams } = new URL(req.url);
+   const q = (searchParams.get("q") || "").trim();
+ 
+-  const supabase = supabaseServer();
++  const supabase = await supabaseServer();
+   let query = supabase.from("bsm_directory").select("*").limit(50);
+ 
+   if (q) query = query.ilike("company_name", `%${q}%`);
+diff --git a/app/api/chat/send/route.ts b/app/api/chat/send/route.ts
+index 78065b3..41de072 100644
+--- a/app/api/chat/send/route.ts
++++ b/app/api/chat/send/route.ts
+@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
+       );
+     }
+ 
+-    const supabase = createClient();
++    const supabase = await createClient();
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user) {
+       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+diff --git a/app/api/chat/start/route.ts b/app/api/chat/start/route.ts
+index 56ceac3..f99564e 100644
+--- a/app/api/chat/start/route.ts
++++ b/app/api/chat/start/route.ts
+@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
+       return NextResponse.json({ error: "Seller ID required" }, { status: 400 });
+     }
+ 
+-    const supabase = createClient();
++    const supabase = await createClient();
+ 
+     // Get current user
+     const {
+diff --git a/app/api/kyc/documents/route.ts b/app/api/kyc/documents/route.ts
+index 39a523b..e697678 100644
+--- a/app/api/kyc/documents/route.ts
++++ b/app/api/kyc/documents/route.ts
+@@ -19,7 +19,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+ export async function POST(request: NextRequest) {
+   try {
+     // Validate the user server-side
+-    const serverSupabase = createServerSupabase()
++    const serverSupabase = await createServerSupabase()
+     const { data: { user }, error: authError } = await serverSupabase.auth.getUser()
+     if (authError || !user) {
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+diff --git a/app/api/kyc/upload/route.ts b/app/api/kyc/upload/route.ts
+index 60964c0..14a88b1 100644
+--- a/app/api/kyc/upload/route.ts
++++ b/app/api/kyc/upload/route.ts
+@@ -16,7 +16,7 @@ type DocumentType = typeof VALID_DOCUMENT_TYPES[number]
+ export async function POST(request: NextRequest) {
+   try {
+     // Validate the user server-side
+-    const supabase = createServerSupabase()
++    const supabase = await createServerSupabase()
+     const { data: { user }, error: authError } = await supabase.auth.getUser()
+     if (authError || !user) {
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+diff --git a/app/api/onboarding/buyer/route.ts b/app/api/onboarding/buyer/route.ts
+index bc9ce1d..304d014 100644
+--- a/app/api/onboarding/buyer/route.ts
++++ b/app/api/onboarding/buyer/route.ts
+@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
+ // auth user — client-supplied IDs are never accepted.
+ export async function POST(request: NextRequest) {
+   try {
+-    const supabase = createServerSupabase()
++    const supabase = await createServerSupabase()
+     const {
+       data: { user },
+       error: authError,
+diff --git a/app/api/onboarding/seller/route.ts b/app/api/onboarding/seller/route.ts
+index dc01756..05cd9cd 100644
+--- a/app/api/onboarding/seller/route.ts
++++ b/app/api/onboarding/seller/route.ts
+@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
+ // auth user; the client can never choose an ID or a verification status.
+ export async function POST(request: NextRequest) {
+   try {
+-    const supabase = createServerSupabase()
++    const supabase = await createServerSupabase()
+     const {
+       data: { user },
+       error: authError,
+diff --git a/app/api/payments/create-intent/route.ts b/app/api/payments/create-intent/route.ts
+index 15b1c37..2811f42 100644
+--- a/app/api/payments/create-intent/route.ts
++++ b/app/api/payments/create-intent/route.ts
+@@ -28,7 +28,7 @@ function stripeClient() {
+ }
+ 
+ export async function POST(request: NextRequest) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ 
+diff --git a/app/api/payments/request-payout/route.ts b/app/api/payments/request-payout/route.ts
+index 1b0fcc1..e09939b 100644
+--- a/app/api/payments/request-payout/route.ts
++++ b/app/api/payments/request-payout/route.ts
+@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
+ import { createServerSupabase } from "@/lib/supabase/server";
+ 
+ export async function POST() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ 
+diff --git a/app/api/prefs/currency/route.ts b/app/api/prefs/currency/route.ts
+index ced6429..425c738 100644
+--- a/app/api/prefs/currency/route.ts
++++ b/app/api/prefs/currency/route.ts
+@@ -11,7 +11,8 @@ export async function POST(request: Request) {
+   const chosen = toCurrencyCode(currency);
+ 
+   // 1 year, readable by client (not httpOnly) so your forms can read it
+-  cookies().set("currency", chosen, {
++  const cookieStore = await cookies();
++  cookieStore.set("currency", chosen, {
+     path: "/",
+     maxAge: 60 * 60 * 24 * 365,
+     sameSite: "lax",
+diff --git a/app/api/prefs/language/route.ts b/app/api/prefs/language/route.ts
+index abcea7f..b5783f5 100644
+--- a/app/api/prefs/language/route.ts
++++ b/app/api/prefs/language/route.ts
+@@ -12,7 +12,8 @@ export async function POST(request: Request) {
+   const chosen = SUPPORTED_LANGUAGES.find(l => l.code === next)?.code || DEFAULT_LANGUAGE;
+ 
+   // 1 year, readable by client (not httpOnly) so your forms can read it
+-  cookies().set("language", chosen, {
++  const cookieStore = await cookies();
++  cookieStore.set("language", chosen, {
+     path: "/",
+     maxAge: 60 * 60 * 24 * 365,
+     sameSite: "lax",
+@@ -20,4 +21,4 @@ export async function POST(request: Request) {
+   });
+ 
+   return new NextResponse(null, { status: 204 });
+-}
+\ No newline at end of file
++}
+diff --git a/app/api/products/[slug]/recommendations/route.ts b/app/api/products/[slug]/recommendations/route.ts
+index 484caaa..44368d0 100644
+--- a/app/api/products/[slug]/recommendations/route.ts
++++ b/app/api/products/[slug]/recommendations/route.ts
+@@ -14,7 +14,7 @@ export async function GET(
+ ) {
+   try {
+     const { slug } = params;
+-    const supabase = createClient();
++    const supabase = await createClient();
+ 
+     // Get the product to find its category
+     const { data: product } = await supabase
+diff --git a/app/api/search/suggest/route.ts b/app/api/search/suggest/route.ts
+index 30700c9..b2f7dcd 100644
+--- a/app/api/search/suggest/route.ts
++++ b/app/api/search/suggest/route.ts
+@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
+       return NextResponse.json({ suggestions: [] });
+     }
+ 
+-    const supabase = createClient();
++    const supabase = await createClient();
+ 
+     // Search for products by title (case-insensitive, prefix match)
+     const { data: products, error } = await supabase
+diff --git a/app/api/seller/orders/[id]/status/route.ts b/app/api/seller/orders/[id]/status/route.ts
+index 93f314d..562156e 100644
+--- a/app/api/seller/orders/[id]/status/route.ts
++++ b/app/api/seller/orders/[id]/status/route.ts
+@@ -18,7 +18,7 @@ export async function POST(
+     return NextResponse.json({ error: "Invalid fulfillment update" }, { status: 400 });
+   }
+ 
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+diff --git a/app/api/seller/products/[id]/route.ts b/app/api/seller/products/[id]/route.ts
+index 0e25d8a..902f21f 100644
+--- a/app/api/seller/products/[id]/route.ts
++++ b/app/api/seller/products/[id]/route.ts
+@@ -6,7 +6,7 @@ export async function PATCH(
+   request: NextRequest,
+   { params }: { params: { id: string } },
+ ) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ 
+@@ -39,7 +39,7 @@ export async function DELETE(
+   _request: NextRequest,
+   { params }: { params: { id: string } },
+ ) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ 
+diff --git a/app/api/seller/products/route.ts b/app/api/seller/products/route.ts
+index fc728c4..6444d0c 100644
+--- a/app/api/seller/products/route.ts
++++ b/app/api/seller/products/route.ts
+@@ -3,7 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
+ import { sellerProductSchema } from "./validation";
+ 
+ export async function POST(request: NextRequest) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ 
+diff --git a/app/bsm/apply/page.tsx b/app/bsm/apply/page.tsx
+index 33bc80b..1eae936 100644
+--- a/app/bsm/apply/page.tsx
++++ b/app/bsm/apply/page.tsx
+@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
+ import { createServerSupabase } from "@/lib/supabase/server";
+ 
+ export default async function BSMApplyPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   
+   if (!user) {
+diff --git a/app/dashboard/bsm/vendors/actions.ts b/app/dashboard/bsm/vendors/actions.ts
+index 8fe6db4..82290bd 100644
+--- a/app/dashboard/bsm/vendors/actions.ts
++++ b/app/dashboard/bsm/vendors/actions.ts
+@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
+ import { requireRole } from "@/lib/auth/requireRole";
+ 
+ // ---------- Supabase server client ----------
+-function sb() {
+-  return createClient();
++async function sb() {
++  return await createClient();
+ }
+ 
+ // ---------- Role gate (BSM only) ----------
+@@ -61,7 +61,7 @@ const ListMyQuotesSchema = z.object({
+ // ---------- RFQ fetch (matches your table: rfq) ----------
+ export async function getRFQ(rfq_id: string) {
+   await assertBSM();
+-  const supabase = sb();
++  const supabase = await sb();
+ 
+   const { data: rfq, error } = await supabase
+     .from("rfq")
+@@ -109,7 +109,7 @@ export async function createQuotation(
+ ) {
+   const gate = await assertBSM();
+   const parsed = CreateQuoteSchema.parse(input);
+-  const supabase = sb();
++  const supabase = await sb();
+ 
+   const rfq = await getRFQ(parsed.rfq_id);
+   const qty = Number(parsed.quantity ?? rfq.quantity ?? 1);
+@@ -162,7 +162,7 @@ export async function updateQuotationStatus(
+ ) {
+   await assertBSM();
+   const parsed = UpdateQuoteStatusSchema.parse(input);
+-  const supabase = sb();
++  const supabase = await sb();
+   const { error } = await supabase
+     .from("quotations")
+     .update({ status: parsed.status })
+@@ -177,7 +177,7 @@ export async function listMyQuotations(
+ ) {
+   const gate = await assertBSM();
+   const { status, limit, offset } = ListMyQuotesSchema.parse(input ?? {});
+-  const supabase = sb();
++  const supabase = await sb();
+ 
+   let q = supabase
+     .from("quotations")
+diff --git a/app/dashboard/buyer/orders/page.tsx b/app/dashboard/buyer/orders/page.tsx
+index ae47d9f..334055c 100644
+--- a/app/dashboard/buyer/orders/page.tsx
++++ b/app/dashboard/buyer/orders/page.tsx
+@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
+ import { createServerSupabase } from "@/lib/supabase/server";
+ 
+ export default async function BuyerOrdersPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+diff --git a/app/dashboard/orders/page.tsx b/app/dashboard/orders/page.tsx
+index 53a8dc1..53fb371 100644
+--- a/app/dashboard/orders/page.tsx
++++ b/app/dashboard/orders/page.tsx
+@@ -4,7 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
+ import SellerOrderActions from "@/components/seller/SellerOrderActions";
+ 
+ export default async function SellerOrdersPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) redirect("/auth/sign-in");
+ 
+diff --git a/app/dashboard/seller/analytics/page.tsx b/app/dashboard/seller/analytics/page.tsx
+index a365173..aa8048e 100644
+--- a/app/dashboard/seller/analytics/page.tsx
++++ b/app/dashboard/seller/analytics/page.tsx
+@@ -10,7 +10,7 @@ function money(cents: number) {
+ }
+ 
+ export default async function SellerAnalyticsPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+diff --git a/app/dashboard/store/[id]/edit/page.tsx b/app/dashboard/store/[id]/edit/page.tsx
+index 8e01ef2..65dcaad 100644
+--- a/app/dashboard/store/[id]/edit/page.tsx
++++ b/app/dashboard/store/[id]/edit/page.tsx
+@@ -3,7 +3,7 @@ import { createServerSupabase } from '../../../../../lib/supabase/server';
+ import ProductEditorForm from '@/components/seller/ProductEditorForm';
+ 
+ export default async function EditProductPage({ params }: { params: { id: string } }) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   
+   const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+ 
+diff --git a/app/dashboard/store/[id]/page.tsx b/app/dashboard/store/[id]/page.tsx
+index 1d1813e..6e4b7bc 100644
+--- a/app/dashboard/store/[id]/page.tsx
++++ b/app/dashboard/store/[id]/page.tsx
+@@ -9,7 +9,7 @@ export default async function StoreItemPage({ params }: PageProps) {
+   const { id } = params;
+ 
+   // Protect the page (requires signed-in user)
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+diff --git a/app/dashboard/store/new/page.tsx b/app/dashboard/store/new/page.tsx
+index 96980b8..9da7024 100644
+--- a/app/dashboard/store/new/page.tsx
++++ b/app/dashboard/store/new/page.tsx
+@@ -4,7 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
+ import ProductEditorForm from "@/components/seller/ProductEditorForm";
+ 
+ export default async function NewProductPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+ 
+   const {
+     data: { user },
+diff --git a/app/dashboard/store/page.tsx b/app/dashboard/store/page.tsx
+index 52462ee..e134d2c 100644
+--- a/app/dashboard/store/page.tsx
++++ b/app/dashboard/store/page.tsx
+@@ -18,7 +18,7 @@ type ProductRow = {
+ 
+ export default async function DashboardStorePage() {
+   // Auth (server-side)
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+     error: sessErr,
+@@ -37,7 +37,8 @@ export default async function DashboardStorePage() {
+   const products = (data ?? []) as ProductRow[];
+ 
+   // Currency preference + FX rates
+-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
++  const cookieStore = await cookies();
++  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
+   const rates = await getFxRates();
+ 
+   const header = (
+diff --git a/app/dashboard/vendor/bsm/[id]/page.tsx b/app/dashboard/vendor/bsm/[id]/page.tsx
+index b15d0cb..a745f76 100644
+--- a/app/dashboard/vendor/bsm/[id]/page.tsx
++++ b/app/dashboard/vendor/bsm/[id]/page.tsx
+@@ -73,7 +73,7 @@ export default async function BSMDetail({
+ }: {
+   params: { id: string };
+ }) {
+-  const supabase = supabaseServer();
++  const supabase = await supabaseServer();
+ 
+   // Viewer info (for role-based UI)
+   const {
+diff --git a/app/layout.tsx b/app/layout.tsx
+index c510fce..f71a5b5 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -37,8 +37,8 @@ function clampLocale(candidate: string | undefined, supported: string[]): string
+   return supported.includes(lc) ? lc : "en";
+ }
+ 
+-export default function RootLayout({ children }: { children: React.ReactNode }) {
+-  const c = cookies();
++export default async function RootLayout({ children }: { children: React.ReactNode }) {
++  const c = await cookies();
+ 
+   // ✅ Read new cookie names first, fall back to legacy ones
+   const cookieLocaleRaw =
+diff --git a/app/seller/apply/page.tsx b/app/seller/apply/page.tsx
+index d504516..ee58df9 100644
+--- a/app/seller/apply/page.tsx
++++ b/app/seller/apply/page.tsx
+@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
+ import { createServerSupabase } from "@/lib/supabase/server";
+ 
+ export default async function SellerApplyPage() {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: { user } } = await supabase.auth.getUser();
+   
+   if (!user) {
+diff --git a/app/store/by-id/[id]/page.tsx b/app/store/by-id/[id]/page.tsx
+index 6a78aba..bdbfa9b 100644
+--- a/app/store/by-id/[id]/page.tsx
++++ b/app/store/by-id/[id]/page.tsx
+@@ -53,7 +53,8 @@ export default async function ProductDetailPage({
+   const hero = gallery[0] ?? "/placeholder.png";
+ 
+   // Currency preference + FX conversion
+-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
++  const cookieStore = await cookies();
++  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
+   const rates = await getFxRates();
+   const displayAmount = convertFromBase(
+     Number(product.price ?? 0),
+diff --git a/components/i18n/I18nText.tsx b/components/i18n/I18nText.tsx
+index 1127431..bbc7fba 100644
+--- a/components/i18n/I18nText.tsx
++++ b/components/i18n/I18nText.tsx
+@@ -1,10 +1,10 @@
+ 'use client';
+ 
+-import { useEffect, useState } from 'react';
++import { useEffect, useState, type ElementType } from 'react';
+ import { useI18n } from './I18nProvider';
+ import { translate } from '@/lib/i18n/translate';
+ 
+-type TagName = keyof JSX.IntrinsicElements | React.JSXElementConstructor<any>;
++type TagName = ElementType;
+ 
+ export default function I18nText({
+   text,
+diff --git a/components/kyc/DocumentUpload.tsx b/components/kyc/DocumentUpload.tsx
+index 77eccc5..7867851 100644
+--- a/components/kyc/DocumentUpload.tsx
++++ b/components/kyc/DocumentUpload.tsx
+@@ -259,7 +259,9 @@ export default function DocumentUpload({
+                 </button>
+ 
+                 <input
+-                  ref={el => fileInputRefs.current[docType.key] = el}
++                  ref={(el) => {
++                    fileInputRefs.current[docType.key] = el;
++                  }}
+                   type="file"
+                   accept={docType.accept}
+                   className="hidden"
+@@ -341,4 +343,4 @@ export default function DocumentUpload({
+       </div>
+     </div>
+   )
+-}
+\ No newline at end of file
++}
+diff --git a/components/layout/SearchSuggestions.tsx b/components/layout/SearchSuggestions.tsx
+index 411b92a..0aab054 100644
+--- a/components/layout/SearchSuggestions.tsx
++++ b/components/layout/SearchSuggestions.tsx
+@@ -31,7 +31,7 @@ export default function SearchSuggestions({ className }: Props) {
+ 
+   const inputRef = useRef<HTMLInputElement>(null);
+   const dropdownRef = useRef<HTMLDivElement>(null);
+-  const debounceTimer = useRef<NodeJS.Timeout>();
++  const debounceTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+ 
+   // Fetch suggestions
+   const fetchSuggestions = useCallback(async (searchQuery: string) => {
+diff --git a/components/search/AdvancedSearch.tsx b/components/search/AdvancedSearch.tsx
+index 4f74ad9..38c5dea 100644
+--- a/components/search/AdvancedSearch.tsx
++++ b/components/search/AdvancedSearch.tsx
+@@ -38,7 +38,7 @@ export default function AdvancedSearch({
+   const [showFilters, setShowFilters] = useState(!compact)
+   const [categories, setCategories] = useState<any[]>([])
+   const [availableBrands, setAvailableBrands] = useState<any[]>([])
+-  const debounceRef = useRef<NodeJS.Timeout>()
++  const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined)
+   const supabase = getSupabaseClient()
+ 
+   useEffect(() => {
+diff --git a/i18n/server.ts b/i18n/server.ts
+index 25102a9..e483299 100644
+--- a/i18n/server.ts
++++ b/i18n/server.ts
+@@ -16,8 +16,8 @@ function getFromDict(dict: any, key: string) {
+     .reduce<any>((a, p) => (a && a[p] != null ? a[p] : undefined), dict);
+ }
+ 
+-export function getServerI18n() {
+-  const c = cookies();
++export async function getServerI18n() {
++  const c = await cookies();
+   const cookieLocale = c.get("locale")?.value || "en";
+   const locale = clamp(cookieLocale);
+   const dict = (DICTS as any)[locale] ?? (DICTS as any).en;
+diff --git a/lib/auth/capabilities.ts b/lib/auth/capabilities.ts
+index 96a7192..3184338 100644
+--- a/lib/auth/capabilities.ts
++++ b/lib/auth/capabilities.ts
+@@ -11,7 +11,7 @@ import type {
+ } from "./capabilityRouting";
+ 
+ export async function resolveCapabilities(): Promise<Capabilities | null> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const {
+     data: { user },
+     error,
+diff --git a/lib/auth/requireAdmin.ts b/lib/auth/requireAdmin.ts
+index 5e6f6c0..bfd84fb 100644
+--- a/lib/auth/requireAdmin.ts
++++ b/lib/auth/requireAdmin.ts
+@@ -10,7 +10,7 @@ export type RequireAdminResult =
+   | { user: null; errorResponse: NextResponse }
+ 
+ export async function requireAdmin(): Promise<RequireAdminResult> {
+-  const supabase = createServerSupabase()
++  const supabase = await createServerSupabase()
+   const {
+     data: { user },
+     error,
+diff --git a/lib/data/brands.ts b/lib/data/brands.ts
+index c08faa5..a490ab5 100644
+--- a/lib/data/brands.ts
++++ b/lib/data/brands.ts
+@@ -1,7 +1,7 @@
+ import { createServerSupabase } from "@/lib/supabase/server";
+ 
+ export async function getCatalogBrands(marketplaceBrand = "entiznetstore") {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data, error } = await supabase
+     .from("brands")
+     .select("id, name, slug, description, logo_url, is_verified, products!inner(id)")
+@@ -22,7 +22,7 @@ export async function getCatalogBrands(marketplaceBrand = "entiznetstore") {
+ }
+ 
+ export async function getCatalogBrand(slug: string) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data, error } = await supabase
+     .from("brands")
+     .select("id, name, slug, description, logo_url, banner_url, is_verified")
+diff --git a/lib/data/categories.ts b/lib/data/categories.ts
+index b3a2131..5f443eb 100644
+--- a/lib/data/categories.ts
++++ b/lib/data/categories.ts
+@@ -12,7 +12,7 @@ export type CatalogCategory = {
+ export async function getCatalogCategories(
+   marketplaceBrand = "entiznetstore",
+ ): Promise<CatalogCategory[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const [categoriesResult, linksResult] = await Promise.all([
+     supabase
+       .from("categories")
+@@ -47,7 +47,7 @@ export async function getCatalogCategories(
+ }
+ 
+ export async function getCatalogCategory(slug: string) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data, error } = await supabase
+     .from("categories")
+     .select("id, parent_id, name, slug, description, image_url")
+diff --git a/lib/data/products.ts b/lib/data/products.ts
+index 09f371e..f4917c5 100644
+--- a/lib/data/products.ts
++++ b/lib/data/products.ts
+@@ -73,7 +73,7 @@ function toProductSummary(row: SummaryRow): Product {
+ 
+ /** Full product detail for the product page, including seller "store" info. */
+ export async function getProductBySlug(slug: string): Promise<Product | null> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: row } = await supabase
+     .from("products")
+     .select(
+@@ -140,7 +140,7 @@ export async function getRelatedProducts(
+   slug: string,
+   limit = 8
+ ): Promise<Product[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data: base } = await supabase
+     .from("products")
+     .select("marketplace_brand")
+@@ -166,7 +166,7 @@ export async function getFeaturedProducts(
+   limit = 6,
+   marketplaceBrand?: string,
+ ): Promise<Product[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   let query = supabase
+     .from("products")
+     .select(SUMMARY_COLS)
+@@ -189,7 +189,7 @@ export async function getProductsByCategory(
+   marketplaceBrand = "entiznetstore",
+   limit = 50,
+ ): Promise<Product[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data } = await supabase
+     .from("product_categories")
+     .select(`products!inner(${SUMMARY_COLS})`)
+@@ -210,7 +210,7 @@ export async function getProductsByBrand(
+   marketplaceBrand = "entiznetstore",
+   limit = 50,
+ ): Promise<Product[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const { data } = await supabase
+     .from("products")
+     .select(SUMMARY_COLS)
+@@ -229,7 +229,7 @@ export async function getSellerProducts(
+   excludeId?: string,
+   limit = 8
+ ): Promise<Product[]> {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   let q = supabase
+     .from("products")
+     .select(SUMMARY_COLS)
+@@ -258,7 +258,7 @@ export async function searchProducts(opts: {
+   onSale?: boolean;
+   limit?: number;
+ }) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   let q = supabase
+     .from("products")
+     .select(`${SUMMARY_COLS}, seller_id, created_at, updated_at, tags`)
+@@ -325,7 +325,7 @@ export async function getStorefront(
+   sellerIdOrSlug: string,
+   opts: { q?: string; page?: number; pageSize?: number } = {}
+ ) {
+-  const supabase = createServerSupabase();
++  const supabase = await createServerSupabase();
+   const isUuid =
+     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+       sellerIdOrSlug
+diff --git a/lib/supabase/server.ts b/lib/supabase/server.ts
+index f29baad..dc6a825 100644
+--- a/lib/supabase/server.ts
++++ b/lib/supabase/server.ts
+@@ -1,8 +1,8 @@
+ import { cookies } from "next/headers";
+ import { createServerClient } from "@supabase/ssr";
+ 
+-export function createServerSupabase() {
+-  const cookieStore = cookies();
++export async function createServerSupabase() {
++  const cookieStore = await cookies();
+   return createServerClient(
+     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+diff --git a/middleware.disabled.ts b/middleware.disabled.ts
+index 503f014..7e87a36 100644
+--- a/middleware.disabled.ts
++++ b/middleware.disabled.ts
+@@ -63,7 +63,7 @@ export function middleware(request: NextRequest) {
+   // Light API telemetry headers (informational example)
+   if (pathname.startsWith("/api/")) {
+     const forwardedFor = request.headers.get("x-forwarded-for");
+-    const ip = forwardedFor ? forwardedFor.split(",")[0] : request.ip;
++    const ip = forwardedFor ? forwardedFor.split(",")[0] : undefined;
+     response.headers.set("X-RateLimit-Limit", "100");
+     response.headers.set("X-RateLimit-Remaining", "99"); // placeholder
+     response.headers.set("X-Client-IP", ip || "unknown");
