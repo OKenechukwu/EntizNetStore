@@ -1,0 +1,38 @@
+name: Migrate Legacy Supabase Auth Helper
+
+on:
+  push:
+    branches:
+      - codex/m0-production-foundation
+    paths:
+      - scripts/migrate-legacy-supabase-auth-helper.mjs
+      - .github/workflows/migrate-legacy-auth-helper.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run auth-helper codemod
+        run: node scripts/migrate-legacy-supabase-auth-helper.mjs
+
+      - name: Commit migrated callers
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No legacy auth-helper callers remain"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app components lib client server
+          git commit -m "refactor: migrate legacy Supabase auth helper callers"
+          git push
