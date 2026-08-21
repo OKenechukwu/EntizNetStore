@@ -1,43 +1,34 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createServerSupabase } from '@/lib/supabase/server'
 import EnhancedMessageCenter from '@/components/messaging/EnhancedMessageCenter'
 
 export default async function MessagesPage({
   searchParams,
 }: {
-  searchParams?: { conversation?: string };
+  searchParams?: Promise<{ conversation?: string }>
 }) {
-  const supabase = createServerComponentClient({ cookies })
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
+  const params = searchParams ? await searchParams : {}
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) {
     redirect('/auth/signin?redirect=/messages')
   }
 
-  // Determine user type (buyer or seller)
-  const [buyerProfile, sellerProfile] = await Promise.all([
-    supabase
-      .from('profiles_buyer')
-      .select('*')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('profiles_seller')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-  ])
-
-  const userType = sellerProfile.data ? 'seller' : 'buyer'
+  const sellerProfile = await supabase
+    .from('profiles_seller')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
 
   return (
     <div className="h-screen">
-      <EnhancedMessageCenter 
+      <EnhancedMessageCenter
         currentUserId={user.id}
-        userType={userType}
-        initialConversationId={searchParams?.conversation}
+        userType={sellerProfile.data ? 'seller' : 'buyer'}
+        initialConversationId={params.conversation}
       />
     </div>
   )

@@ -1,57 +1,73 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { ObjectStorageService } from '@/server/objectStorage'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-// Valid KYC document types for EntizNetStore
+const KYC_BUCKET = 'kyc-documents'
 const VALID_DOCUMENT_TYPES = [
-  'identity', 
-  'business_license', 
-  'tax_document', 
-  'address_proof', 
-  'bank_statement'
+  'identity',
+  'business_license',
+  'tax_document',
+  'address_proof',
+  'bank_statement',
 ] as const
 
-type DocumentType = typeof VALID_DOCUMENT_TYPES[number]
+type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number]
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate the user server-side
     const supabase = await createServerSupabase()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only sellers can upload KYC documents (capability = seller profile presence)
     const { data: sellerProfile } = await supabase
       .from('profiles_seller')
       .select('id')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
     if (!sellerProfile) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+      return NextResponse.json({ error: 'Seller capability required' }, { status: 403 })
     }
 
-    const { documentType } = await request.json()
-    
-    if (!documentType) {
-      return NextResponse.json({ error: 'Document type is required' }, { status: 400 })
+    const body = (await request.json()) as {
+      documentType?: string
+      fileName?: string
     }
+    const documentType = body.documentType as DocumentType | undefined
 
-    // Validate document type
-    if (!VALID_DOCUMENT_TYPES.includes(documentType as DocumentType)) {
+    if (!documentType || !VALID_DOCUMENT_TYPES.includes(documentType)) {
       return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
     }
 
-    const objectStorageService = new ObjectStorageService()
-    const uploadURL = await objectStorageService.getKYCDocumentUploadURL(user.id, documentType)
+    const extension = body.fileName?.match(/\.[a-z0-9]{1,10}$/i)?.[0]?.toLowerCase() ?? ''
+    const filePath = `${user.id}/${documentType}/${randomUUID()}${extension}`
 
-    return NextResponse.json({ 
-      uploadURL,
-      method: 'PUT'
+    const { data, error } = await getSupabaseAdmin()
+      .storage
+      .from(KYC_BUCKET)
+      .createSignedUploadUrl(filePath)
+
+    if (error || !data?.signedUrl) {
+      console.error('Failed to create KYC signed upload URL:', error)
+      return NextResponse.json({ error: 'Unable to initialize secure upload' }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      uploadURL: data.signedUrl,
+      token: data.token,
+      filePath,
+      bucket: KYC_BUCKET,
+      method: 'PUT',
     })
   } catch (error) {
-    console.error('Error generating upload URL:', error)
+    console.error('Error generating KYC upload URL:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,13 +1,13 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createServerSupabase } from '@/lib/supabase/server'
 import NotificationsPage from '@/components/notifications/NotificationsPage'
 
 export default async function NotificationsPageWrapper() {
-  const supabase = createServerComponentClient({ cookies })
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) {
     redirect('/auth/signin?redirect=/notifications')
   }

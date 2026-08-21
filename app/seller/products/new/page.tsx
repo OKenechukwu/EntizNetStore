@@ -1,39 +1,30 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createServerSupabase } from '@/lib/supabase/server'
 import ProductForm from '@/components/products/ProductForm'
 
 export default async function NewProductPage() {
-  const supabase = createServerComponentClient({ cookies })
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) {
     redirect('/auth/signin?redirect=/seller/products/new')
   }
 
-  // Check if user has seller profile
   const { data: sellerProfile } = await supabase
     .from('profiles_seller')
-    .select('*')
+    .select('id')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (!sellerProfile) {
     redirect('/seller/apply')
   }
 
-  // Get categories and brands for the form
   const [categoriesData, brandsData] = await Promise.all([
-    supabase
-      .from('categories')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order'),
-    supabase
-      .from('brands')
-      .select('*')
-      .order('name')
+    supabase.from('categories').select('*').eq('is_active', true).order('sort_order'),
+    supabase.from('brands').select('*').order('name'),
   ])
 
   return (
@@ -46,7 +37,7 @@ export default async function NewProductPage() {
           </p>
         </div>
 
-        <ProductForm 
+        <ProductForm
           categories={categoriesData.data || []}
           brands={brandsData.data || []}
           sellerId={user.id}

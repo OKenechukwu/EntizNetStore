@@ -9,9 +9,14 @@ import ChatWindow from './ChatWindow'
 interface MessageCenterProps {
   currentUserId: string
   userType: 'buyer' | 'seller'
+  initialConversationId?: string
 }
 
-export default function MessageCenter({ currentUserId, userType }: MessageCenterProps) {
+export default function MessageCenter({
+  currentUserId,
+  userType,
+  initialConversationId,
+}: MessageCenterProps) {
   const { brand, theme } = useBrand()
   const [conversations, setConversations] = useState<any[]>([])
   const [activeConversation, setActiveConversation] = useState<any>(null)
@@ -19,26 +24,26 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
   const supabase = getSupabaseClient()
 
   useEffect(() => {
-    loadConversations()
+    void loadConversations()
 
     const channel = supabase
       .channel('conversations')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
-        () => loadConversations(),
+        () => void loadConversations(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
         () => {
-          if (activeConversation) loadMessages(activeConversation.id)
+          if (activeConversation) void loadMessages(activeConversation.id)
         },
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      void supabase.removeChannel(channel)
     }
   }, [currentUserId])
 
@@ -58,17 +63,27 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
 
       if (error) throw error
 
-      setConversations(
+      const processed =
         data?.map((conv) => {
           const latestMessage = conv.messages?.[conv.messages.length - 1]
           const unreadCount =
             conv.messages?.filter(
               (msg: any) => msg.sender_id !== currentUserId && !msg.is_read,
             ).length || 0
-
           return { ...conv, latestMessage, unreadCount }
-        }) || [],
-      )
+        }) || []
+
+      setConversations(processed)
+
+      if (initialConversationId && !activeConversation) {
+        const requested = processed.find(
+          (conversation) => conversation.id === initialConversationId,
+        )
+        if (requested) {
+          setActiveConversation(requested)
+          void loadMessages(requested.id)
+        }
+      }
     } catch (error) {
       console.error('Error loading conversations:', error)
     } finally {
@@ -175,9 +190,7 @@ export default function MessageCenter({ currentUserId, userType }: MessageCenter
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-6xl mb-4" style={{ color: theme.colors.accent }}>
-                💬
-              </div>
+              <div className="text-6xl mb-4" style={{ color: theme.colors.accent }}>💬</div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: theme.colors.text.primary }}>
                 {brand === 'primediscreet' ? 'Elite Communication Center' : 'Select a conversation'}
               </h3>
