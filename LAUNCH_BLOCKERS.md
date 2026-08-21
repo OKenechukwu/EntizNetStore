@@ -22,9 +22,9 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | --- | --- | --- |
 | Reconcile repository/live migration history | VERIFIED | Repository migration versions match live applied history; applied SQL was not rewritten. |
 | Pre-change production recovery checkpoint | VERIFIED | Current application data captured in `supabase/seed.sql`; recovery runbook in `docs/operations/BACKUP_RECOVERY.md`. |
-| Remove runtime Neon/Helium assumptions | IN PROGRESS | Final repository residue scan required before M0 sign-off. Historical provenance inside already-applied migrations may remain immutable. |
-| Remove Replit runtime/debug assumptions | VERIFIED | `.replit` and routable debug/dev/test surfaces removed; runtime client no longer depends on Replit preview behavior. |
-| Remove unused legacy dependencies | IN PROGRESS | `package.json` cleaned; `package-lock.json` synchronization + clean `npm ci` verification still required. |
+| Remove runtime Neon/Helium assumptions | VERIFIED | `npm run verify:foundation` scans executable runtime source and passed in CI; historical provenance inside already-applied migrations remains immutable. |
+| Remove Replit runtime/debug assumptions | VERIFIED | `.replit`, Replit sidecar storage, and routable debug/dev/test surfaces removed; runtime client no longer depends on Replit preview behavior. |
+| Remove unused legacy dependencies | VERIFIED | `package.json`/`package-lock.json` synchronized; clean locked `npm ci` and production dependency audit pass in CI. |
 | Replace template README | VERIFIED | Production-oriented EntizNetStore README committed. |
 | Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`. |
 | Database security-advisor cleanup | VERIFIED WITH DOCUMENTED EXCEPTIONS | Remaining advisor entries are intentional deny-by-default tables and audited authenticated `SECURITY DEFINER` RPCs. |
@@ -34,11 +34,11 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Capability architecture decision | VERIFIED | `docs/architecture/ADR-0001-account-capabilities.md`. |
 | Backup/recovery procedure | VERIFIED | Operational runbook committed; managed backup requirement remains a separate P0 before customer/payment data. |
 | Canonical launch blocker record | VERIFIED | This document. |
-| Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints and unauthenticated DeepL proxy removed; static localization remains. |
-| Clean dependency/install/build verification | OPEN | Synchronize lockfile; prove `npm ci`, typecheck and production build from locked dependencies. |
-| Fresh database reproduction | OPEN | Rebuild from migrations + seed in an empty disposable environment and compare schema/security invariants. |
+| Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints, anonymous DeepL proxy, and client translation callers removed; static localization remains. |
+| Clean dependency/install/build verification | VERIFIED | CI run #49 proved locked `npm ci`, production-foundation scan, TypeScript, and Next.js production build on commit `4f715ae475b477ae114089c3d9a682bb97773c91`. |
+| Fresh database reproduction | VERIFIED | CI run #49 started a fresh PostgreSQL 17/Supabase stack, rebuilt from all migrations + seed, verified schema/RLS/RPC/index invariants, and shut down cleanly. Final reproduction assertions also cover the private `kyc-documents` storage bucket. |
 
-**M0 status: IN PROGRESS** until the last two verification rows and final residue scan are green.
+**M0 status: VERIFIED.** The production-foundation exit gate is complete. M0 verification does **not** clear the independent P0 launch blockers below.
 
 ---
 
@@ -89,9 +89,11 @@ Automated tests must prove representative anon/buyer/seller/cross-account/admin/
 
 ## P0-05 — Seller/admin/KYC/storage security completion
 
-**Status: OPEN**
+**Status: IN PROGRESS**
 
-Verify all seller/admin/KYC/upload routes against server-side ownership and least privilege. Define accepted upload types, size limits, path ownership, signed/public media boundaries, malware/content handling where applicable, and deletion/recovery behavior.
+KYC storage is now on a private Supabase Storage bucket with a 10MB limit and an explicit PDF/JPEG/PNG/WebP allow-list. Signed upload/view URLs are issued server-side only after seller/admin authorization, and fresh-environment CI reproduces and verifies the private bucket configuration.
+
+Still required before launch: complete route-level ownership regression coverage for all seller/admin/KYC/upload flows; verify deletion/recovery behavior; define malware/content handling; and verify public-vs-signed boundaries for all non-KYC product/media uploads.
 
 ## P0-06 — Production deployment hardening
 
