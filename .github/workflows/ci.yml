@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -55,24 +55,3 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-
-  apply-next16-migration:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out feature branch
-        uses: actions/checkout@v4
-        with:
-          ref: fix/supabase-messaging-consolidation
-
-      - name: Apply migration patch
-        run: |
-          git apply .github/next16-code.patch
-          git rm .github/next16-code.patch
-
-      - name: Commit migration
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app components i18n lib middleware.disabled.ts
-          git commit -m "Migrate application code to Next.js 16"
-          git push origin HEAD:fix/supabase-messaging-consolidation
