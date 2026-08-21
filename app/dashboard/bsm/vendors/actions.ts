@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/requireRole";
 
 // ---------- Supabase server client ----------
-function sb() {
-  return createClient();
+async function sb() {
+  return await createClient();
 }
 
 // ---------- Role gate (BSM only) ----------
@@ -61,7 +61,7 @@ const ListMyQuotesSchema = z.object({
 // ---------- RFQ fetch (matches your table: rfq) ----------
 export async function getRFQ(rfq_id: string) {
   await assertBSM();
-  const supabase = sb();
+  const supabase = await sb();
 
   const { data: rfq, error } = await supabase
     .from("rfq")
@@ -109,7 +109,7 @@ export async function createQuotation(
 ) {
   const gate = await assertBSM();
   const parsed = CreateQuoteSchema.parse(input);
-  const supabase = sb();
+  const supabase = await sb();
 
   const rfq = await getRFQ(parsed.rfq_id);
   const qty = Number(parsed.quantity ?? rfq.quantity ?? 1);
@@ -162,7 +162,7 @@ export async function updateQuotationStatus(
 ) {
   await assertBSM();
   const parsed = UpdateQuoteStatusSchema.parse(input);
-  const supabase = sb();
+  const supabase = await sb();
   const { error } = await supabase
     .from("quotations")
     .update({ status: parsed.status })
@@ -177,7 +177,7 @@ export async function listMyQuotations(
 ) {
   const gate = await assertBSM();
   const { status, limit, offset } = ListMyQuotesSchema.parse(input ?? {});
-  const supabase = sb();
+  const supabase = await sb();
 
   let q = supabase
     .from("quotations")

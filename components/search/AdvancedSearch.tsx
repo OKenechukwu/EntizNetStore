@@ -38,7 +38,7 @@ export default function AdvancedSearch({
   const [showFilters, setShowFilters] = useState(!compact)
   const [categories, setCategories] = useState<any[]>([])
   const [availableBrands, setAvailableBrands] = useState<any[]>([])
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const supabase = getSupabaseClient()
 
   useEffect(() => {

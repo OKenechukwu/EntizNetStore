@@ -13,11 +13,12 @@ type ProductRow = {
   base_price: number | null; // stored in BASE_CURRENCY
   status: string | null;
   product_media: { url: string; position: number | null }[] | null;
+  product_variants: { inventory_quantity: number | null; is_active: boolean | null }[] | null;
 };
 
 export default async function DashboardStorePage() {
   // Auth (server-side)
-  const supabase = createServerSupabase();
+  const supabase = await createServerSupabase();
   const {
     data: { user },
     error: sessErr,
@@ -29,14 +30,15 @@ export default async function DashboardStorePage() {
   // Fetch only this seller's products (canonical schema; RLS also scopes rows)
   const { data, error } = await supabase
     .from("products")
-    .select("id, title, base_price, status, product_media(url, position)")
+    .select("id, title, base_price, status, product_media(url, position), product_variants(inventory_quantity, is_active)")
     .eq("seller_id", user.id)
     .order("title", { ascending: true });
 
   const products = (data ?? []) as ProductRow[];
 
   // Currency preference + FX rates
-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
+  const cookieStore = await cookies();
+  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
   const rates = await getFxRates();
 
   const header = (
@@ -99,6 +101,9 @@ export default async function DashboardStorePage() {
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Inventory
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -108,7 +113,11 @@ export default async function DashboardStorePage() {
               const media = [...(p.product_media ?? [])].sort(
                 (a, b) => (a.position ?? 0) - (b.position ?? 0),
               );
-              const img = media[0]?.url || "/placeholder.png";
+              const img = media[0]?.url || "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg";
+              const inventory = (p.product_variants ?? []).reduce(
+                (sum, variant) => sum + (variant.is_active ? Number(variant.inventory_quantity ?? 0) : 0),
+                0,
+              );
 
               const displayAmount = convertFromBase(
                 Number(p.base_price ?? 0),
@@ -143,9 +152,10 @@ export default async function DashboardStorePage() {
                       {p.status ?? "—"}
                     </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{inventory}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <Link
-                      href={`/store/${p.id}`}
+                      href={`/dashboard/store/${p.id}`}
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       View

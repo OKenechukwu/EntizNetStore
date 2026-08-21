@@ -10,6 +10,7 @@ import { translate } from "@/lib/i18n/translate"; // ✅ DeepL helper
 interface MessageCenterProps {
   currentUserId: string;
   userType: "buyer" | "seller";
+  initialConversationId?: string;
 }
 
 type MessageCategory = "inquiries" | "orders" | "promos";
@@ -25,6 +26,7 @@ interface CategoryConfig {
 export default function EnhancedMessageCenter({
   currentUserId,
   userType,
+  initialConversationId,
 }: MessageCenterProps) {
   const { brand, theme } = useBrand();
   const [conversations, setConversations] = useState<any[]>([]);
@@ -155,6 +157,15 @@ export default function EnhancedMessageCenter({
         }) || [];
 
       setConversations(processedConversations);
+      if (initialConversationId && !activeConversation) {
+        const requested = processedConversations.find(
+          (conversation) => conversation.id === initialConversationId,
+        );
+        if (requested) {
+          setActiveConversation(requested);
+          void loadMessages(requested.id);
+        }
+      }
     } catch (error) {
       console.error("Error loading conversations:", error);
     } finally {
@@ -218,12 +229,9 @@ export default function EnhancedMessageCenter({
         messages: data || [],
       }));
 
-      // Mark as read
-      await supabase
-        .from("messages")
-        .update({ is_read: true })
-        .eq("conversation_id", conversationId)
-        .neq("sender_id", currentUserId);
+      await supabase.rpc("mark_conversation_read", {
+        target_conversation_id: conversationId,
+      });
 
       // Refresh badges
       loadNotifications();
@@ -250,28 +258,24 @@ export default function EnhancedMessageCenter({
         }
       }
 
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: activeConversation.id,
-        sender_id: currentUserId,
-        content: translatedText,
-        attachments: attachments,
-        is_read: false,
-        // optional audit columns (ensure your table has them or remove):
-        original_text: content.trim(),
-        source_lang: sourceLang,
-        target_lang: targetLang,
+      const recipientId = activeConversation.participants?.find(
+        (id: string) => id !== currentUserId,
+      );
+      if (!recipientId) throw new Error("Conversation recipient is missing");
+
+      const response = await fetch("/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: translatedText,
+          threadId: activeConversation.id,
+          recipientId,
+        }),
       });
-
-      if (error) throw error;
-
-      // bump conversation timestamps
-      await supabase
-        .from("conversations")
-        .update({
-          last_message_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", activeConversation.id);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to send message");
+      }
 
       // refresh thread
       loadMessages(activeConversation.id);
@@ -292,10 +296,9 @@ export default function EnhancedMessageCenter({
           type: conversationType,
           participants: [currentUserId, otherUserId],
           subject: subject,
-          order_id: conversationType.includes("order")
-            ? `order_${Date.now()}`
-            : null,
-          status: "active",
+          metadata: conversationType.includes("order")
+            ? { order_reference: `order_${Date.now()}` }
+            : {},
         })
         .select()
         .single();

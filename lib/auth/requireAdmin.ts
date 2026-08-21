@@ -10,7 +10,7 @@ export type RequireAdminResult =
   | { user: null; errorResponse: NextResponse }
 
 export async function requireAdmin(): Promise<RequireAdminResult> {
-  const supabase = createServerSupabase()
+  const supabase = await createServerSupabase()
   const {
     data: { user },
     error,

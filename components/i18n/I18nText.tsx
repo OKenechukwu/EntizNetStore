@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ElementType } from 'react';
 import { useI18n } from './I18nProvider';
 import { translate } from '@/lib/i18n/translate';
 
-type TagName = keyof JSX.IntrinsicElements | React.JSXElementConstructor<any>;
+type TagName = ElementType;
 
 export default function I18nText({
   text,

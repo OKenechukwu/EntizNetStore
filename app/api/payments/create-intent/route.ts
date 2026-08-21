@@ -1,134 +1,106 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+import { z } from "zod";
+import { createServerSupabase } from "@/lib/supabase/server";
 
-// Lazy init: constructing Stripe at module scope crashes the production
-// build (page-data collection) when STRIPE_SECRET_KEY is not configured.
-function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
-  return new Stripe(key, {
-    apiVersion: '2025-08-27.basil'
-  })
+const requestSchema = z.object({
+  idempotencyKey: z.string().uuid(),
+  items: z.array(z.object({
+    productId: z.string().uuid(),
+    variantId: z.string().uuid().nullable().optional(),
+    quantity: z.number().int().min(1).max(100),
+  })).min(1).max(100),
+  shippingAddress: z.object({
+    name: z.string().trim().min(2).max(200),
+    line1: z.string().trim().min(2).max(200),
+    line2: z.string().trim().max(200).optional(),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().max(100).optional(),
+    postalCode: z.string().trim().min(1).max(30),
+    country: z.string().trim().length(2).transform((value) => value.toUpperCase()),
+  }).nullable(),
+});
+
+function stripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("Stripe checkout is not configured");
+  return new Stripe(key);
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid checkout" }, { status: 400 });
+  }
+
+  const input = parsed.data;
+  const address = input.shippingAddress ? {
+    name: input.shippingAddress.name,
+    line1: input.shippingAddress.line1,
+    line2: input.shippingAddress.line2 || null,
+    city: input.shippingAddress.city,
+    state: input.shippingAddress.state || null,
+    postal_code: input.shippingAddress.postalCode,
+    country: input.shippingAddress.country,
+  } : null;
+
+  const { data: checkoutRows, error: checkoutError } = await supabase.rpc("create_checkout_session", {
+    p_items: input.items,
+    p_shipping_address: address,
+    p_idempotency_key: input.idempotencyKey,
+  });
+  if (checkoutError || !checkoutRows?.[0]) {
+    return NextResponse.json({ error: checkoutError?.message || "Unable to create checkout" }, { status: 400 });
+  }
+
+  const checkout = checkoutRows[0];
   try {
-    const stripe = getStripe()
-    const body = await request.json()
-    const { 
-      amount, 
-      currency = 'usd', 
-      metadata, 
-      customer_info, 
-      shipping_required = false 
-    } = body
-
-    // Verify authentication
-    const supabase = createServerComponentClient({ cookies })
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Validate required fields
-    if (!amount || amount < 50) { // Minimum $0.50
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
-    }
-
-    // Create or retrieve customer
-    let customer
-    if (customer_info?.email) {
-      const existingCustomers = await stripe.customers.list({
-        email: customer_info.email,
-        limit: 1
-      })
-
-      if (existingCustomers.data.length > 0) {
-        customer = existingCustomers.data[0]
-      } else {
-        customer = await stripe.customers.create({
-          email: customer_info.email,
-          name: customer_info.name,
-          address: shipping_required ? customer_info.address : undefined,
-          metadata: {
-            user_id: user.id,
-            marketplace_brand: metadata?.marketplace_brand || 'entiznetstore'
-          }
-        })
-      }
-    }
-
-    // Calculate platform fee (8% for PrimeDiscreet, 10% for EntizNetStore)
-    const platformFeeRate = metadata?.marketplace_brand === 'primediscreet' ? 0.08 : 0.10
-    const platformFee = Math.round(amount * platformFeeRate)
-
-    // Create payment intent with connect account for escrow
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      customer: customer?.id,
+    const paymentIntent = await stripeClient().paymentIntents.create({
+      amount: Number(checkout.amount_cents),
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      receipt_email: user.email,
       metadata: {
-        ...metadata,
-        customer_id: customer?.id,
-        user_id: user.id,
-        platform_fee_amount: platformFee.toString()
-      },
-      application_fee_amount: platformFee,
-      transfer_data: {
-        destination: metadata?.seller_stripe_account_id || process.env.STRIPE_SELLER_ACCOUNT_ID!,
-      },
-      automatic_payment_methods: {
-        enabled: true
-      },
-      shipping: shipping_required && customer_info?.address ? {
-        name: customer_info.name,
-        address: {
-          line1: customer_info.address.line1,
-          line2: customer_info.address.line2 || undefined,
-          city: customer_info.address.city,
-          state: customer_info.address.state,
-          postal_code: customer_info.address.postal_code,
-          country: customer_info.address.country || 'US'
-        }
-      } : undefined
-    })
-
-    // Create order record in database for tracking
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert({
+        checkout_session_id: checkout.session_id,
         buyer_id: user.id,
-        seller_id: metadata?.seller_id,
-        product_id: metadata?.product_id,
-        variant_id: metadata?.variant_id || null,
-        quantity: parseInt(metadata?.quantity || '1'),
-        total_cents: amount,
-        platform_fee_cents: platformFee,
-        status: 'pending_payment',
-        stripe_payment_intent_id: paymentIntent.id,
-        marketplace_brand: metadata?.marketplace_brand || 'entiznetstore',
-        shipping_required: shipping_required,
-        shipping_address: shipping_required ? customer_info?.address : null
-      })
+        marketplace_brand: "entiznetstore",
+      },
+      shipping: input.shippingAddress ? {
+        name: input.shippingAddress.name,
+        address: {
+          line1: input.shippingAddress.line1,
+          line2: input.shippingAddress.line2,
+          city: input.shippingAddress.city,
+          state: input.shippingAddress.state,
+          postal_code: input.shippingAddress.postalCode,
+          country: input.shippingAddress.country,
+        },
+      } : undefined,
+    }, { idempotencyKey: checkout.session_id });
 
-    if (orderError) {
-      console.error('Database error:', orderError)
-      // Don't fail payment creation, but log the error
-    }
+    const { error: attachError } = await supabase.rpc("attach_checkout_payment_intent", {
+      p_session_id: checkout.session_id,
+      p_payment_intent_id: paymentIntent.id,
+    });
+    if (attachError) throw attachError;
 
     return NextResponse.json({
-      client_secret: paymentIntent.client_secret,
-      payment_intent_id: paymentIntent.id
-    })
-
-  } catch (error: any) {
-    console.error('Payment intent creation error:', error)
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      checkoutSessionId: checkout.session_id,
+      amountCents: Number(checkout.amount_cents),
+      currency: "usd",
+    });
+  } catch (error) {
+    await supabase.rpc("cancel_checkout_session", { p_session_id: checkout.session_id });
+    console.error("Payment intent creation failed:", error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create payment intent' },
-      { status: 500 }
-    )
+      { error: error instanceof Error ? error.message : "Unable to initialize payment" },
+      { status: 503 },
+    );
   }
 }

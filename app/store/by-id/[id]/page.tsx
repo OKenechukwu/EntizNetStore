@@ -18,8 +18,9 @@ type Product = {
 export default async function ProductDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   // Supabase fetch (server)
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +30,7 @@ export default async function ProductDetailPage({
   const { data, error } = await supabase
     .from("products")
     .select("id, title, description, price, images")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !data) {
@@ -53,7 +54,8 @@ export default async function ProductDetailPage({
   const hero = gallery[0] ?? "/placeholder.png";
 
   // Currency preference + FX conversion
-  const userCurrency = toCurrencyCode(cookies().get("currency")?.value);
+  const cookieStore = await cookies();
+  const userCurrency = toCurrencyCode(cookieStore.get("currency")?.value);
   const rates = await getFxRates();
   const displayAmount = convertFromBase(
     Number(product.price ?? 0),

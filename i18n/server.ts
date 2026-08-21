@@ -16,8 +16,8 @@ function getFromDict(dict: any, key: string) {
     .reduce<any>((a, p) => (a && a[p] != null ? a[p] : undefined), dict);
 }
 
-export function getServerI18n() {
-  const c = cookies();
+export async function getServerI18n() {
+  const c = await cookies();
   const cookieLocale = c.get("locale")?.value || "en";
   const locale = clamp(cookieLocale);
   const dict = (DICTS as any)[locale] ?? (DICTS as any).en;

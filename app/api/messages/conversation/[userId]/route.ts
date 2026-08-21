@@ -5,7 +5,7 @@ import { MessageEncryption } from '@/lib/security'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Check authentication
@@ -14,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const otherUserId = params.userId
+    const { userId: otherUserId } = await params
     if (!otherUserId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }

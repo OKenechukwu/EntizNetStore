@@ -1,27 +1,43 @@
 // app/api/chat/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { createClient } from "@/lib/supabase/server";
 
-// Persists chat messages in the live Neon database (messages table).
 export async function POST(req: NextRequest) {
   try {
-    const { text, threadId, senderId, recipientId } = await req.json();
+    const { text, threadId, recipientId } = await req.json();
 
-    if (!text || !senderId || !recipientId) {
+    if (!text?.trim() || !threadId || !recipientId) {
       return NextResponse.json(
-        { error: "text, senderId and recipientId are required" },
+        { error: "text, threadId and recipientId are required" },
         { status: 400 }
       );
     }
 
-    const rows = await query<{ id: string }>(
-      `INSERT INTO messages (sender_id, recipient_id, content, conversation_id)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id`,
-      [senderId, recipientId, text, threadId ?? null]
-    );
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
-    return NextResponse.json({ ok: true, messageId: rows[0]?.id });
+    const { data: message, error } = await supabase
+      .from("messages")
+      .insert({
+        sender_id: user.id,
+        recipient_id: recipientId,
+        content: text.trim(),
+        conversation_id: threadId,
+      })
+      .select("id, content")
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({
+      ok: true,
+      messageId: message.id,
+      original: text.trim(),
+      translated: message.content,
+    });
   } catch (error) {
     console.error("Failed to send message:", error);
     return NextResponse.json(

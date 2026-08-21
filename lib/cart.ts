@@ -3,6 +3,8 @@
 
 export type CartItem = {
   id: string;
+  variantId?: string;
+  variantTitle?: string;
   title: string;
   priceBase: number; // always USD
   image?: string;
@@ -43,7 +45,10 @@ export function setCart(items: CartItem[]): void {
 
 export function addItem(item: CartItem): void {
   const cart = getCart();
-  const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
+  const existingIndex = cart.findIndex(
+    (cartItem) =>
+      cartItem.id === item.id && cartItem.variantId === item.variantId,
+  );
   
   if (existingIndex >= 0) {
     // Item exists, increase quantity
@@ -56,18 +61,22 @@ export function addItem(item: CartItem): void {
   setCart(cart);
 }
 
-export function removeItem(id: string): void {
+export function removeItem(id: string, variantId?: string): void {
   const cart = getCart();
-  const filtered = cart.filter(item => item.id !== id);
+  const filtered = cart.filter(
+    (item) => item.id !== id || item.variantId !== variantId,
+  );
   setCart(filtered);
 }
 
-export function setQty(id: string, qty: number): void {
+export function setQty(id: string, qty: number, variantId?: string): void {
   // Clamp qty to minimum of 1
   const clampedQty = Math.max(1, qty);
   
   const cart = getCart();
-  const item = cart.find(cartItem => cartItem.id === id);
+  const item = cart.find(
+    (cartItem) => cartItem.id === id && cartItem.variantId === variantId,
+  );
   
   if (item) {
     item.qty = clampedQty;

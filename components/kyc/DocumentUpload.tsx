@@ -259,7 +259,9 @@ export default function DocumentUpload({
                 </button>
 
                 <input
-                  ref={el => fileInputRefs.current[docType.key] = el}
+                  ref={(el) => {
+                    fileInputRefs.current[docType.key] = el;
+                  }}
                   type="file"
                   accept={docType.accept}
                   className="hidden"

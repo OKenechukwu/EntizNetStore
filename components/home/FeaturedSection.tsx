@@ -57,6 +57,11 @@ export default function FeaturedSection({
       </div>
 
       {/* Full-width responsive grid */}
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-card p-8 text-center text-sm text-foreground/60">
+          Products will appear here as soon as sellers publish them.
+        </div>
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {items.map((item) => {
           const converted = convertFromBase(Number(item.price || 0), currency, fx);
@@ -107,6 +112,7 @@ export default function FeaturedSection({
           );
         })}
       </div>
+      )}
     </section>
   );
 }

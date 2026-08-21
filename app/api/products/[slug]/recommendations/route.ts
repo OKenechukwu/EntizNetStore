@@ -10,11 +10,11 @@ export const runtime = "edge";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params;
-    const supabase = createClient();
+    const { slug } = await params;
+    const supabase = await createClient();
 
     // Get the product to find its category
     const { data: product } = await supabase

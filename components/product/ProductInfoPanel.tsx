@@ -21,7 +21,9 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
   const { currency, rates } = useCurrency();
   const { locale } = useI18n();
   
-  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();
+  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(
+    () => product.variants?.find((variant) => variant.stockRemaining !== 0)?.id,
+  );
   const [quantity, setQuantity] = useState(1);
   const [showReturnPolicy, setShowReturnPolicy] = useState(false);
 
@@ -64,7 +66,11 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
     return `${formatDate(minDate)}–${formatDate(maxDate)}`;
   };
 
-  const maxStock = selectedVariant?.stockRemaining ?? product.stockRemaining ?? 999;
+  const maxStock = selectedVariant
+    ? selectedVariant.stockRemaining ?? 999
+    : product.variants?.length
+      ? 0
+      : product.stockRemaining ?? 999;
 
   return (
     <div className="space-y-6">
@@ -268,14 +274,16 @@ export default function ProductInfoPanel({ product, onAddToCart, onBuyNow }: Pro
       <div className="flex gap-3">
         <button
           onClick={() => onAddToCart(quantity, selectedVariantId)}
-          className="flex-1 rounded-lg border border-brand-secondary bg-transparent px-6 py-3 font-semibold text-brand-secondary transition hover:bg-brand-secondary/10"
+          disabled={maxStock < 1}
+          className="flex-1 rounded-lg border border-brand-secondary bg-transparent px-6 py-3 font-semibold text-brand-secondary transition hover:bg-brand-secondary/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ShoppingCart className="mr-2 inline h-5 w-5" />
           Add to Cart
         </button>
         <button
           onClick={() => onBuyNow(quantity, selectedVariantId)}
-          className="flex-1 rounded-lg bg-brand-secondary px-6 py-3 font-semibold text-black transition hover:opacity-90"
+          disabled={maxStock < 1}
+          className="flex-1 rounded-lg bg-brand-secondary px-6 py-3 font-semibold text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Buy Now
         </button>

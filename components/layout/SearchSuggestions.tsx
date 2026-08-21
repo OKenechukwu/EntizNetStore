@@ -31,7 +31,7 @@ export default function SearchSuggestions({ className }: Props) {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const debounceTimer = useRef<NodeJS.Timeout>();
+  const debounceTimer = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Fetch suggestions
   const fetchSuggestions = useCallback(async (searchQuery: string) => {

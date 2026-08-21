@@ -4,11 +4,12 @@ import { requireRole } from "@/lib/auth/requireRole";
 import { getRFQ } from "@/app/dashboard/bsm/vendors/actions";
 import QuoteForm from "@/components/bsm/QuoteForm";
 
-export default async function Page({ params }: { params: { rfqId: string } }) {
+export default async function Page({ params }: { params: Promise<{ rfqId: string }> }) {
+  const { rfqId } = await params;
   const gate = await requireRole(["brand", "supplier", "manufacturer", "bsm"]);
   if (!gate.ok) notFound();
 
-  const rfq = await getRFQ(params.rfqId).catch(() => null);
+  const rfq = await getRFQ(rfqId).catch(() => null);
   if (!rfq) notFound();
 
   return (

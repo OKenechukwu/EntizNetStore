@@ -25,7 +25,7 @@ export type Capabilities = {
 /**
  * Canonical post-login destination:
  * - admin                → /admin
- * - seller (incl. buyer+seller) → /seller/dashboard (buyer capability is
+ * - seller (incl. buyer+seller) → /dashboard/seller (buyer capability is
  *   preserved — sellers can still browse/buy; no role switcher)
  * - buyer only           → /store
  * - no capability yet    → /store (no dedicated onboarding chooser route
@@ -36,7 +36,7 @@ export function destinationForCapabilities(
 ): string {
   if (!caps) return "/store";
   if (caps.isAdmin) return "/admin";
-  if (caps.isSeller) return "/seller/dashboard";
+  if (caps.isSeller) return "/dashboard/seller";
   if (caps.isBuyer) return "/store";
   return "/store";
 }

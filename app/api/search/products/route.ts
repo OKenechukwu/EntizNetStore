@@ -3,7 +3,7 @@ import { searchProducts } from '@/lib/data/products'
 
 export const dynamic = 'force-dynamic'
 
-// Product search backed by the live Neon Postgres database (see lib/db.ts).
+// Product search backed by the canonical Supabase database.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

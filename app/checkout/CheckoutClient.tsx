@@ -19,14 +19,13 @@ import {
   subtotalBase,
   type CartItem,
 } from "@/lib/cart";
-import { T, useI18n } from "@/components/i18n/I18nProvider";
+import { T } from "@/components/i18n/I18nProvider";
+import CartStripePayment from "@/components/payments/CartStripePayment";
 
 export default function CheckoutClient() {
-  const { t } = useI18n();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userCurrency, setUserCurrency] = useState(DEFAULT_CURRENCY);
   const [rates, setRates] = useState<FxRates>({} as FxRates);
-  const [isLoading, setIsLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
   // Load cart and currency on mount
@@ -70,53 +69,21 @@ export default function CheckoutClient() {
     fetchRates();
   }, [userCurrency]);
 
-  const handleQtyChange = (id: string, newQty: number) => {
+  const handleQtyChange = (id: string, newQty: number, variantId?: string) => {
     if (newQty < 1) return;
-    setQty(id, newQty);
+    setQty(id, newQty, variantId);
     setCart(getCart());
   };
 
-  const handleRemoveItem = (id: string) => {
-    removeItem(id);
+  const handleRemoveItem = (id: string, variantId?: string) => {
+    removeItem(id, variantId);
     setCart(getCart());
   };
 
-  const handlePlaceOrder = async () => {
-    if (cart.length === 0 && !orderSuccess) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const orderPayload = {
-        items: cart.map((item) => ({
-          id: item.id,
-          qty: item.qty,
-        })),
-        subtotalBase: subtotalBase(),
-      };
-
-      const response = await fetch("/api/store/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (response.ok) {
-        clearCart();
-        setCart([]);
-        setOrderSuccess(true); // we’ll show this even when cart is empty
-        // Optional: auto-hide after a few seconds
-        // setTimeout(() => setOrderSuccess(false), 5000);
-      } else {
-        throw new Error("Failed to place order");
-      }
-    } catch (error) {
-      console.error("Order failed:", error);
-      alert(t("checkout.orderFailure"));
-    } finally {
-      setIsLoading(false);
-    }
+  const handlePaymentSuccess = () => {
+    clearCart();
+    setCart([]);
+    setOrderSuccess(true);
   };
 
   const convertPrice = (priceBase: number): number =>
@@ -165,7 +132,7 @@ export default function CheckoutClient() {
           <div className="space-y-4 mb-8">
             {cart.map((item) => (
               <div
-                key={item.id}
+                key={`${item.id}:${item.variantId || "default"}`}
                 className="flex items-center gap-4 p-4 border rounded-lg"
               >
                 {item.image && (
@@ -181,6 +148,9 @@ export default function CheckoutClient() {
 
                 <div className="flex-1">
                   <h3 className="font-medium"><I18nText text={item.title} /></h3>
+                  {item.variantTitle && (
+                    <p className="text-xs text-gray-500">{item.variantTitle}</p>
+                  )}
                   <p className="text-sm text-gray-600">
                     {formatPrice(convertPrice(item.priceBase), userCurrency)}{" "}
                     <T k="checkout.each" />
@@ -189,7 +159,7 @@ export default function CheckoutClient() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleQtyChange(item.id, item.qty - 1)}
+                    onClick={() => handleQtyChange(item.id, item.qty - 1, item.variantId)}
                     disabled={item.qty <= 1}
                     className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 text-black border-black"
                   >
@@ -197,7 +167,7 @@ export default function CheckoutClient() {
                   </button>
                   <span className="w-8 text-center text-black">{item.qty}</span>
                   <button
-                    onClick={() => handleQtyChange(item.id, item.qty + 1)}
+                    onClick={() => handleQtyChange(item.id, item.qty + 1, item.variantId)}
                     className="w-8 h-8 rounded border flex items-center justify-center hover:bg-gray-50 text-black border-black"
                   >
                     +
@@ -212,7 +182,7 @@ export default function CheckoutClient() {
                     )}
                   </p>
                   <button
-                    onClick={() => handleRemoveItem(item.id)}
+                    onClick={() => handleRemoveItem(item.id, item.variantId)}
                     className="text-sm text-red-600 hover:underline"
                   >
                     <T k="checkout.remove" />
@@ -230,13 +200,7 @@ export default function CheckoutClient() {
               </span>
             </div>
 
-            <button
-              onClick={handlePlaceOrder}
-              disabled={isLoading || cart.length === 0}
-              className="w-full py-3 bg-black text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isLoading ? t("checkout.placingOrder") : t("checkout.placeOrder")}
-            </button>
+            <CartStripePayment cart={cart} onSuccess={handlePaymentSuccess} />
           </div>
         </>
       )}

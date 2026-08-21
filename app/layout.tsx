@@ -37,8 +37,8 @@ function clampLocale(candidate: string | undefined, supported: string[]): string
   return supported.includes(lc) ? lc : "en";
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const c = cookies();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const c = await cookies();
 
   // ✅ Read new cookie names first, fall back to legacy ones
   const cookieLocaleRaw =
