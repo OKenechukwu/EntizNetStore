@@ -6,6 +6,7 @@ on:
       - codex/m0-production-foundation
     paths:
       - package.json
+      - .github/workflows/lockfile-sync.yml
 
 permissions:
   contents: write
@@ -33,6 +34,19 @@ jobs:
       - name: Regenerate lockfile
         run: npm install --package-lock-only --ignore-scripts
 
+      - name: Commit synchronized lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already synchronized"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: synchronize dependency lockfile"
+            git push
+          fi
+
       - name: Verify locked install
         run: npm ci
 
@@ -41,16 +55,3 @@ jobs:
 
       - name: Build production application
         run: npm run build
-
-      - name: Commit synchronized lockfile
-        shell: bash
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json already synchronized"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore: synchronize dependency lockfile"
-          git push
