@@ -9,18 +9,6 @@ type DeeplOpts = {
   preserveFormatting?: boolean;
 };
 
-// Accept both env var names
-const AUTH_KEY =
-  process.env.DEEPL_AUTH_KEY ||
-  process.env.DEEPL_API_KEY || // ← supports your current name
-  "";
-
-if (!AUTH_KEY) {
-  throw new Error(
-    "Missing DeepL API key. Set DEEPL_AUTH_KEY or DEEPL_API_KEY in .env.local",
-  );
-}
-
 // Choose default endpoint by plan; allow manual override via URL/HOST
 const PLAN = (process.env.DEEPL_PLAN || "pro").toLowerCase() as "pro" | "free";
 const DEFAULT_PRO = "https://api.deepl.com/v2/translate";
@@ -49,6 +37,16 @@ export async function deeplTranslate(
   targetLang: string,
   opts: DeeplOpts = {},
 ): Promise<string | string[]> {
+  // Resolve and validate credentials at request time. Throwing during module
+  // import prevents Next.js from collecting route data in environments where
+  // translation is intentionally not configured (for example CI builds).
+  const authKey = process.env.DEEPL_AUTH_KEY || process.env.DEEPL_API_KEY || "";
+  if (!authKey) {
+    throw new Error(
+      "Missing DeepL API key. Set DEEPL_AUTH_KEY or DEEPL_API_KEY in the deployment environment",
+    );
+  }
+
   const payload = new URLSearchParams();
   const inputs = Array.isArray(text) ? text : [text];
 
@@ -66,7 +64,7 @@ export async function deeplTranslate(
     const res = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
-        Authorization: `DeepL-Auth-Key ${AUTH_KEY}`,
+        Authorization: `DeepL-Auth-Key ${authKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: payload.toString(),
