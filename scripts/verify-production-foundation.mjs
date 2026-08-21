@@ -40,6 +40,10 @@ function stripComments(content) {
 // ---------------------------------------------------------------------------
 const forbiddenPaths = [
   ".replit",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "bun.lock",
+  "bun.lockb",
   "app/_debug-routes/page.tsx",
   "app/api/hello/route.ts",
   "app/api/i18n/auto/route.ts",
@@ -80,12 +84,17 @@ for (const relativePath of runtimeFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// Dependency contract: package.json and package-lock.json must agree exactly at
-// the root and known legacy packages must be absent from the locked graph.
+// Dependency contract: npm + package-lock.json are canonical. package.json and
+// package-lock.json must agree exactly at the root and known legacy packages
+// must be absent from the locked graph.
 // ---------------------------------------------------------------------------
 const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const lockRoot = lock.packages?.[""] ?? {};
+
+if (!/^npm@/.test(pkg.packageManager ?? "")) {
+  fail(`Canonical packageManager must be npm, found: ${pkg.packageManager ?? "missing"}`);
+}
 
 if (lock.name !== pkg.name || lockRoot.name !== pkg.name) {
   fail(`Lockfile package name drift: package=${pkg.name}, lock=${lock.name}, lockRoot=${lockRoot.name}`);
