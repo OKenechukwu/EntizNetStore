@@ -72,7 +72,7 @@ jobs:
           cache: npm
 
       - name: Upgrade vulnerable major dependencies
-        run: npm install --package-lock-only next@16.3.1 eslint-config-next@16.3.1 react@latest react-dom@latest @types/react@latest @types/react-dom@latest @google-cloud/storage@8.0.1
+        run: npm install --package-lock-only next@16.3.1 eslint-config-next@16.3.1 react@latest react-dom@latest @types/react@latest @types/react-dom@latest eslint@latest @google-cloud/storage@8.0.1
 
       - name: Commit upgraded manifests
         run: |
