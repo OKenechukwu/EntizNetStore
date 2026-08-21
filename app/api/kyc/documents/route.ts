@@ -4,14 +4,21 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { sanitizeInput } from '@/lib/security'
 
 const KYC_BUCKET = 'kyc-documents'
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
+const VALID_DOCUMENT_TYPES = [
+  'identity',
+  'business_license',
+  'tax_document',
+  'address_proof',
+  'bank_statement',
 ] as const
 const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number]
+
+type InspectedFile = {
+  size: number
+  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp'
+}
 
 function pathFromSignedUploadUrl(value: string): string | null {
   try {
@@ -22,6 +29,63 @@ function pathFromSignedUploadUrl(value: string): string | null {
     return decodeURIComponent(pathname.slice(index + marker.length))
   } catch {
     return null
+  }
+}
+
+function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null {
+  if (size <= 0 || size > MAX_FILE_SIZE) return null
+
+  if (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  ) {
+    return { size, mimeType: 'application/pdf' }
+  }
+
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { size, mimeType: 'image/jpeg' }
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return { size, mimeType: 'image/png' }
+  }
+
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { size, mimeType: 'image/webp' }
+  }
+
+  return null
+}
+
+async function deleteRejectedUpload(filePath: string) {
+  try {
+    await getSupabaseAdmin().storage.from(KYC_BUCKET).remove([filePath])
+  } catch (error) {
+    console.error('Failed to remove rejected KYC upload:', error)
   }
 }
 
@@ -52,38 +116,79 @@ export async function POST(request: NextRequest) {
       filePath?: string
       uploadURL?: string
       fileName?: string
+      // Legacy client hints remain accepted for compatibility, but the server
+      // never uses them as the source of truth.
       fileSize?: number
       mimeType?: string
     }
 
-    const documentType = sanitizeInput(body.documentType ?? '')
+    const documentType = sanitizeInput(body.documentType ?? '') as DocumentType
     const fileName = sanitizeInput(body.fileName ?? '')
     const filePath = body.filePath || (body.uploadURL ? pathFromSignedUploadUrl(body.uploadURL) : null)
 
-    if (!documentType || !fileName || !filePath) {
+    if (!VALID_DOCUMENT_TYPES.includes(documentType)) {
+      return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
+    }
+
+    if (!fileName || !filePath) {
       return NextResponse.json(
         { error: 'Document type, file path, and file name are required' },
         { status: 400 },
       )
     }
 
-    if (body.fileSize != null && (body.fileSize < 0 || body.fileSize > MAX_FILE_SIZE)) {
-      return NextResponse.json({ error: 'File size exceeds the 10MB limit' }, { status: 400 })
-    }
-
-    if (
-      body.mimeType &&
-      !ALLOWED_MIME_TYPES.includes(body.mimeType as (typeof ALLOWED_MIME_TYPES)[number])
-    ) {
-      return NextResponse.json({ error: 'Unsupported KYC document type' }, { status: 400 })
-    }
-
     const requiredPrefix = `${user.id}/${documentType}/`
-    if (!filePath.startsWith(requiredPrefix) || filePath.includes('..')) {
+    if (!filePath.startsWith(requiredPrefix) || filePath.includes('..') || filePath.includes('\\')) {
       return NextResponse.json({ error: 'Invalid KYC storage path' }, { status: 400 })
     }
 
     const admin = getSupabaseAdmin()
+
+    const { data: existing } = await admin
+      .from('kyc_documents')
+      .select('id')
+      .eq('seller_id', user.id)
+      .eq('file_path', filePath)
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'This KYC upload is already registered', documentId: existing.id },
+        { status: 409 },
+      )
+    }
+
+    // Registration is the authoritative security boundary. Download the
+    // private object with service-role access, use Blob.size for the real byte
+    // count, and identify supported formats from magic bytes rather than the
+    // browser-provided Content-Type or filename extension.
+    const { data: blob, error: downloadError } = await admin.storage
+      .from(KYC_BUCKET)
+      .download(filePath)
+
+    if (downloadError || !blob) {
+      console.error('Unable to verify KYC storage object:', downloadError)
+      return NextResponse.json(
+        { error: 'Uploaded KYC object was not found; upload must complete before registration' },
+        { status: 409 },
+      )
+    }
+
+    if (blob.size <= 0 || blob.size > MAX_FILE_SIZE) {
+      await deleteRejectedUpload(filePath)
+      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 })
+    }
+
+    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer())
+    const inspected = inspectSignature(signature, blob.size)
+    if (!inspected) {
+      await deleteRejectedUpload(filePath)
+      return NextResponse.json(
+        { error: 'Unsupported KYC document. Upload a real PDF, JPEG, PNG, or WebP file.' },
+        { status: 400 },
+      )
+    }
+
     const { data: document, error: insertError } = await admin
       .from('kyc_documents')
       .insert({
@@ -91,8 +196,8 @@ export async function POST(request: NextRequest) {
         document_type: documentType,
         file_path: filePath,
         file_name: fileName,
-        file_size: body.fileSize ?? null,
-        mime_type: body.mimeType ?? null,
+        file_size: inspected.size,
+        mime_type: inspected.mimeType,
         verification_status: 'pending',
       })
       .select()

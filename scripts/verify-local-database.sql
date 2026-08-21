@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 
--- EntizNetStore M0 fresh-environment reproduction assertions.
+-- EntizNetStore fresh-environment reproduction assertions.
 -- Run against a newly reset local Supabase database after all repository
 -- migrations and supabase/seed.sql have been applied.
 
@@ -86,13 +86,12 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical M0 baseline';
+    raise exception 'Public table set differs from canonical baseline';
   end if;
 end
 $$;
 
--- Private KYC storage must be reproduced exactly enough to remain non-public,
--- size-limited and restricted to the launch-approved document formats.
+-- Storage buckets required by production architecture.
 do $$
 declare
   bucket_public boolean;
@@ -114,13 +113,69 @@ begin
     raise exception 'KYC storage bucket must enforce a 10MB file limit, found %', bucket_limit;
   end if;
   if not coalesce(bucket_mimes @> array[
-    'application/pdf',
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp'
+    'application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'
   ]::text[], false) then
-    raise exception 'KYC storage bucket MIME allow-list differs from M0 baseline';
+    raise exception 'KYC storage bucket MIME allow-list differs from baseline';
+  end if;
+
+  select public, file_size_limit, allowed_mime_types
+    into bucket_public, bucket_limit, bucket_mimes
+  from storage.buckets
+  where id = 'product-media';
+
+  if not found then
+    raise exception 'Required product-media storage bucket is missing';
+  end if;
+  if not bucket_public then
+    raise exception 'Product media bucket must be public for storefront rendering';
+  end if;
+  if bucket_limit is distinct from 10485760 then
+    raise exception 'Product media bucket must enforce a 10MB file limit, found %', bucket_limit;
+  end if;
+  if not coalesce(bucket_mimes @> array[
+    'image/jpeg', 'image/jpg', 'image/png', 'image/webp'
+  ]::text[], false) then
+    raise exception 'Product media MIME allow-list differs from P0 baseline';
+  end if;
+end
+$$;
+
+-- RLS policies and table grants must agree: authenticated participants can
+-- read only their own transaction rows, trusted workers can operate the ledger,
+-- and no API role can write directly.
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'payment_sessions',
+    'inventory_reservations',
+    'orders',
+    'order_items',
+    'escrow_transactions'
+  ] loop
+    if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
+      raise exception 'authenticated is missing SELECT on %', table_name;
+    end if;
+    if has_table_privilege('authenticated', format('public.%I', table_name), 'INSERT')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'UPDATE')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'DELETE') then
+      raise exception 'authenticated must not directly mutate %', table_name;
+    end if;
+    if not has_table_privilege('service_role', format('public.%I', table_name), 'SELECT')
+       or not has_table_privilege('service_role', format('public.%I', table_name), 'INSERT')
+       or not has_table_privilege('service_role', format('public.%I', table_name), 'UPDATE')
+       or not has_table_privilege('service_role', format('public.%I', table_name), 'DELETE') then
+      raise exception 'service_role transaction privileges incomplete on %', table_name;
+    end if;
+  end loop;
+
+  if has_table_privilege('anon', 'public.payment_webhook_events', 'SELECT')
+     or has_table_privilege('authenticated', 'public.payment_webhook_events', 'SELECT') then
+    raise exception 'Raw webhook records must remain trusted-worker-only';
+  end if;
+  if not has_table_privilege('service_role', 'public.payment_webhook_events', 'SELECT') then
+    raise exception 'service_role must inspect webhook deduplication records';
   end if;
 end
 $$;
