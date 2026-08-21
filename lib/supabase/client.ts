@@ -8,7 +8,7 @@ import type { SupabaseClient, Session } from "@supabase/supabase-js";
 
 let _client: SupabaseClient | null = null;
 
-/** Singleton plain browser client (more reliable on Replit preview). */
+/** Singleton browser-compatible Supabase client. */
 export function getSupabaseClient() {
   if (_client) return _client;
 
@@ -21,7 +21,6 @@ export function getSupabaseClient() {
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storageKey: "entiznet.auth",
-      // Force browser storage (fixes some iframe/preview oddities)
       storage: typeof window !== "undefined" ? window.localStorage : undefined,
       // PKCE code flow: consistent with exchangeCodeForSession() in
       // /auth/callback and with password-recovery links. detectSessionInUrl
