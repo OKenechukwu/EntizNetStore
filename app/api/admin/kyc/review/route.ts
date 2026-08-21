@@ -3,9 +3,14 @@ import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { validateMessageContent } from '@/lib/validation'
 
+const DOCUMENT_REVIEW_STATUSES = ['approved', 'rejected'] as const
+const VERIFICATION_FINAL_STATUSES = ['approved', 'rejected'] as const
+
+type DocumentReviewStatus = (typeof DOCUMENT_REVIEW_STATUSES)[number]
+type VerificationFinalStatus = (typeof VERIFICATION_FINAL_STATUSES)[number]
+
 export async function POST(request: NextRequest) {
   try {
-    // Verify trusted admin (server-validated user + app_metadata role)
     const { user, errorResponse } = await requireAdmin()
     if (errorResponse) return errorResponse
 
@@ -15,7 +20,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Action is required' }, { status: 400 })
     }
 
-    // Validate input content
     if (reason) {
       const validation = validateMessageContent(reason)
       if (!validation.isValid) {
@@ -30,107 +34,163 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const admin = getSupabaseAdmin()
+
     switch (action) {
-      case 'review_document':
-        if (!documentId || !status) {
-          return NextResponse.json({ 
-            error: 'Document ID and status are required' 
-          }, { status: 400 })
+      case 'review_document': {
+        if (!documentId || !DOCUMENT_REVIEW_STATUSES.includes(status as DocumentReviewStatus)) {
+          return NextResponse.json(
+            { error: 'Document ID and a valid review status are required' },
+            { status: 400 },
+          )
         }
 
-        // Update document status using admin client to bypass RLS
-        const updateData: any = {
-          verification_status: status,
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id
+        const reviewStatus = status as DocumentReviewStatus
+        if (reviewStatus === 'rejected' && !reason) {
+          return NextResponse.json({ error: 'A rejection reason is required' }, { status: 400 })
         }
 
-        if (reason) {
-          updateData.rejection_reason = reason
-        }
-
-        const { error: docError } = await getSupabaseAdmin()
+        const { data: document, error: lookupError } = await admin
           .from('kyc_documents')
-          .update(updateData)
+          .select('id, seller_id, verification_status')
+          .eq('id', documentId)
+          .maybeSingle()
+
+        if (lookupError || !document) {
+          return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+        }
+
+        const { error: docError } = await admin
+          .from('kyc_documents')
+          .update({
+            verification_status: reviewStatus,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user.id,
+            rejection_reason: reviewStatus === 'rejected' ? reason : null,
+          })
           .eq('id', documentId)
 
         if (docError) throw docError
 
-        // Log admin action to audit table
         await logAdminAction(user.id, 'document_review', {
           document_id: documentId,
-          action: status,
-          reason
+          seller_id: document.seller_id,
+          action: reviewStatus,
+          reason: reviewStatus === 'rejected' ? reason : null,
         })
 
-        return NextResponse.json({ 
-          success: true, 
-          message: `Document ${status} successfully` 
+        return NextResponse.json({
+          success: true,
+          message: `Document ${reviewStatus} successfully`,
         })
+      }
 
-      case 'complete_verification':
-        if (!requestId || !status) {
-          return NextResponse.json({ 
-            error: 'Request ID and status are required' 
-          }, { status: 400 })
+      case 'complete_verification': {
+        if (!requestId || !VERIFICATION_FINAL_STATUSES.includes(status as VerificationFinalStatus)) {
+          return NextResponse.json(
+            { error: 'Request ID and a valid final status are required' },
+            { status: 400 },
+          )
         }
 
-        // Get the seller ID for this request using admin client
-        const { data: requestData } = await getSupabaseAdmin()
-          .from('kyc_verification_requests')
-          .select('seller_id')
-          .eq('id', requestId)
-          .single()
+        const finalStatus = status as VerificationFinalStatus
+        if (finalStatus === 'rejected' && !notes) {
+          return NextResponse.json({ error: 'Reviewer notes are required for rejection' }, { status: 400 })
+        }
 
-        if (!requestData) {
+        const { data: requestData, error: requestLookupError } = await admin
+          .from('kyc_verification_requests')
+          .select('id, seller_id, required_documents, submitted_documents')
+          .eq('id', requestId)
+          .maybeSingle()
+
+        if (requestLookupError || !requestData) {
           return NextResponse.json({ error: 'Verification request not found' }, { status: 404 })
         }
 
-        // Update verification request using admin client
-        const { error: requestError } = await getSupabaseAdmin()
+        if (finalStatus === 'approved') {
+          const required = requestData.required_documents ?? []
+          const { data: documents, error: documentsError } = await admin
+            .from('kyc_documents')
+            .select('document_type, verification_status')
+            .eq('seller_id', requestData.seller_id)
+
+          if (documentsError) throw documentsError
+
+          const approvedTypes = new Set(
+            (documents ?? [])
+              .filter((document) => document.verification_status === 'approved')
+              .map((document) => document.document_type),
+          )
+          const missingApproval = required.find((documentType: string) => !approvedTypes.has(documentType))
+
+          if (missingApproval) {
+            return NextResponse.json(
+              { error: `Required document is not approved: ${missingApproval}` },
+              { status: 409 },
+            )
+          }
+        }
+
+        const now = new Date().toISOString()
+        const sellerStatus = finalStatus === 'approved' ? 'verified' : 'rejected'
+
+        const { error: requestError } = await admin
           .from('kyc_verification_requests')
           .update({
-            verification_status: status,
-            review_date: new Date().toISOString(),
-            reviewer_notes: notes
+            verification_status: finalStatus,
+            review_date: now,
+            reviewer_notes: notes || null,
           })
           .eq('id', requestId)
 
         if (requestError) throw requestError
 
-        // Update seller profile using admin client
-        const { error: sellerError } = await getSupabaseAdmin()
+        const { error: sellerError } = await admin
           .from('profiles_seller')
-          .update({ verification_status: status })
+          .update({
+            verification_status: sellerStatus,
+            updated_at: now,
+          })
           .eq('id', requestData.seller_id)
 
-        if (sellerError) throw sellerError
+        if (sellerError) {
+          // Avoid leaving the request approved when the seller capability could
+          // not be promoted. Revert the request to an actionable review state.
+          await admin
+            .from('kyc_verification_requests')
+            .update({
+              verification_status: 'under_review',
+              review_date: null,
+            })
+            .eq('id', requestId)
+          throw sellerError
+        }
 
-        // Log admin action
         await logAdminAction(user.id, 'verification_complete', {
           request_id: requestId,
           seller_id: requestData.seller_id,
-          action: status,
-          notes
+          action: finalStatus,
+          seller_status: sellerStatus,
+          notes: notes || null,
         })
 
-        return NextResponse.json({ 
-          success: true, 
-          message: `Verification ${status} successfully` 
+        return NextResponse.json({
+          success: true,
+          message: `Verification ${finalStatus} successfully`,
         })
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
-
   } catch (error) {
     console.error('Error in admin KYC review:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Helper function to log admin actions to audit table
-async function logAdminAction(adminId: string, action: string, metadata: any) {
+async function logAdminAction(adminId: string, action: string, metadata: Record<string, unknown>) {
   try {
     const { error } = await getSupabaseAdmin()
       .from('admin_audit_logs')
@@ -140,7 +200,7 @@ async function logAdminAction(adminId: string, action: string, metadata: any) {
         target_type: getTargetType(action),
         target_id: getTargetId(metadata),
         metadata,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
 
     if (error) {
@@ -148,7 +208,6 @@ async function logAdminAction(adminId: string, action: string, metadata: any) {
       return false
     }
 
-    console.log('Admin Action Logged:', { adminId, action, metadata })
     return true
   } catch (error) {
     console.error('Error logging admin action:', error)
@@ -156,7 +215,6 @@ async function logAdminAction(adminId: string, action: string, metadata: any) {
   }
 }
 
-// Helper to determine target type from action
 function getTargetType(action: string): string {
   switch (action) {
     case 'document_review':
@@ -168,7 +226,7 @@ function getTargetType(action: string): string {
   }
 }
 
-// Helper to extract target ID from metadata
-function getTargetId(metadata: any): string {
-  return metadata.document_id || metadata.request_id || 'unknown'
+function getTargetId(metadata: Record<string, unknown>): string {
+  const value = metadata.document_id ?? metadata.request_id
+  return typeof value === 'string' ? value : 'unknown'
 }
