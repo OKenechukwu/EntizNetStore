@@ -1,9 +1,5 @@
 // app/auth/sign-in/page.tsx
-import dynamic from "next/dynamic";
-
-const AuthCard = dynamic(() => import("@/components/auth/AuthCard"), {
-  ssr: false,
-});
+import AuthCard from "@/components/auth/AuthCard";
 
 export default function SignInOnlyPage() {
   return (
