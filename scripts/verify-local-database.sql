@@ -91,6 +91,40 @@ begin
 end
 $$;
 
+-- Private KYC storage must be reproduced exactly enough to remain non-public,
+-- size-limited and restricted to the launch-approved document formats.
+do $$
+declare
+  bucket_public boolean;
+  bucket_limit bigint;
+  bucket_mimes text[];
+begin
+  select public, file_size_limit, allowed_mime_types
+    into bucket_public, bucket_limit, bucket_mimes
+  from storage.buckets
+  where id = 'kyc-documents';
+
+  if not found then
+    raise exception 'Required private KYC storage bucket is missing';
+  end if;
+  if bucket_public then
+    raise exception 'KYC storage bucket must remain private';
+  end if;
+  if bucket_limit is distinct from 10485760 then
+    raise exception 'KYC storage bucket must enforce a 10MB file limit, found %', bucket_limit;
+  end if;
+  if not coalesce(bucket_mimes @> array[
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp'
+  ]::text[], false) then
+    raise exception 'KYC storage bucket MIME allow-list differs from M0 baseline';
+  end if;
+end
+$$;
+
 -- Canonical supporting indexes introduced/required by M0.
 do $$
 declare
