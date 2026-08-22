@@ -21,7 +21,7 @@ export default async function BSMApplyPage() {
     <div className="container mx-auto max-w-2xl px-4 py-12">
       <h1 className="text-3xl font-bold mb-3">Brands, Suppliers & Manufacturers</h1>
       <p className="text-foreground/70 mb-8">
-        Add a Business/BSM capability to the same account you already use to shop or sell.
+        Create a sell-capable Business/BSM account on your existing identity. Buyer stays active, while Seller and Business capabilities are added together and protected by business-grade KYC.
       </p>
       <div className="rounded-lg border border-white/10 bg-card p-6 md:p-8">
         <CapabilityApplicationForm kind="business" />
