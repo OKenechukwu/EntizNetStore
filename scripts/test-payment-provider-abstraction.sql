@@ -17,8 +17,16 @@ values
 insert into public.profiles_buyer(id, display_name)
 values ('81000000-0000-0000-0000-000000000001', 'Provider Buyer');
 
-insert into public.profiles_seller(id, storefront_name, verification_status)
-values ('82000000-0000-0000-0000-000000000002', 'Provider Seller', 'verified');
+insert into public.profiles_seller(
+  id, storefront_name, verification_status, return_policy, shipping_policy
+)
+values (
+  '82000000-0000-0000-0000-000000000002',
+  'Provider Seller',
+  'verified',
+  'Returns accepted within 14 days for eligible unused items.',
+  'Tracked shipping is dispatched within three business days.'
+);
 
 -- This fixture represents a listing that already passed M2 moderation. This
 -- suite validates the payment-provider contract rather than product review.
@@ -206,7 +214,6 @@ begin
 end
 $$;
 
--- Exact provider event replay is ignored and cannot consume inventory twice.
 do $$
 declare
   v_processed boolean;
@@ -231,7 +238,6 @@ begin
 end
 $$;
 
--- A late terminal event cannot downgrade an already-paid checkout.
 select public.finalize_checkout_payment_v2(
   'evt_late_terminal',
   'simulator.payment.terminal_failure',
@@ -262,7 +268,6 @@ begin
 end
 $$;
 
--- Provider/payment reference mismatch is rejected before any state mutation.
 do $$
 begin
   begin
@@ -283,7 +288,6 @@ begin
 end
 $$;
 
--- Session 2: terminal failure releases reservation and cancels unpaid order.
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '81000000-0000-0000-0000-000000000001', true);
@@ -367,7 +371,6 @@ begin
 end
 $$;
 
--- Finalizer remains a trusted worker boundary, not a browser/user capability.
 do $$
 begin
   if has_function_privilege(
