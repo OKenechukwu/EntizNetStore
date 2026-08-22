@@ -1,6 +1,6 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-22**
+Last reviewed: **2026-08-23**
 
 This document is the canonical launch-readiness record. A feature looking complete in the UI does not clear a blocker. A blocker is cleared only by verified production-safe behavior, authorization, failure handling, and relevant tests/evidence.
 
@@ -28,7 +28,7 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Replace template README | VERIFIED | Production-oriented EntizNetStore README committed. |
 | Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`; buyer-payment and seller-payout configuration are provider-neutral and fail closed when unconfigured. |
 | Database security-advisor cleanup | VERIFIED WITH DOCUMENTED EXCEPTIONS | Remaining advisor entries are intentional deny-by-default tables and audited authenticated `SECURITY DEFINER` RPCs. |
-| RLS audit | VERIFIED | Current canonical baseline requires RLS on all 31 public tables; the M1 Business projection is included and intentional no-policy tables deny by default. |
+| RLS audit | VERIFIED | M0 established RLS on every then-current public table; later milestones extend the baseline and verify their own additions. |
 | `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment/payout finalization and M1 admin KYC decisions remain restricted to their intended principals. |
 | Performance indexes/policy optimization | VERIFIED | Missing FK indexes, auth-init-plan and overlapping permissive-policy warnings removed. |
 | Capability architecture decision | VERIFIED | `docs/architecture/ADR-0001-account-capabilities.md`. |
@@ -36,7 +36,7 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Canonical launch blocker record | VERIFIED | This document. |
 | Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints, anonymous DeepL proxy, and client translation callers removed; static localization remains. |
 | Clean dependency/install/build verification | VERIFIED | Locked install, production-foundation scan, TypeScript, production build, dependency audit and fresh database reproduction are enforced by CI. |
-| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs M1 plus commerce/payment/payout regressions, and shuts down cleanly. |
+| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs milestone plus commerce/payment/payout regressions, and shuts down cleanly. |
 
 **M0 status: VERIFIED.** The production-foundation exit gate is complete. M0 verification does **not** clear the independent P0 launch blockers below.
 
@@ -67,11 +67,43 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Audit trails | VERIFIED | KYC decision and `admin_audit_logs` insertion occur in one database transaction; final BSM decision synchronizes Seller + Business state atomically. |
 | Database/RLS baseline | VERIFIED | Live EntizNetStore reports 31 public tables, 31 with RLS, 9 intentional deny-by-default tables, and all four M1 buckets. |
 | Fresh regression/build evidence | VERIFIED | PR #7 CI passed production-foundation scan, TypeScript, production build, dependency audit, fresh database replay, M1 identity/KYC/storage tests, BSM verification test, commerce/payment/payout suites and payout concurrency. |
-| Live migration state | VERIFIED | All three M1 forward migrations are applied to Supabase project `kllwwurklumhawfsilpd`, including final Seller/Business KYC synchronization. |
+| Live migration state | VERIFIED | All M1 forward migrations are applied to Supabase project `kllwwurklumhawfsilpd`, including final Seller/Business KYC synchronization. |
 
 **M1 status: VERIFIED.** A new standalone EntizNetStore account can establish Buyer/Seller or Buyer/Seller/Business capability and complete the canonical Supabase-backed verification/storage path without Replit infrastructure. This milestone does **not** mean public commercial launch is approved; the P0/P1 gates below remain authoritative.
 
 Architecture/evidence: `docs/architecture/M1-IDENTITY-KYC-STORAGE.md`, `docs/architecture/ADR-0001-account-capabilities.md`, `scripts/test-m1-identity-kyc-storage.sql`, `scripts/test-m1-bsm-verification.sql`.
+
+---
+
+## M2 — Catalogue & Seller Operations exit gate
+
+**Functional exit condition:** a verified Seller can operate a stable storefront, create and manage a complete product/variant/inventory listing, submit it for independent Admin review, and expose only the approved revision publicly without any Replit catalogue infrastructure.
+
+| Item | Status | Evidence / remaining requirement |
+| --- | --- | --- |
+| Persisted stable storefront slug | VERIFIED | Unique non-null `profiles_seller.store_slug`; clean slug when available, deterministic collision handling, preserved across store-name edits. |
+| Trusted storefront profile mutation | VERIFIED | `/api/seller/storefront` updates store name, bio, shipping and return policies through trusted server authorization; browser profile mutation helpers removed. |
+| Store branding | VERIFIED | Storefront settings combine the M1 validated logo/banner pipeline with M2 profile/policy editing. |
+| Rich product catalogue | VERIFIED | `seller_save_product_v3` persists canonical product type, descriptions, brand/categories, pricing/cost, shipping/tax metadata, material/weight/age, tags/search and up to 100 variants. |
+| Variant/SKU/inventory operations | VERIFIED | Multi-variant options, SKU/barcode, price/cost, stock, inventory policy, weight, shipping and active state are persisted atomically. |
+| RPC-only catalogue writes | VERIFIED | Browser direct product/variant/media/category DML revoked; old Seller save RPCs no longer authenticated-executable. |
+| Product moderation lifecycle | VERIFIED | `not_submitted → pending → approved/rejected`; only approved + active products of verified Sellers are public. |
+| Independent Admin review | VERIFIED | Trusted Admin queue and service-role-only `admin_review_product`; decision + moderation event + admin audit are one transaction. |
+| Edit invalidates approval | VERIFIED | Any Seller content/catalogue edit returns the listing to draft/not_submitted before it can reappear publicly. |
+| Publication invariant | VERIFIED | Database constraint prevents `active` unless moderation is `approved`, including trusted/internal writes. |
+| Seller policy completeness | VERIFIED | Review requires a real Seller return policy and, for shippable products, a real shipping policy; product page no longer fabricates U.S. origin/free delivery/default terms. |
+| Inventory reservation safety | VERIFIED | Seller cannot reduce tracked/deny-policy stock below active non-expired checkout reservations. |
+| Non-orphanable ownership/history | VERIFIED | `products.seller_id` is required/restricting; product deletion fails when order history exists. |
+| Public storefront/product links | VERIFIED | Public storefront uses persisted slug; product pages link to canonical Seller store and expose only approved catalogue rows. |
+| Seller operating UX | VERIFIED | Product list/detail/editor show moderation, rejection notes, inventory, Submit for Review, Unpublish/Republish and rich catalogue management states. |
+| M2 fresh-database regression gates | VERIFIED | CI verifies structural invariants/indexes, catalogue/moderation isolation, inventory-reservation guard, active-product approval invariant and Seller policy completeness alongside all M1 and commerce/payment/payout suites. |
+| Branch release CI | VERIFIED | CI #185 passed the full M2 release stack; CI #187 re-passed the complete stack after adding moderation FK indexes and structural assertions. |
+| Live M2 migrations/advisors | VERIFIED | All eight M2 forward migrations are live on `kllwwurklumhawfsilpd`; live baseline is 32 public tables / 32 RLS, 9 intentional deny-by-default tables. Two new FK advisor findings were fixed; remaining M2 `SECURITY DEFINER` Seller RPC warnings are reviewed intentional boundaries. |
+| Main/Vercel verification | PENDING MERGE | Pre-merge Vercel production runtime baseline has no error clusters. Final verification is required immediately after PR #8 reaches `main`. |
+
+**M2 status: RELEASE READY — engineering, fresh-database CI and live Supabase rollout are verified. Only merged-`main`/production deployment evidence remains before this milestone is marked fully VERIFIED.**
+
+Architecture/evidence: `docs/architecture/M2-CATALOGUE-SELLER-OPERATIONS.md`, `scripts/verify-m2-database-invariants.sql`, `scripts/test-m2-catalog-moderation.sql`, `scripts/test-m2-inventory-reservation-guard.sql`, `scripts/test-m2-active-approval-invariant.sql`, `scripts/test-m2-product-policy-completeness.sql`.
 
 ---
 
@@ -130,20 +162,25 @@ The missing external processor does **not** block continued engineering or inter
 
 Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Payout coverage verifies seller-only reads, cross-seller isolation, no authenticated payout mutation RPC execution, no authenticated access to raw provider events, and service-role-only payout mutation.
 
-M1 now additionally covers multi-capability profile coexistence, Business visibility boundaries, own-vs-cross-seller KYC isolation, no direct authenticated KYC mutation, service-role-only KYC review RPCs, required-document approval gating, atomic audit logging and BSM Seller/Business synchronization. The canonical reproduction requires RLS on all 31 public tables.
+M1 additionally covers multi-capability profile coexistence, Business visibility boundaries, own-vs-cross-seller KYC isolation, no direct authenticated KYC mutation, service-role-only KYC review RPCs, required-document approval gating, atomic audit logging and BSM Seller/Business synchronization.
 
-Still required before public launch: broader HTTP-level anon/buyer/seller/cross-account/admin ownership tests for catalog, messaging endpoints, product/branding/media routes and remaining privileged application routes. Database-level M1 isolation is verified; P0 requires representative end-to-end route coverage too.
+M2 adds database-level cross-Seller catalogue isolation, RPC-only product mutation, Admin-only moderation, public visibility gating, moderation-history isolation, publication invariants, Seller policy prerequisites and inventory-reservation safety. The reproduced M2 baseline requires RLS on all 32 public tables.
+
+Still required before public launch: broader HTTP-level anon/buyer/seller/cross-account/admin ownership tests for catalogue, messaging endpoints, product/branding/media/storefront routes and remaining privileged application routes. Database-level isolation is strong; P0 requires representative end-to-end route coverage too.
 
 ## P0-05 — Seller/admin/KYC/storage security completion
 
 **Status: IN PROGRESS**
 
-Verified implementation now includes:
+Verified/implemented security includes:
 - private `kyc-documents` bucket with 10MB PDF/JPEG/PNG/WebP restrictions and Seller-scoped signed access;
 - KYC object re-download, actual size enforcement and PDF/JPEG/PNG/WebP magic-byte validation instead of trusting browser metadata;
 - Seller/Business lifecycle and final approval gated on every mandatory document being approved;
-- transactional admin document/final decisions with atomic audit rows and repeat-review protection;
+- transactional admin KYC decisions with atomic audit rows and repeat-review protection;
 - public `product-media` bucket with server ownership/existence/size/signature verification before product save;
+- M2 RPC-only catalogue mutation and independent Admin product moderation;
+- M2 product edits invalidate approval before public visibility can return;
+- M2 stock edits respect active checkout reservations;
 - public `seller-branding` bucket plus usable logo/banner upload UI, server byte validation and replacement cleanup;
 - private `message-attachments` bucket plus sender-only upload, participant-only access, participant RLS and integrated message attachment UI;
 - trusted server conversation-key access so encryption keys remain behind a browser-denied table boundary;
@@ -181,7 +218,7 @@ Production needs actionable monitoring for payment/payout callback failures, che
 
 **Status: OPEN for EntizNet entry; does not block standalone internal testing**
 
-M1 has established compatible one-identity/multi-capability semantics in EntizNetStore. Before EntizNet-linked launch, implement and verify the secure identity/capability handoff described by ADR-0001. Standalone and EntizNet entry must resolve to the same identity/permissions without duplicated credentials or direct cross-product database coupling.
+M1 established compatible one-identity/multi-capability semantics in EntizNetStore. Before EntizNet-linked launch, implement and verify the secure identity/capability handoff described by ADR-0001. Standalone and EntizNet entry must resolve to the same identity/permissions without duplicated credentials or direct cross-product database coupling.
 
 ## P0-09 — Seller payout/disbursement end-to-end verification
 

@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStorefront } from "@/lib/data/products";
+import { getStorefrontByIdentity } from "@/lib/data/storefront";
 
 export const dynamic = "force-dynamic";
 
-// Public storefront data (seller profile + active products) from Supabase.
+// Public storefront data (verified Seller profile + approved active products)
+// from Supabase. RLS remains the final visibility boundary.
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const data = await getStorefront(id, {
+    const data = await getStorefrontByIdentity(id, {
       q: searchParams.get("q") ?? undefined,
       page: Number(searchParams.get("page") ?? 1) || 1,
       pageSize: Number(searchParams.get("pageSize") ?? 24) || 24,
@@ -22,9 +23,6 @@ export async function GET(
     return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to load storefront:", error);
-    return NextResponse.json(
-      { error: "Failed to load storefront" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load storefront" }, { status: 500 });
   }
 }

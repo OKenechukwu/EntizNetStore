@@ -1,5 +1,6 @@
 // app/products/[slug]/page.tsx
 import { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getProductBySlug,
@@ -7,6 +8,7 @@ import {
   getFeaturedProducts,
   getSellerProducts,
 } from "@/lib/data/products";
+import { getSellerStorefrontPublicDetails } from "@/lib/data/storefront";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductInfoPanelClient from "@/components/product/ProductInfoPanelClient";
 import ProductTabs from "@/components/product/ProductTabs";
@@ -19,9 +21,6 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-/* ---------------------------------- */
-/* Canonical Supabase product fetchers */
-/* ---------------------------------- */
 async function getProductFromDb(slug: string): Promise<Product | null> {
   try {
     return await getProductBySlug(slug);
@@ -31,7 +30,6 @@ async function getProductFromDb(slug: string): Promise<Product | null> {
   }
 }
 
-/* Recommendations for DB product */
 async function getRecommendationsFromDb(productSlug: string): Promise<Product[]> {
   try {
     return await getRelatedProducts(productSlug, 8);
@@ -41,7 +39,6 @@ async function getRecommendationsFromDb(productSlug: string): Promise<Product[]>
   }
 }
 
-/* Sponsored (DB) */
 async function getSponsoredProductsDb(): Promise<Product[]> {
   try {
     return await getFeaturedProducts(6, "entiznetstore");
@@ -51,7 +48,6 @@ async function getSponsoredProductsDb(): Promise<Product[]> {
   }
 }
 
-/* More from store */
 async function getStoreProducts(storeId: string, excludeId: string): Promise<Product[]> {
   try {
     return await getSellerProducts(storeId, excludeId, 8);
@@ -61,79 +57,97 @@ async function getStoreProducts(storeId: string, excludeId: string): Promise<Pro
   }
 }
 
-/* ---------------------------------- */
-/* Metadata */
-/* ---------------------------------- */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const prod = await getProductFromDb(slug);
+  const product = await getProductFromDb(slug);
 
-  if (!prod) {
-    return { title: "Product Not Found" };
-  }
+  if (!product) return { title: "Product Not Found" };
 
   return {
-    title: `${prod.title} | EntizNetStore`,
-    description: prod.description || prod.title,
+    title: `${product.title} | EntizNetStore`,
+    description: product.description || product.title,
   };
 }
 
-/* ---------------------------------- */
-/* Page */
-/* ---------------------------------- */
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
   const product = await getProductFromDb(slug);
 
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
-  // Data for rows/tabs
-  const [recommendations, sponsored, storeProducts] = await Promise.all([
+  const [recommendations, sponsored, storeProducts, storefrontDetails] = await Promise.all([
     getRecommendationsFromDb(slug),
     getSponsoredProductsDb(),
-    product!.store ? getStoreProducts(product!.store.id, product!.id) : Promise.resolve([] as Product[]),
+    product.store ? getStoreProducts(product.store.id, product.id) : Promise.resolve([] as Product[]),
+    product.store ? getSellerStorefrontPublicDetails(product.store.id) : Promise.resolve(null),
   ]);
+
+  // Older data-access code supplied placeholder U.S. origin/free-delivery data.
+  // M2 intentionally removes those claims. Public products must now have real
+  // Seller return terms and, where shipping is required, a real shipping policy
+  // before review can proceed.
+  const displayProduct: Product = {
+    ...product,
+    shippingOrigin: undefined,
+    deliveryOptions: undefined,
+    returnPolicy: storefrontDetails?.returnPolicy
+      ? {
+          shortLabel: "Seller return policy",
+          fullText: storefrontDetails.returnPolicy,
+        }
+      : undefined,
+  };
+
+  const canonicalStoreSlug = storefrontDetails?.storeSlug ?? null;
 
   return (
     <main className="min-h-screen w-full bg-background px-4 py-8 md:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
-        {/* Main 2-column layout */}
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Left: Gallery */}
           <div>
-            <ProductGallery images={product!.images} productName={product!.title} />
+            <ProductGallery images={displayProduct.images} productName={displayProduct.title} />
           </div>
 
-          {/* Right: Info Panel (client handles currency / locale) */}
           <div>
-            <ProductInfoPanelClient product={product!} />
+            <ProductInfoPanelClient product={displayProduct} />
 
-            {/* Chat Seller */}
-            {product!.store && (
-              <div className="mt-6 border-t border-white/10 pt-6">
+            {storefrontDetails?.shippingPolicy ? (
+              <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                <h2 className="text-sm font-semibold">Seller shipping policy</h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm opacity-75">
+                  {storefrontDetails.shippingPolicy}
+                </p>
+              </div>
+            ) : null}
+
+            {displayProduct.store && (
+              <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/10 pt-6">
+                {canonicalStoreSlug ? (
+                  <Link
+                    href={`/store/${canonicalStoreSlug}`}
+                    className="luxury-button-outline px-4 py-2 text-sm"
+                  >
+                    Visit {displayProduct.store.name}
+                  </Link>
+                ) : null}
                 <ChatSellerButton
-                  sellerId={product!.store.id}
-                  productId={product!.id}
-                  productTitle={product!.title}
+                  sellerId={displayProduct.store.id}
+                  productId={displayProduct.id}
+                  productTitle={displayProduct.title}
                 />
               </div>
             )}
           </div>
         </div>
 
-        {/* Sponsored Products */}
         {sponsored.length > 0 && <SponsoredProductsRow products={sponsored} />}
 
-        {/* Tabs: description + recommendations */}
-        <ProductTabs product={product!} recommendations={recommendations} />
+        <ProductTabs product={displayProduct} recommendations={recommendations} />
 
-        {/* More from Store */}
-        {product!.store && storeProducts.length > 0 && (
+        {displayProduct.store && canonicalStoreSlug && storeProducts.length > 0 && (
           <MoreFromStoreRow
-            storeName={product!.store.name}
-            storeSlug={product!.store.slug}
+            storeName={displayProduct.store.name}
+            storeSlug={canonicalStoreSlug}
             products={storeProducts}
           />
         )}

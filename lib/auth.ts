@@ -40,14 +40,12 @@ export type SellerVerificationStatus =
 export type SellerProfile = {
   id: string;
   storefront_name: string;
+  store_slug: string;
   bio?: string;
   logo_url?: string;
   banner_url?: string;
   business_type: 'individual' | 'business' | 'creator';
-  tax_id?: string;
   verification_status: SellerVerificationStatus;
-  verification_documents?: any;
-  payout_method?: any;
   return_policy?: string;
   shipping_policy?: string;
   created_at: string;
@@ -76,13 +74,6 @@ export type BusinessProfile = {
   updated_at: string;
 };
 
-function normalizeCountryInput(value?: string | null): string | undefined {
-  if (!value) return undefined;
-  const s = value.trim();
-  if (!s) return undefined;
-  return s.slice(0, 2).toUpperCase();
-}
-
 export async function signUp(email: string, password: string, _role: UserRole = 'buyer') {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
@@ -110,7 +101,8 @@ export async function getCurrentSession(): Promise<Session | null> {
   return session;
 }
 
-// Capability creation is server-only through /api/onboarding/*.
+// Capability creation and mutation are server-only through trusted /api routes.
+// Browser code may read the current user's profiles through RLS.
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
   const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
   if (error) return null;
@@ -129,22 +121,18 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   return data;
 }
 
-export async function updateBuyerProfile(userId: string, updates: Partial<BuyerProfile>) {
-  const normalized = {
-    ...updates,
-    country: normalizeCountryInput(updates.country),
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabase.from('profiles_buyer').update(normalized).eq('id', userId).select().single();
-  if (error) throw error;
-  return data;
-}
-
-export async function updateSellerProfile(userId: string, updates: Partial<SellerProfile>) {
-  const payload = { ...updates, updated_at: new Date().toISOString() };
-  const { data, error } = await supabase.from('profiles_seller').update(payload).eq('id', userId).select().single();
-  if (error) throw error;
-  return data;
+// Compatibility helper for the existing Buyer dashboard. The userId argument is
+// intentionally not trusted or sent to the backend; the server derives identity
+// from the authenticated session and updates only that Buyer projection.
+export async function updateBuyerProfile(_userId: string, updates: Partial<BuyerProfile>) {
+  const response = await fetch('/api/buyer/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Unable to update buyer profile');
+  return result.profile as BuyerProfile;
 }
 
 export async function getUserRole(userId: string): Promise<UserRole> {
