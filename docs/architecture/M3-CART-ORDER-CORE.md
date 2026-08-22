@@ -28,6 +28,10 @@ It is not a separate roadmap milestone.
 
 Normal browser clients must not be able to manufacture arbitrary checkout item arrays, prices, totals, addresses, order state, reservation state or payment state. Those values must flow from trusted server-owned marketplace records.
 
+## Relationship to combined M3
+
+This foundation is part of the combined M3 execution because Admin order/refund/dispute/revenue tooling cannot be trustworthy while checkout is still browser-authoritative. It should be completed and verified early, then reused by the operational control plane and EntizNet integration work rather than replaced.
+
 ## Deployment discipline
 
 The high-frequency development branch disables its own Vercel auto-deploys so GitHub CI can absorb rapid engineering commits without exhausting the Vercel Hobby deployment quota. `main` remains production-enabled.
