@@ -19,7 +19,7 @@ declare
   v_request public.kyc_verification_requests%rowtype;
   v_missing text;
   v_seller_status text;
-  v_has_business boolean;
+  v_business_rows integer := 0;
 begin
   if p_status not in ('approved', 'rejected') then
     raise exception 'invalid_verification_status';
@@ -79,7 +79,7 @@ begin
       updated_at = now()
   where id = v_request.seller_id;
 
-  get diagnostics v_has_business = row_count;
+  get diagnostics v_business_rows = row_count;
 
   insert into public.admin_audit_logs (
     admin_id, action, target_type, target_id, metadata, timestamp
@@ -93,7 +93,7 @@ begin
       'seller_id', v_request.seller_id,
       'action', p_status,
       'seller_status', v_seller_status,
-      'business_status_synced', v_has_business,
+      'business_status_synced', v_business_rows > 0,
       'notes', nullif(btrim(coalesce(p_notes, '')), '')
     ),
     now()
