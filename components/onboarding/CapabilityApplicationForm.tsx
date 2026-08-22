@@ -38,7 +38,7 @@ export default function CapabilityApplicationForm({ kind }: Props) {
       if (!response.ok) throw new Error(result.error || 'Unable to complete onboarding');
 
       await refreshProfile();
-      router.replace(isSeller ? '/dashboard/verification' : '/dashboard/bsm');
+      router.replace('/dashboard/verification');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to complete onboarding');
@@ -95,13 +95,17 @@ export default function CapabilityApplicationForm({ kind }: Props) {
       <div className="rounded-lg border border-accent-gold/20 bg-accent-gold/5 p-4 text-sm opacity-90">
         {isSeller
           ? 'Your Buyer capability stays active. Seller verification starts in pending state and the next step is secure KYC document submission.'
-          : 'Your Buyer capability stays active. Business/BSM is added to the same account and can coexist with Seller capability.'}
+          : 'Your BSM onboarding keeps Buyer active and provisions Seller + Business capabilities on the same identity. The next step is business-grade KYC before public product publishing.'}
       </div>
 
       {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
 
       <button type="submit" disabled={busy} className="luxury-button w-full py-3 disabled:opacity-60">
-        {busy ? 'Creating capability…' : isSeller ? 'Continue to seller verification' : 'Create Business/BSM capability'}
+        {busy
+          ? 'Creating capability…'
+          : isSeller
+            ? 'Continue to seller verification'
+            : 'Continue to business verification'}
       </button>
     </form>
   );
