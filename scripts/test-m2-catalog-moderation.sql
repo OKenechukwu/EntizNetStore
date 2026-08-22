@@ -25,7 +25,7 @@ values
   ('91000000-0000-0000-0000-000000000001', 'M2 Seller One Store', 'individual', 'verified'),
   ('92000000-0000-0000-0000-000000000002', 'M2 Seller Two Store', 'individual', 'verified');
 
--- Store slugs are persisted, stable and unique instead of derived by scanning.
+-- Store slugs are persisted, clean and unique instead of derived by scanning.
 do $$
 declare
   v_slug_one text;
@@ -36,7 +36,7 @@ begin
   if v_slug_one is null or v_slug_two is null or v_slug_one = v_slug_two then
     raise exception 'Stable unique store_slug provisioning failed: %, %', v_slug_one, v_slug_two;
   end if;
-  if v_slug_one !~ '^m2-seller-one-store-' then
+  if v_slug_one <> 'm2-seller-one-store' then
     raise exception 'Unexpected canonical store slug: %', v_slug_one;
   end if;
 end
@@ -109,13 +109,19 @@ select public.seller_save_product_v3(
   array['moderated','premium']
 ) as product_id \gset
 
+-- psql variables are not interpolated safely inside dollar-quoted DO bodies.
+-- Persist the generated ID in a session GUC for all procedural assertions.
+select set_config('entiznetstore.m2_product_id', :'product_id', false);
+
 -- Direct table mutation is forbidden even for the owning verified Seller.
 do $$
+declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
 begin
   begin
     update public.products
     set status = 'active', moderation_status = 'approved'
-    where id = :'product_id'::uuid;
+    where id = v_product_id;
     raise exception 'Seller unexpectedly bypassed RPC-only product mutation';
   exception
     when insufficient_privilege then null;
@@ -123,7 +129,7 @@ begin
 
   begin
     insert into public.product_media(product_id, type, url)
-    values (:'product_id'::uuid, 'image', 'https://example.invalid/bypass.webp');
+    values (v_product_id, 'image', 'https://example.invalid/bypass.webp');
     raise exception 'Seller unexpectedly bypassed RPC-only child mutation';
   exception
     when insufficient_privilege then null;
@@ -134,9 +140,10 @@ $$;
 -- Draft/not-submitted product is visible to owner but not anonymous users.
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_own integer;
 begin
-  select count(*) into v_own from public.products where id = :'product_id'::uuid;
+  select count(*) into v_own from public.products where id = v_product_id;
   if v_own <> 1 then raise exception 'Seller cannot read own draft'; end if;
 end
 $$;
@@ -145,9 +152,10 @@ reset role;
 set local role anon;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_public integer;
 begin
-  select count(*) into v_public from public.products where id = :'product_id'::uuid;
+  select count(*) into v_public from public.products where id = v_product_id;
   if v_public <> 0 then raise exception 'Unreviewed product leaked publicly'; end if;
 end
 $$;
@@ -159,10 +167,12 @@ select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002
 select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 
 do $$
+declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
 begin
   begin
     perform public.seller_save_product_v3(
-      :'product_id'::uuid,
+      v_product_id,
       'Cross seller overwrite', '', '', 'physical', 10, null, null, null,
       array['b9ec6994-3765-4a06-a072-6bcf6b619645']::uuid[],
       array['https://example.invalid/cross.webp'],
@@ -184,15 +194,16 @@ select public.seller_submit_product_for_review(:'product_id'::uuid);
 reset role;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_moderation text;
   v_status text;
   v_events integer;
 begin
   select moderation_status, status into v_moderation, v_status
-  from public.products where id = :'product_id'::uuid;
+  from public.products where id = v_product_id;
   select count(*) into v_events
   from public.product_moderation_events
-  where product_id = :'product_id'::uuid and action = 'submitted';
+  where product_id = v_product_id and action = 'submitted';
   if v_moderation <> 'pending' or v_status <> 'draft' or v_events <> 1 then
     raise exception 'Product submission transition failed: moderation %, status %, events %', v_moderation, v_status, v_events;
   end if;
@@ -203,9 +214,10 @@ $$;
 set local role anon;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_public integer;
 begin
-  select count(*) into v_public from public.products where id = :'product_id'::uuid;
+  select count(*) into v_public from public.products where id = v_product_id;
   if v_public <> 0 then raise exception 'Pending product leaked publicly'; end if;
 end
 $$;
@@ -223,17 +235,18 @@ select public.admin_review_product(
 reset role;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_moderation text;
   v_status text;
   v_admin_events integer;
   v_audits integer;
 begin
   select moderation_status, status into v_moderation, v_status
-  from public.products where id = :'product_id'::uuid;
+  from public.products where id = v_product_id;
   select count(*) into v_admin_events from public.product_moderation_events
-  where product_id = :'product_id'::uuid and action = 'approved';
+  where product_id = v_product_id and action = 'approved';
   select count(*) into v_audits from public.admin_audit_logs
-  where action = 'product_moderation' and target_id = :'product_id';
+  where action = 'product_moderation' and target_id = v_product_id::text;
   if v_moderation <> 'approved' or v_status <> 'active' or v_admin_events <> 1 or v_audits <> 1 then
     raise exception 'Atomic Admin product approval failed: moderation %, status %, events %, audits %',
       v_moderation, v_status, v_admin_events, v_audits;
@@ -245,15 +258,16 @@ $$;
 set local role anon;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_products integer;
   v_variants integer;
   v_media integer;
   v_categories integer;
 begin
-  select count(*) into v_products from public.products where id = :'product_id'::uuid;
-  select count(*) into v_variants from public.product_variants where product_id = :'product_id'::uuid;
-  select count(*) into v_media from public.product_media where product_id = :'product_id'::uuid;
-  select count(*) into v_categories from public.product_categories where product_id = :'product_id'::uuid;
+  select count(*) into v_products from public.products where id = v_product_id;
+  select count(*) into v_variants from public.product_variants where product_id = v_product_id;
+  select count(*) into v_media from public.product_media where product_id = v_product_id;
+  select count(*) into v_categories from public.product_categories where product_id = v_product_id;
   if v_products <> 1 or v_variants < 1 or v_media < 1 or v_categories < 1 then
     raise exception 'Approved catalogue visibility failed: products %, variants %, media %, categories %',
       v_products, v_variants, v_media, v_categories;
@@ -271,9 +285,11 @@ select public.seller_set_product_publication(:'product_id'::uuid, false);
 reset role;
 set local role anon;
 do $$
-declare v_public integer;
+declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
+  v_public integer;
 begin
-  select count(*) into v_public from public.products where id = :'product_id'::uuid;
+  select count(*) into v_public from public.products where id = v_product_id;
   if v_public <> 0 then raise exception 'Unpublished approved product remained public'; end if;
 end
 $$;
@@ -305,14 +321,15 @@ select public.seller_save_product_v3(
 reset role;
 do $$
 declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
   v_moderation text;
   v_status text;
   v_edits integer;
 begin
   select moderation_status, status into v_moderation, v_status
-  from public.products where id = :'product_id'::uuid;
+  from public.products where id = v_product_id;
   select count(*) into v_edits from public.product_moderation_events
-  where product_id = :'product_id'::uuid and action = 'edited';
+  where product_id = v_product_id and action = 'edited';
   if v_moderation <> 'not_submitted' or v_status <> 'draft' or v_edits < 1 then
     raise exception 'Seller edit did not invalidate product approval';
   end if;
@@ -321,9 +338,11 @@ $$;
 
 set local role anon;
 do $$
-declare v_public integer;
+declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
+  v_public integer;
 begin
-  select count(*) into v_public from public.products where id = :'product_id'::uuid;
+  select count(*) into v_public from public.products where id = v_product_id;
   if v_public <> 0 then raise exception 'Edited product leaked publicly before re-review'; end if;
 end
 $$;
@@ -335,10 +354,12 @@ select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002
 select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 
 do $$
-declare v_events integer;
+declare
+  v_product_id uuid := current_setting('entiznetstore.m2_product_id')::uuid;
+  v_events integer;
 begin
   select count(*) into v_events from public.product_moderation_events
-  where product_id = :'product_id'::uuid;
+  where product_id = v_product_id;
   if v_events <> 0 then raise exception 'Cross-seller moderation history leaked'; end if;
 end
 $$;
