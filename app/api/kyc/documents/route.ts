@@ -211,6 +211,7 @@ export async function POST(request: NextRequest) {
       const required = verificationRequest.required_documents ?? [];
       const isComplete = required.every((item: string) => submitted.includes(item));
       const requestStatus = isComplete ? 'under_review' : 'incomplete';
+      const capabilityStatus = isComplete ? 'under_review' : 'pending';
 
       const { error: updateError } = await admin
         .from('kyc_verification_requests')
@@ -219,18 +220,44 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error('Error updating KYC verification request:', updateError);
-      } else if (!['verified', 'suspended'].includes(sellerProfile.verification_status)) {
-        // Resubmission after rejection becomes actionable again. A verified or
-        // suspended seller is never silently downgraded by an extra upload.
-        const { error: sellerStatusError } = await admin
-          .from('profiles_seller')
-          .update({
-            verification_status: isComplete ? 'under_review' : 'pending',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', user.id);
-        if (sellerStatusError) {
-          console.error('Error updating seller verification lifecycle:', sellerStatusError);
+      } else {
+        if (!['verified', 'suspended'].includes(sellerProfile.verification_status)) {
+          // Resubmission after rejection becomes actionable again. A verified or
+          // suspended seller is never silently downgraded by an extra upload.
+          const { error: sellerStatusError } = await admin
+            .from('profiles_seller')
+            .update({
+              verification_status: capabilityStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+          if (sellerStatusError) {
+            console.error('Error updating seller verification lifecycle:', sellerStatusError);
+          }
+        }
+
+        // Business/BSM uses the same KYC evidence but keeps a distinct business
+        // projection. Keep its lifecycle synchronized so BSM never remains
+        // permanently "pending" after the shared seller verification advances.
+        const { data: businessProfile } = await admin
+          .from('profiles_business')
+          .select('verification_status')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (
+          businessProfile &&
+          !['verified', 'suspended'].includes(businessProfile.verification_status)
+        ) {
+          const { error: businessStatusError } = await admin
+            .from('profiles_business')
+            .update({
+              verification_status: capabilityStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+          if (businessStatusError) {
+            console.error('Error updating Business/BSM verification lifecycle:', businessStatusError);
+          }
         }
       }
     }
