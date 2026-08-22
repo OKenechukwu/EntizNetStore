@@ -56,9 +56,6 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          # Pin the stable release verified for this production baseline.
-          # Avoid `latest`: resolving it consumes GitHub release API quota and
-          # can make otherwise valid reproduction runs fail nondeterministically.
           version: 2.111.0
 
       - name: Start fresh local Supabase stack
@@ -75,6 +72,9 @@ jobs:
 
       - name: Run M1 BSM verification regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-bsm-verification.sql
+
+      - name: Run M2 catalogue and moderation regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-catalog-moderation.sql
 
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
