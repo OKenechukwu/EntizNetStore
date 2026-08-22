@@ -75,6 +75,9 @@ jobs:
       - name: Run provider-neutral payment regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
 
+      - name: Run terminal payment-state regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-terminal-state.sql
+
       - name: Stop local Supabase stack
         if: always()
         run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
