@@ -17,7 +17,7 @@ The canonical database separates capability data into projections keyed by the S
 
 `auth.users.id` is the canonical EntizNetStore identity key. Buyer, Seller, and Business/BSM capabilities are additive entitlements/projections attached to that identity; they are not permanent mutually exclusive account types.
 
-A user may therefore hold any supported combination on one identity. In the standalone EntizNetStore onboarding model, Buyer is the baseline marketplace capability and Seller/Business are additive capabilities.
+Buyer is the standalone marketplace baseline. A normal Seller therefore holds Buyer + Seller. A Business/BSM account is a commercial marketplace identity and holds Buyer + Seller + Business/BSM on the same UUID so a brand, supplier, manufacturer, distributor, wholesaler, or retailer is not left with a business profile that cannot actually sell.
 
 ### 2. Canonical capability projections
 
@@ -26,7 +26,9 @@ A user may therefore hold any supported combination on one identity. In the stan
 - `profiles_seller_private` contains private Seller/business operational data and stays separated from public storefront information.
 - `profiles_business` contains the canonical Business/BSM projection for brands, suppliers, manufacturers, distributors, wholesalers, retailers, and other supported business identities.
 
-Presence of one projection does not prohibit another projection from existing for the same user id. In particular, Seller onboarding provisions/retains Buyer rather than replacing it, and Business/BSM may coexist with both.
+Presence of one projection does not prohibit another projection from existing for the same user id. Seller onboarding provisions/retains Buyer rather than replacing it. Business/BSM onboarding provisions/retains both Buyer and Seller while adding the Business projection.
+
+The Business projection remains distinct because business identity, public business metadata, and business verification state are not the same concept as generic Seller capability, even though BSM commerce requires Seller capability too.
 
 ### 3. Capability lifecycle is server-controlled
 
@@ -37,6 +39,10 @@ Seller verification uses an explicit lifecycle:
 `pending` → `under_review` → `verified` or `rejected`, with `suspended` reserved for an operator-enforced restriction.
 
 KYC request state is tracked independently so document completeness/review can be represented without overloading the Seller profile.
+
+Business/BSM uses the same canonical KYC evidence as its Seller projection but requires the registered-business document set. Transitional and final verification state is synchronized to `profiles_business`; final Seller + Business decisions and the audit row are committed atomically.
+
+If an already-verified individual/creator Seller adds Business/BSM, the entity type has materially changed. The Seller is converted to business type and business-grade KYC is required again rather than inheriting an individual verification decision.
 
 ### 4. Authorization is server-enforced and state-aware
 
@@ -75,7 +81,8 @@ The React Native applications must use the same backend/domain capability checks
 ### Positive
 
 - A customer can become a Seller without creating a second account.
-- A Business/BSM identity can coexist with Buyer and Seller on the same UUID.
+- A BSM account can actually sell because Buyer + Seller + Business are provisioned on one UUID.
+- Business identity/verification remains explicit instead of being collapsed into a Seller boolean.
 - EntizNet can grant Store capabilities without conflicting with other Entiz ecosystem capabilities.
 - Existing RLS ownership rules continue to use the stable user UUID.
 - Sensitive Seller/KYC data remains segregated.
@@ -93,6 +100,10 @@ The React Native applications must use the same backend/domain capability checks
 ### Permanent single `role` per user
 
 Rejected because it prevents legitimate Buyer + Seller + Business combinations and conflicts with EntizNet's multi-capability account model.
+
+### Business/BSM without Seller capability
+
+Rejected because the BSM registration surface is a commerce/selling path. A Business projection without Seller capability would authenticate successfully but fail the canonical product APIs that correctly require Seller capability.
 
 ### Duplicate EntizNetStore accounts per capability
 
