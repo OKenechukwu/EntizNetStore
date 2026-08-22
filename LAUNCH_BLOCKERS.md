@@ -1,6 +1,6 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-22**
+Last reviewed: **2026-08-23**
 
 This document is the canonical launch-readiness record. A feature looking complete in the UI does not clear a blocker. A blocker is cleared only by verified production-safe behavior, authorization, failure handling, and relevant tests/evidence.
 
@@ -81,27 +81,27 @@ Architecture/evidence: `docs/architecture/M1-IDENTITY-KYC-STORAGE.md`, `docs/arc
 
 | Item | Status | Evidence / remaining requirement |
 | --- | --- | --- |
-| Persisted stable storefront slug | IMPLEMENTED / VERIFYING | Unique non-null `profiles_seller.store_slug`; clean slug when available, deterministic collision handling, preserved across store-name edits. |
-| Trusted storefront profile mutation | IMPLEMENTED / VERIFYING | `/api/seller/storefront` updates store name, bio, shipping and return policies through trusted server authorization; browser profile mutation helpers removed. |
-| Store branding | IMPLEMENTED / VERIFYING | Storefront settings combine the M1 validated logo/banner pipeline with M2 profile/policy editing. |
-| Rich product catalogue | IMPLEMENTED / VERIFYING | `seller_save_product_v3` persists canonical product type, descriptions, brand/categories, pricing/cost, shipping/tax metadata, material/weight/age, tags/search and up to 100 variants. |
-| Variant/SKU/inventory operations | IMPLEMENTED / VERIFYING | Multi-variant options, SKU/barcode, price/cost, stock, inventory policy, weight, shipping and active state are persisted atomically. |
-| RPC-only catalogue writes | IMPLEMENTED / VERIFYING | Browser direct product/variant/media/category DML revoked; old Seller save RPCs no longer authenticated-executable. |
-| Product moderation lifecycle | IMPLEMENTED / VERIFYING | `not_submitted → pending → approved/rejected`; only approved + active products of verified Sellers are public. |
-| Independent Admin review | IMPLEMENTED / VERIFYING | Trusted Admin queue and service-role-only `admin_review_product`; decision + moderation event + admin audit are one transaction. |
-| Edit invalidates approval | IMPLEMENTED / VERIFYING | Any Seller content/catalogue edit returns the listing to draft/not_submitted before it can reappear publicly. |
-| Publication invariant | IMPLEMENTED / VERIFYING | Database constraint prevents `active` unless moderation is `approved`, including trusted/internal writes. |
-| Seller policy completeness | IMPLEMENTED / VERIFYING | Review requires a real Seller return policy and, for shippable products, a real shipping policy; product page no longer fabricates U.S. origin/free delivery/default terms. |
-| Inventory reservation safety | IMPLEMENTED / VERIFYING | Seller cannot reduce tracked/deny-policy stock below active non-expired checkout reservations. |
-| Non-orphanable ownership/history | IMPLEMENTED / VERIFYING | `products.seller_id` is required/restricting; product deletion fails when order history exists. |
-| Public storefront/product links | IMPLEMENTED / VERIFYING | Public storefront uses persisted slug; product pages link to canonical Seller store and expose only approved catalogue rows. |
-| Seller operating UX | IMPLEMENTED / VERIFYING | Product list/detail/editor show moderation, rejection notes, inventory, Submit for Review, Unpublish/Republish and rich catalogue management states. |
-| M2 fresh-database regression gates | IMPLEMENTED / VERIFYING | CI includes structural invariant verification, catalogue/moderation isolation, inventory-reservation guard, active-product approval invariant and Seller policy-completeness tests. |
-| Final branch CI | IN PROGRESS | Must pass production foundation, TypeScript, production build, dependency audit, fresh migration replay, all M1/M2 and commerce/payment/payout regressions. |
-| Live M2 migrations/advisors | PENDING GREEN CI | No M2 migration is applied to live Supabase until the final branch CI is green. After rollout, live table/RLS/RPC/trigger/constraint and advisor checks must match the reproduced baseline. |
-| Main/Vercel verification | PENDING | Required after M2 merge. |
+| Persisted stable storefront slug | VERIFIED | Unique non-null `profiles_seller.store_slug`; clean slug when available, deterministic collision handling, preserved across store-name edits. |
+| Trusted storefront profile mutation | VERIFIED | `/api/seller/storefront` updates store name, bio, shipping and return policies through trusted server authorization; browser profile mutation helpers removed. |
+| Store branding | VERIFIED | Storefront settings combine the M1 validated logo/banner pipeline with M2 profile/policy editing. |
+| Rich product catalogue | VERIFIED | `seller_save_product_v3` persists canonical product type, descriptions, brand/categories, pricing/cost, shipping/tax metadata, material/weight/age, tags/search and up to 100 variants. |
+| Variant/SKU/inventory operations | VERIFIED | Multi-variant options, SKU/barcode, price/cost, stock, inventory policy, weight, shipping and active state are persisted atomically. |
+| RPC-only catalogue writes | VERIFIED | Browser direct product/variant/media/category DML revoked; old Seller save RPCs no longer authenticated-executable. |
+| Product moderation lifecycle | VERIFIED | `not_submitted → pending → approved/rejected`; only approved + active products of verified Sellers are public. |
+| Independent Admin review | VERIFIED | Trusted Admin queue and service-role-only `admin_review_product`; decision + moderation event + admin audit are one transaction. |
+| Edit invalidates approval | VERIFIED | Any Seller content/catalogue edit returns the listing to draft/not_submitted before it can reappear publicly. |
+| Publication invariant | VERIFIED | Database constraint prevents `active` unless moderation is `approved`, including trusted/internal writes. |
+| Seller policy completeness | VERIFIED | Review requires a real Seller return policy and, for shippable products, a real shipping policy; product page no longer fabricates U.S. origin/free delivery/default terms. |
+| Inventory reservation safety | VERIFIED | Seller cannot reduce tracked/deny-policy stock below active non-expired checkout reservations. |
+| Non-orphanable ownership/history | VERIFIED | `products.seller_id` is required/restricting; product deletion fails when order history exists. |
+| Public storefront/product links | VERIFIED | Public storefront uses persisted slug; product pages link to canonical Seller store and expose only approved catalogue rows. |
+| Seller operating UX | VERIFIED | Product list/detail/editor show moderation, rejection notes, inventory, Submit for Review, Unpublish/Republish and rich catalogue management states. |
+| M2 fresh-database regression gates | VERIFIED | CI verifies structural invariants/indexes, catalogue/moderation isolation, inventory-reservation guard, active-product approval invariant and Seller policy completeness alongside all M1 and commerce/payment/payout suites. |
+| Branch release CI | VERIFIED | CI #185 passed the full M2 release stack; CI #187 re-passed the complete stack after adding moderation FK indexes and structural assertions. |
+| Live M2 migrations/advisors | VERIFIED | All eight M2 forward migrations are live on `kllwwurklumhawfsilpd`; live baseline is 32 public tables / 32 RLS, 9 intentional deny-by-default tables. Two new FK advisor findings were fixed; remaining M2 `SECURITY DEFINER` Seller RPC warnings are reviewed intentional boundaries. |
+| Main/Vercel verification | PENDING MERGE | Pre-merge Vercel production runtime baseline has no error clusters. Final verification is required immediately after PR #8 reaches `main`. |
 
-**M2 status: IN PROGRESS — feature implementation is substantially complete; final CI, live migration verification and merged deployment evidence remain.**
+**M2 status: RELEASE READY — engineering, fresh-database CI and live Supabase rollout are verified. Only merged-`main`/production deployment evidence remains before this milestone is marked fully VERIFIED.**
 
 Architecture/evidence: `docs/architecture/M2-CATALOGUE-SELLER-OPERATIONS.md`, `scripts/verify-m2-database-invariants.sql`, `scripts/test-m2-catalog-moderation.sql`, `scripts/test-m2-inventory-reservation-guard.sql`, `scripts/test-m2-active-approval-invariant.sql`, `scripts/test-m2-product-policy-completeness.sql`.
 
