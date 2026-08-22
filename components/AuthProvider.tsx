@@ -41,10 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const seller = sellerProfile.status === 'fulfilled' ? sellerProfile.value : null;
       const business = businessProfile.status === 'fulfilled' ? businessProfile.value : null;
       const buyer = buyerProfile.status === 'fulfilled' ? buyerProfile.value : null;
+      const isAdmin = currentUser.app_metadata?.role === 'admin';
 
-      // Compatibility role chooses one default presentation only. Capability
-      // flags retain every permission-bearing identity the account owns.
-      const role: UserRole = seller ? 'seller' : business ? 'bsm' : 'buyer';
+      // `role` is only the default presentation. Permission-bearing identity is
+      // retained in the additive flags and verified again on trusted APIs.
+      const role: UserRole = isAdmin ? 'admin' : seller ? 'seller' : business ? 'bsm' : 'buyer';
       const profile = seller || business || buyer;
 
       setUser({
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: currentUser.email!,
         role,
         profile: profile || undefined,
+        isAdmin,
         isBuyer: !!buyer,
         isSeller: !!seller,
         isBusiness: !!business,
@@ -99,9 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, signOut: handleSignOut, refreshProfile }}
-    >
+    <AuthContext.Provider value={{ user, loading, signOut: handleSignOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
@@ -109,8 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

@@ -9,8 +9,7 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   profile?: BuyerProfile | SellerProfile | BusinessProfile;
-  // Additive capability flags. `role` remains only a compatibility/default-UI
-  // hint; authorization and routing must use canonical capability presence.
+  isAdmin?: boolean;
   isBuyer?: boolean;
   isSeller?: boolean;
   isBusiness?: boolean;
@@ -84,11 +83,7 @@ function normalizeCountryInput(value?: string | null): string | undefined {
   return s.slice(0, 2).toUpperCase();
 }
 
-export async function signUp(
-  email: string,
-  password: string,
-  _role: UserRole = 'buyer',
-) {
+export async function signUp(email: string, password: string, _role: UserRole = 'buyer') {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   return data;
@@ -106,46 +101,30 @@ export async function signOut() {
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
 
 export async function getCurrentSession(): Promise<Session | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   return session;
 }
 
-// Profile creation is server-only through /api/onboarding/*.
+// Capability creation is server-only through /api/onboarding/*.
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles_buyer')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
   if (error) return null;
   return data;
 }
 
 export async function getSellerProfile(userId: string): Promise<SellerProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles_seller')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.from('profiles_seller').select('*').eq('id', userId).single();
   if (error) return null;
   return data;
 }
 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles_business')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).single();
   if (error) return null;
   return data;
 }
@@ -156,24 +135,14 @@ export async function updateBuyerProfile(userId: string, updates: Partial<BuyerP
     country: normalizeCountryInput(updates.country),
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await supabase
-    .from('profiles_buyer')
-    .update(normalized)
-    .eq('id', userId)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('profiles_buyer').update(normalized).eq('id', userId).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function updateSellerProfile(userId: string, updates: Partial<SellerProfile>) {
   const payload = { ...updates, updated_at: new Date().toISOString() };
-  const { data, error } = await supabase
-    .from('profiles_seller')
-    .update(payload)
-    .eq('id', userId)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('profiles_seller').update(payload).eq('id', userId).select().single();
   if (error) throw error;
   return data;
 }
