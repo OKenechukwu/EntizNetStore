@@ -24,10 +24,24 @@ values
   ('10000000-0000-0000-0000-000000000001', 'P0 Buyer One'),
   ('20000000-0000-0000-0000-000000000002', 'P0 Buyer Two');
 
-insert into public.profiles_seller(id, storefront_name, verification_status)
+insert into public.profiles_seller(
+  id, storefront_name, verification_status, return_policy, shipping_policy
+)
 values
-  ('30000000-0000-0000-0000-000000000003', 'P0 Seller One', 'verified'),
-  ('40000000-0000-0000-0000-000000000004', 'P0 Seller Two', 'verified');
+  (
+    '30000000-0000-0000-0000-000000000003',
+    'P0 Seller One',
+    'verified',
+    'Returns accepted within 14 days for eligible unused items.',
+    'Tracked shipping is dispatched within three business days.'
+  ),
+  (
+    '40000000-0000-0000-0000-000000000004',
+    'P0 Seller Two',
+    'verified',
+    'Returns accepted within 14 days for eligible unused items.',
+    'Tracked shipping is dispatched within three business days.'
+  );
 
 -- These products represent listings that already passed M2 moderation. The
 -- checkout suite tests commerce state, not the moderation transition itself.
@@ -223,8 +237,6 @@ do $$
 declare
   v_target uuid;
 begin
-  -- Security-definer lookup is deliberately simulated with the known test key
-  -- through a role-safe subquery executed before the restricted operation.
   reset role;
   select id into v_target
   from public.payment_sessions
@@ -240,7 +252,6 @@ begin
 end
 $$;
 
--- Restore Buyer 1 claims for later visibility assertions.
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 select set_config(
   'request.jwt.claims',
@@ -348,7 +359,6 @@ begin
 end
 $$;
 
--- Exact event replay must return false and must not consume stock twice.
 do $$
 declare
   v_processed boolean;
@@ -375,7 +385,6 @@ begin
 end
 $$;
 
--- A distinct late failure event must never downgrade a paid checkout.
 select public.finalize_checkout_payment(
   'evt_p0_failed_late',
   'payment_intent.payment_failed',
@@ -404,7 +413,6 @@ begin
 end
 $$;
 
--- Event/outcome spoofing must be rejected even from the service-role RPC path.
 do $$
 begin
   begin
@@ -434,7 +442,6 @@ select set_config(
   true
 );
 
--- Seller 2 cannot mutate Seller 1's order.
 do $$
 declare
   v_foreign_order uuid;
@@ -455,7 +462,6 @@ begin
 end
 $$;
 
--- Seller 1 can advance only through the allowed paid fulfillment sequence.
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
 select set_config(
   'request.jwt.claims',
@@ -576,8 +582,6 @@ begin
 end
 $$;
 
--- A success callback against an explicitly cancelled checkout is an incident,
--- not permission to recreate stock/order state silently.
 reset role;
 set local role service_role;
 do $$
@@ -656,7 +660,6 @@ declare v_orders integer;
 begin
   select count(*) into v_orders from public.orders;
   if v_orders <> 2 then
-    -- Seller 1 owns Buyer 1's paid order and Buyer 2's cancelled order.
     raise exception 'Seller 1 RLS visibility incorrect: orders %', v_orders;
   end if;
 end
