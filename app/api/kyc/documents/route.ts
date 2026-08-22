@@ -1,39 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
-import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { sanitizeInput } from '@/lib/security'
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase } from '@/lib/supabase/server';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { sanitizeInput } from '@/lib/security';
 
-const KYC_BUCKET = 'kyc-documents'
+const KYC_BUCKET = 'kyc-documents';
 const VALID_DOCUMENT_TYPES = [
   'identity',
   'business_license',
   'tax_document',
   'address_proof',
   'bank_statement',
-] as const
-const MAX_FILE_SIZE = 10 * 1024 * 1024
+] as const;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number]
+type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number];
 
 type InspectedFile = {
-  size: number
-  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp'
-}
+  size: number;
+  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+};
 
 function pathFromSignedUploadUrl(value: string): string | null {
   try {
-    const marker = `/object/upload/sign/${KYC_BUCKET}/`
-    const pathname = new URL(value).pathname
-    const index = pathname.indexOf(marker)
-    if (index < 0) return null
-    return decodeURIComponent(pathname.slice(index + marker.length))
+    const marker = `/object/upload/sign/${KYC_BUCKET}/`;
+    const pathname = new URL(value).pathname;
+    const index = pathname.indexOf(marker);
+    if (index < 0) return null;
+    return decodeURIComponent(pathname.slice(index + marker.length));
   } catch {
-    return null
+    return null;
   }
 }
 
 function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null {
-  if (size <= 0 || size > MAX_FILE_SIZE) return null
+  if (size <= 0 || size > MAX_FILE_SIZE) return null;
 
   if (
     bytes.length >= 5 &&
@@ -43,13 +43,11 @@ function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null
     bytes[3] === 0x46 &&
     bytes[4] === 0x2d
   ) {
-    return { size, mimeType: 'application/pdf' }
+    return { size, mimeType: 'application/pdf' };
   }
-
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return { size, mimeType: 'image/jpeg' }
+    return { size, mimeType: 'image/jpeg' };
   }
-
   if (
     bytes.length >= 8 &&
     bytes[0] === 0x89 &&
@@ -61,9 +59,8 @@ function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null
     bytes[6] === 0x1a &&
     bytes[7] === 0x0a
   ) {
-    return { size, mimeType: 'image/png' }
+    return { size, mimeType: 'image/png' };
   }
-
   if (
     bytes.length >= 12 &&
     bytes[0] === 0x52 &&
@@ -75,118 +72,111 @@ function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null
     bytes[10] === 0x42 &&
     bytes[11] === 0x50
   ) {
-    return { size, mimeType: 'image/webp' }
+    return { size, mimeType: 'image/webp' };
   }
-
-  return null
+  return null;
 }
 
 async function deleteRejectedUpload(filePath: string) {
   try {
-    await getSupabaseAdmin().storage.from(KYC_BUCKET).remove([filePath])
+    await getSupabaseAdmin().storage.from(KYC_BUCKET).remove([filePath]);
   } catch (error) {
-    console.error('Failed to remove rejected KYC upload:', error)
+    console.error('Failed to remove rejected KYC upload:', error);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabase()
+    const supabase = await createServerSupabase();
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: sellerProfile } = await supabase
       .from('profiles_seller')
-      .select('id')
+      .select('id, verification_status')
       .eq('id', user.id)
-      .maybeSingle()
+      .maybeSingle();
 
     if (!sellerProfile) {
-      return NextResponse.json({ error: 'Seller capability required' }, { status: 403 })
+      return NextResponse.json({ error: 'Seller capability required' }, { status: 403 });
     }
 
     const body = (await request.json()) as {
-      documentType?: string
-      filePath?: string
-      uploadURL?: string
-      fileName?: string
-      // Legacy client hints remain accepted for compatibility, but the server
-      // never uses them as the source of truth.
-      fileSize?: number
-      mimeType?: string
-    }
+      documentType?: string;
+      filePath?: string;
+      uploadURL?: string;
+      fileName?: string;
+      fileSize?: number;
+      mimeType?: string;
+    };
 
-    const documentType = sanitizeInput(body.documentType ?? '') as DocumentType
-    const fileName = sanitizeInput(body.fileName ?? '')
-    const filePath = body.filePath || (body.uploadURL ? pathFromSignedUploadUrl(body.uploadURL) : null)
+    const documentType = sanitizeInput(body.documentType ?? '') as DocumentType;
+    const fileName = sanitizeInput(body.fileName ?? '');
+    const filePath = body.filePath || (body.uploadURL ? pathFromSignedUploadUrl(body.uploadURL) : null);
 
     if (!VALID_DOCUMENT_TYPES.includes(documentType)) {
-      return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid document type' }, { status: 400 });
     }
-
     if (!fileName || !filePath) {
       return NextResponse.json(
         { error: 'Document type, file path, and file name are required' },
         { status: 400 },
-      )
+      );
     }
 
-    const requiredPrefix = `${user.id}/${documentType}/`
+    const requiredPrefix = `${user.id}/${documentType}/`;
     if (!filePath.startsWith(requiredPrefix) || filePath.includes('..') || filePath.includes('\\')) {
-      return NextResponse.json({ error: 'Invalid KYC storage path' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid KYC storage path' }, { status: 400 });
     }
 
-    const admin = getSupabaseAdmin()
-
+    const admin = getSupabaseAdmin();
     const { data: existing } = await admin
       .from('kyc_documents')
       .select('id')
       .eq('seller_id', user.id)
       .eq('file_path', filePath)
-      .maybeSingle()
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
         { error: 'This KYC upload is already registered', documentId: existing.id },
         { status: 409 },
-      )
+      );
     }
 
-    // Registration is the authoritative security boundary. Download the
-    // private object with service-role access, use Blob.size for the real byte
-    // count, and identify supported formats from magic bytes rather than the
-    // browser-provided Content-Type or filename extension.
+    // The browser's filename, Content-Type and claimed size are not trusted.
+    // Download the private object and identify supported formats by magic bytes.
     const { data: blob, error: downloadError } = await admin.storage
       .from(KYC_BUCKET)
-      .download(filePath)
+      .download(filePath);
 
     if (downloadError || !blob) {
-      console.error('Unable to verify KYC storage object:', downloadError)
+      console.error('Unable to verify KYC storage object:', downloadError);
       return NextResponse.json(
         { error: 'Uploaded KYC object was not found; upload must complete before registration' },
         { status: 409 },
-      )
+      );
     }
 
     if (blob.size <= 0 || blob.size > MAX_FILE_SIZE) {
-      await deleteRejectedUpload(filePath)
-      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 })
+      await deleteRejectedUpload(filePath);
+      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 });
     }
 
-    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer())
-    const inspected = inspectSignature(signature, blob.size)
+    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+    const inspected = inspectSignature(signature, blob.size);
     if (!inspected) {
-      await deleteRejectedUpload(filePath)
+      await deleteRejectedUpload(filePath);
       return NextResponse.json(
         { error: 'Unsupported KYC document. Upload a real PDF, JPEG, PNG, or WebP file.' },
         { status: 400 },
-      )
+      );
     }
 
     const { data: document, error: insertError } = await admin
@@ -201,42 +191,53 @@ export async function POST(request: NextRequest) {
         verification_status: 'pending',
       })
       .select()
-      .single()
+      .single();
 
     if (insertError) {
-      console.error('Error creating KYC document record:', insertError)
-      return NextResponse.json({ error: 'Failed to save document record' }, { status: 500 })
+      console.error('Error creating KYC document record:', insertError);
+      return NextResponse.json({ error: 'Failed to save document record' }, { status: 500 });
     }
 
     const { data: verificationRequest } = await admin
       .from('kyc_verification_requests')
       .select('id, required_documents, submitted_documents')
       .eq('seller_id', user.id)
-      .maybeSingle()
+      .maybeSingle();
 
     if (verificationRequest) {
       const submitted = Array.from(
         new Set([...(verificationRequest.submitted_documents ?? []), documentType]),
-      )
-      const required = verificationRequest.required_documents ?? []
-      const isComplete = required.every((item: string) => submitted.includes(item))
+      );
+      const required = verificationRequest.required_documents ?? [];
+      const isComplete = required.every((item: string) => submitted.includes(item));
+      const requestStatus = isComplete ? 'under_review' : 'incomplete';
 
       const { error: updateError } = await admin
         .from('kyc_verification_requests')
-        .update({
-          submitted_documents: submitted,
-          verification_status: isComplete ? 'under_review' : 'incomplete',
-        })
-        .eq('id', verificationRequest.id)
+        .update({ submitted_documents: submitted, verification_status: requestStatus })
+        .eq('id', verificationRequest.id);
 
       if (updateError) {
-        console.error('Error updating KYC verification request:', updateError)
+        console.error('Error updating KYC verification request:', updateError);
+      } else if (!['verified', 'suspended'].includes(sellerProfile.verification_status)) {
+        // Resubmission after rejection becomes actionable again. A verified or
+        // suspended seller is never silently downgraded by an extra upload.
+        const { error: sellerStatusError } = await admin
+          .from('profiles_seller')
+          .update({
+            verification_status: isComplete ? 'under_review' : 'pending',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+        if (sellerStatusError) {
+          console.error('Error updating seller verification lifecycle:', sellerStatusError);
+        }
       }
     }
 
-    return NextResponse.json({ success: true, document }, { status: 201 })
+    return NextResponse.json({ success: true, document }, { status: 201 });
   } catch (error) {
-    console.error('Error saving KYC document:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error saving KYC document:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
