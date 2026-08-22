@@ -21,6 +21,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SHIPPING_QUOTE_PROVIDER: unconfigured
+      TAX_QUOTE_PROVIDER: unconfigured
       PAYMENT_PROVIDER: unconfigured
       NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
       PAYOUT_PROVIDER: unconfigured
@@ -87,6 +89,9 @@ jobs:
 
       - name: Run M2 Seller policy completeness regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-product-policy-completeness.sql
+
+      - name: Run M3 cart and order core regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-cart-order-core.sql
 
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
