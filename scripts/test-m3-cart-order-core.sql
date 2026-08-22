@@ -2,6 +2,8 @@
 
 -- M3 persistent cart/address/quote/checkout authorization regression suite.
 -- Runs against the disposable fresh Supabase CI database and rolls back.
+-- Generated IDs captured by psql are copied into session-scoped custom GUCs
+-- before PL/pgSQL blocks because psql variables are not expanded inside $$.
 
 begin;
 
@@ -31,8 +33,6 @@ values (
   'Shipping is configured for the test Seller.'
 );
 
--- Build one valid approved digital/non-taxable product using the M2 lifecycle
--- invariant rather than bypassing it with an invalid active insert.
 insert into public.products(
   id, seller_id, title, slug, description, type, status,
   moderation_status, base_price, requires_shipping, is_taxable,
@@ -106,18 +106,22 @@ select public.buyer_save_address(
   null, 'Home', true, 'shipping', 'M3', 'Buyer', null,
   '1 Test Street', null, 'Test City', 'Test Province', '1000', 'PH', '+630000000000'
 ) as address_id \gset
+select set_config('m3.address_id', :'address_id', false);
 
 -- Direct address/cart mutation is forbidden even for the owner.
 do $$
 begin
   begin
-    update public.addresses set city = 'Bypass City' where id = :'address_id'::uuid;
+    update public.addresses
+    set city = 'Bypass City'
+    where id = current_setting('m3.address_id')::uuid;
     raise exception 'Buyer unexpectedly bypassed address RPC boundary';
   exception when insufficient_privilege then null;
   end;
 
   begin
-    insert into public.carts(buyer_id) values ('a1000000-0000-0000-0000-000000000001');
+    insert into public.carts(buyer_id)
+    values ('a1000000-0000-0000-0000-000000000001');
     raise exception 'Buyer unexpectedly bypassed cart RPC boundary';
   exception when insufficient_privilege then null;
   end;
@@ -125,11 +129,13 @@ end
 $$;
 
 select public.buyer_get_or_create_cart() as cart_id \gset
+select set_config('m3.cart_id', :'cart_id', false);
 select public.buyer_get_or_create_cart() as cart_id_replay \gset
+select set_config('m3.cart_id_replay', :'cart_id_replay', false);
 
 do $$
 begin
-  if :'cart_id' <> :'cart_id_replay' then
+  if current_setting('m3.cart_id') <> current_setting('m3.cart_id_replay') then
     raise exception 'buyer_get_or_create_cart did not preserve one active cart';
   end if;
 end
@@ -140,16 +146,23 @@ select public.buyer_set_cart_item(
   'a5000000-0000-0000-0000-000000000005',
   2
 ) as cart_item_id \gset
+select set_config('m3.cart_item_id', :'cart_item_id', false);
 
 reset role;
 select version as cart_version from public.carts where id = :'cart_id'::uuid \gset
+select set_config('m3.cart_version', :'cart_version', false);
 
 do $$
 begin
-  if :'cart_version'::bigint <= 1 then
+  if current_setting('m3.cart_version')::bigint <= 1 then
     raise exception 'Cart mutation did not increment version';
   end if;
-  if (select count(*) from public.carts where buyer_id = 'a1000000-0000-0000-0000-000000000001' and status = 'active') <> 1 then
+  if (
+    select count(*)
+    from public.carts
+    where buyer_id = 'a1000000-0000-0000-0000-000000000001'
+      and status = 'active'
+  ) <> 1 then
     raise exception 'Buyer has more than one active cart';
   end if;
 end
@@ -162,18 +175,27 @@ select set_config('request.jwt.claims', '{"sub":"a2000000-0000-0000-0000-0000000
 
 do $$
 begin
-  if (select count(*) from public.addresses where id = :'address_id'::uuid) <> 0 then
+  if (
+    select count(*) from public.addresses
+    where id = current_setting('m3.address_id')::uuid
+  ) <> 0 then
     raise exception 'Cross-Buyer address leaked through RLS';
   end if;
-  if (select count(*) from public.carts where id = :'cart_id'::uuid) <> 0 then
+  if (
+    select count(*) from public.carts
+    where id = current_setting('m3.cart_id')::uuid
+  ) <> 0 then
     raise exception 'Cross-Buyer cart leaked through RLS';
   end if;
-  if (select count(*) from public.cart_items where id = :'cart_item_id'::uuid) <> 0 then
+  if (
+    select count(*) from public.cart_items
+    where id = current_setting('m3.cart_item_id')::uuid
+  ) <> 0 then
     raise exception 'Cross-Buyer cart item leaked through RLS';
   end if;
 
   begin
-    perform public.buyer_remove_cart_item(:'cart_item_id'::uuid);
+    perform public.buyer_remove_cart_item(current_setting('m3.cart_item_id')::uuid);
     raise exception 'Cross-Buyer cart-item mutation unexpectedly succeeded';
   exception when insufficient_privilege then null;
   end;
@@ -222,7 +244,9 @@ begin
       cart_id, buyer_id, cart_version, status, subtotal_cents, total_cents,
       items_snapshot, seller_totals, expires_at
     ) values (
-      :'cart_id'::uuid, 'a1000000-0000-0000-0000-000000000001', :'cart_version'::bigint,
+      current_setting('m3.cart_id')::uuid,
+      'a1000000-0000-0000-0000-000000000001',
+      current_setting('m3.cart_version')::bigint,
       'ready', 1, 1, '[]'::jsonb, '{}'::jsonb, now() + interval '15 minutes'
     );
     raise exception 'Buyer unexpectedly inserted trusted cart quote directly';
@@ -231,8 +255,7 @@ begin
 end
 $$;
 
--- Trusted server quote fixture for the current cart version. It represents the
--- same digital/non-taxable internal quote that /api/cart/quote may mark ready.
+-- Trusted server quote fixture for the current cart version.
 reset role;
 insert into public.cart_quotes(
   id, cart_id, buyer_id, cart_version, status, block_reasons, currency,
@@ -286,6 +309,8 @@ select * from public.create_checkout_session_v2(
   'a6000000-0000-0000-0000-000000000006',
   'a7000000-0000-0000-0000-000000000007'
 ) \gset
+select set_config('m3.session_id', :'session_id', false);
+select set_config('m3.amount_cents', :'amount_cents', false);
 
 do $$
 declare
@@ -294,15 +319,29 @@ declare
   v_items integer;
   v_reservations integer;
 begin
-  select status into v_quote_status from public.cart_quotes where id = 'a6000000-0000-0000-0000-000000000006';
-  select count(*) into v_orders from public.orders where payment_session_id = :'session_id'::uuid;
-  select count(*) into v_items from public.order_items oi join public.orders o on o.id = oi.order_id where o.payment_session_id = :'session_id'::uuid;
-  select count(*) into v_reservations from public.inventory_reservations where payment_session_id = :'session_id'::uuid and status = 'pending';
+  select status into v_quote_status
+  from public.cart_quotes
+  where id = 'a6000000-0000-0000-0000-000000000006';
 
-  if :'amount_cents'::bigint <> 5000 or v_quote_status <> 'consumed'
+  select count(*) into v_orders
+  from public.orders
+  where payment_session_id = current_setting('m3.session_id')::uuid;
+
+  select count(*) into v_items
+  from public.order_items oi
+  join public.orders o on o.id = oi.order_id
+  where o.payment_session_id = current_setting('m3.session_id')::uuid;
+
+  select count(*) into v_reservations
+  from public.inventory_reservations
+  where payment_session_id = current_setting('m3.session_id')::uuid
+    and status = 'pending';
+
+  if current_setting('m3.amount_cents')::bigint <> 5000
+     or v_quote_status <> 'consumed'
      or v_orders <> 1 or v_items <> 1 or v_reservations <> 1 then
     raise exception 'Trusted checkout freeze failed: amount %, quote %, orders %, items %, reservations %',
-      :'amount_cents', v_quote_status, v_orders, v_items, v_reservations;
+      current_setting('m3.amount_cents'), v_quote_status, v_orders, v_items, v_reservations;
   end if;
 end
 $$;
@@ -313,19 +352,20 @@ select * from public.create_checkout_session_v2(
   'a6000000-0000-0000-0000-000000000006',
   'a7000000-0000-0000-0000-000000000007'
 ) \gset replay_
+select set_config('m3.replay_session_id', :'replay_session_id', false);
+select set_config('m3.replay_amount_cents', :'replay_amount_cents', false);
 
 do $$
 begin
-  if :'replay_session_id' <> :'session_id' or :'replay_amount_cents'::bigint <> 5000 then
+  if current_setting('m3.replay_session_id') <> current_setting('m3.session_id')
+     or current_setting('m3.replay_amount_cents')::bigint <> 5000 then
     raise exception 'Checkout v2 idempotent replay changed session or amount';
   end if;
 end
 $$;
 
--- Create another quote, then mutate the cart. The older quote must become stale
--- even though its immutable row still says ready.
+-- Create another quote, then mutate the cart. The older quote must become stale.
 reset role;
-select version as fresh_version from public.carts where id = :'cart_id'::uuid \gset
 insert into public.cart_quotes(
   id, cart_id, buyer_id, cart_version, status, subtotal_cents, total_cents,
   items_snapshot, seller_totals, expires_at
@@ -336,7 +376,8 @@ select
   (select items_snapshot from public.cart_quotes where id = 'a6000000-0000-0000-0000-000000000006'),
   (select seller_totals from public.cart_quotes where id = 'a6000000-0000-0000-0000-000000000006'),
   now() + interval '15 minutes'
-from public.carts where id = :'cart_id'::uuid;
+from public.carts
+where id = :'cart_id'::uuid;
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000001', true);
@@ -351,7 +392,7 @@ do $$
 begin
   begin
     perform * from public.create_checkout_session_v2(
-      :'cart_id'::uuid,
+      current_setting('m3.cart_id')::uuid,
       'a8000000-0000-0000-0000-000000000008',
       'a9000000-0000-0000-0000-000000000009'
     );
@@ -389,11 +430,21 @@ declare
   v_payment_status text;
   v_inventory integer;
 begin
-  select status into v_cart_status from public.carts where id = :'cart_id'::uuid;
-  select status into v_session_status from public.payment_sessions where id = :'session_id'::uuid;
+  select status into v_cart_status
+  from public.carts
+  where id = current_setting('m3.cart_id')::uuid;
+
+  select status into v_session_status
+  from public.payment_sessions
+  where id = current_setting('m3.session_id')::uuid;
+
   select status, payment_status into v_order_status, v_payment_status
-    from public.orders where payment_session_id = :'session_id'::uuid;
-  select inventory_quantity into v_inventory from public.product_variants where id = 'a5000000-0000-0000-0000-000000000005';
+  from public.orders
+  where payment_session_id = current_setting('m3.session_id')::uuid;
+
+  select inventory_quantity into v_inventory
+  from public.product_variants
+  where id = 'a5000000-0000-0000-0000-000000000005';
 
   if v_cart_status <> 'converted' or v_session_status <> 'paid'
      or v_order_status <> 'confirmed' or v_payment_status <> 'paid'
