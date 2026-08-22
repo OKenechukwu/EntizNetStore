@@ -83,7 +83,7 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
   };
 
   const goAfterAuth = async () => {
-    // Authenticated: complete any pending buyer/seller onboarding
+    // Authenticated: complete any pending buyer/seller/business onboarding
     // (idempotent trusted endpoint; identity derived server-side).
     await completePendingOnboarding();
     // Canonical capability-based destination (server-derived; never from
@@ -135,7 +135,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
         }
 
         // Preserve the registration choice for after email verification.
-        setPendingOnboarding(role === 'seller' ? 'seller' : 'buyer');
+        setPendingOnboarding(
+          role === 'seller' ? 'seller' : role === 'bsm' ? 'business' : 'buyer',
+        );
         append('Account created. Please verify your email, then sign in.');
         if (variant === 'combined') setMode('signin');
       }
@@ -204,7 +206,6 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
     <div className="w-full max-w-xl px-4">
       <h1 className="text-2xl font-semibold mb-6 text-center">Welcome to EntizNet</h1>
 
-      {/* Role tabs */}
       <div className="flex justify-center gap-2 mb-2">
         <RoleTab value="buyer" label="Buyer" />
         <RoleTab value="seller" label="Seller" />
@@ -219,10 +220,8 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
         </div>
       )}
 
-      {/* Grey card with white inputs */}
       <div className="rounded-xl bg-gray-200 p-6 shadow-sm">
         <div className="space-y-4">
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium mb-2">Email address</label>
             <input
@@ -239,7 +238,6 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             )}
           </div>
 
-          {/* Password */}
           <div>
             <label className="block text-sm font-medium mb-2">Password</label>
             <div className="relative">
@@ -274,10 +272,8 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             )}
           </div>
 
-          {/* Sign-up extras */}
           {mode === 'signup' && (
             <>
-              {/* Phone */}
               <div>
                 <label className="block text-sm font-medium mb-2">Phone number</label>
                 <input
@@ -292,7 +288,6 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
                 <p className="text-xs mt-1 opacity-70">{phoneHelp}</p>
               </div>
 
-              {/* Address + suggestions */}
               <div className="relative">
                 <label className="block text-sm font-medium mb-2">Address</label>
                 <input
@@ -330,10 +325,8 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             </>
           )}
 
-          {/* Error */}
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          {/* Submit */}
           <button onClick={handleSubmit} className="luxury-button-outline w-full py-2 disabled:opacity-60" disabled={busy} type="button">
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
           </button>

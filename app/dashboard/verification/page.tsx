@@ -1,457 +1,328 @@
-"use client";
+'use client';
 
-import { useAuth } from '@/components/AuthProvider'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/components/AuthProvider';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-type DocumentType = 'identity' | 'business_license' | 'tax_document' | 'address_proof' | 'bank_statement'
+type DocumentType =
+  | 'identity'
+  | 'business_license'
+  | 'tax_document'
+  | 'address_proof'
+  | 'bank_statement';
 
-interface KYCDocument {
-  id: string
-  document_type: DocumentType
-  file_name: string
-  verification_status: 'pending' | 'approved' | 'rejected'
-  uploaded_at: string
-  rejection_reason?: string
-}
+type KYCDocument = {
+  id: string;
+  document_type: DocumentType;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string | null;
+  uploaded_at: string;
+  reviewed_at?: string | null;
+};
 
-interface VerificationRequest {
-  id: string
-  verification_status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'incomplete'
-  submission_date: string
-  reviewer_notes?: string
-  required_documents: string[]
-  submitted_documents: string[]
-}
+type VerificationRequest = {
+  id: string;
+  verification_status:
+    | 'pending'
+    | 'incomplete'
+    | 'under_review'
+    | 'needs_information'
+    | 'approved'
+    | 'rejected';
+  reviewer_notes?: string | null;
+  required_documents: DocumentType[];
+  submitted_documents: DocumentType[];
+};
 
-const DOCUMENT_TYPES = {
+type StatusPayload = {
+  sellerStatus: string;
+  verificationRequest: VerificationRequest;
+  documents: KYCDocument[];
+};
+
+const DOCUMENT_TYPES: Record<DocumentType, { label: string; description: string }> = {
   identity: {
     label: 'Government ID',
-    description: 'Valid passport, driver\'s license, or national ID card',
-    required: true
+    description: "Valid passport, driver's license, or national ID card",
   },
   business_license: {
     label: 'Business License',
     description: 'Business registration or operating license',
-    required: true
   },
   tax_document: {
     label: 'Tax Document',
-    description: 'Tax registration or EIN verification',
-    required: false
+    description: 'Tax registration or equivalent business tax document',
   },
   address_proof: {
     label: 'Address Verification',
-    description: 'Utility bill or bank statement showing address',
-    required: false
+    description: 'Recent utility bill, bank statement, or accepted proof of address',
   },
   bank_statement: {
     label: 'Bank Statement',
-    description: 'Recent bank statement for payout verification',
-    required: false
-  }
-}
+    description: 'Optional supporting document for payout verification',
+  },
+};
+
+const MAX_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);
 
 export default function VerificationPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const [documents, setDocuments] = useState<KYCDocument[]>([])
-  const [verificationRequest, setVerificationRequest] = useState<VerificationRequest | null>(null)
-  const [uploadingType, setUploadingType] = useState<DocumentType | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading, refreshProfile } = useAuth();
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
+  const [data, setData] = useState<StatusPayload | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [uploadingType, setUploadingType] = useState<DocumentType | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'seller')) {
-      router.push('/dashboard')
-      return
+    if (loading) return;
+    if (!user) {
+      router.replace('/auth?mode=signin&role=seller');
+      return;
     }
-
-    if (user?.id) {
-      loadVerificationData()
+    if (user.isSeller === false) {
+      router.replace('/seller/apply');
+      return;
     }
-  }, [user, loading, router])
+    void loadStatus();
+  }, [loading, user?.id, user?.isSeller, router]);
 
-  const loadVerificationData = async () => {
+  async function loadStatus() {
     try {
-      setIsLoading(true)
-      
-      // Load verification request
-      const { data: requestData } = await supabase
-        .from('kyc_verification_requests')
-        .select('*')
-        .eq('seller_id', user!.id)
-        .single()
-
-      if (requestData) {
-        setVerificationRequest(requestData)
-      } else {
-        // Create initial verification request
-        const { data: newRequest } = await supabase
-          .from('kyc_verification_requests')
-          .insert({
-            seller_id: user!.id,
-            required_documents: ['identity', 'business_license']
-          })
-          .select()
-          .single()
-        
-        if (newRequest) {
-          setVerificationRequest(newRequest)
-        }
-      }
-
-      // Load uploaded documents
-      const { data: documentsData } = await supabase
-        .from('kyc_documents')
-        .select('*')
-        .eq('seller_id', user!.id)
-        .order('uploaded_at', { ascending: false })
-
-      if (documentsData) {
-        setDocuments(documentsData)
-      }
-    } catch (error) {
-      console.error('Error loading verification data:', error)
+      setIsLoading(true);
+      setError(null);
+      const response = await fetch('/api/kyc/status', { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to load verification status');
+      setData(payload as StatusPayload);
+      await refreshProfile();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to load verification status');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
-  const handleFileUpload = async (documentType: DocumentType) => {
-    setUploadingType(documentType)
-    
+  function chooseFile(documentType: DocumentType) {
+    setSelectedType(documentType);
+    inputRef.current?.click();
+  }
+
+  async function uploadSelectedFile(file: File | undefined) {
+    const documentType = selectedType;
+    if (!file || !documentType) return;
+    setError(null);
+
+    if (file.size <= 0 || file.size > MAX_BYTES || !ACCEPTED_TYPES.has(file.type.toLowerCase())) {
+      setError('KYC documents must be PDF, JPEG, PNG, or WebP and no larger than 10MB.');
+      return;
+    }
+
+    setUploadingType(documentType);
     try {
-      // Get presigned upload URL from secure API
-      const getUploadParameters = async () => {
-        const response = await fetch('/api/kyc/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ documentType })
-        })
-        
-        if (!response.ok) {
-          throw new Error('Failed to get upload URL')
-        }
-        
-        const { uploadURL } = await response.json()
-        return { method: 'PUT' as const, url: uploadURL }
+      const initResponse = await fetch('/api/kyc/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentType, fileName: file.name }),
+      });
+      const init = await initResponse.json().catch(() => ({}));
+      if (!initResponse.ok || !init.uploadURL || !init.filePath) {
+        throw new Error(init.error || 'Unable to initialize secure KYC upload');
       }
 
-      // Handle upload completion
-      const handleUploadComplete = async (result: any) => {
-        if (result.successful && result.successful.length > 0) {
-          const uploadedFile = result.successful[0]
-          
-          // Save document record with secure object storage path
-          const response = await fetch('/api/kyc/documents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              documentType,
-              uploadURL: uploadedFile.uploadURL,
-              fileName: uploadedFile.name,
-              fileSize: uploadedFile.size,
-              mimeType: uploadedFile.type
-            })
-          })
-          
-          if (response.ok) {
-            const { document } = await response.json()
-            setDocuments(prev => [document, ...prev])
-            await loadVerificationData()
-          } else {
-            throw new Error('Failed to save document record')
-          }
-        }
+      const uploadResponse = await fetch(init.uploadURL, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!uploadResponse.ok) throw new Error('KYC upload failed');
+
+      const registerResponse = await fetch('/api/kyc/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentType, filePath: init.filePath, fileName: file.name }),
+      });
+      const registered = await registerResponse.json().catch(() => ({}));
+      if (!registerResponse.ok) {
+        throw new Error(registered.error || 'Unable to register KYC document');
       }
 
-      // For now, show file input until ObjectUploader is properly integrated
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.pdf,.jpg,.jpeg,.png,.webp'
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0]
-        if (!file) return
-
-        // Validate file
-        if (file.size > 10 * 1024 * 1024) {
-          alert('File size must be less than 10MB')
-          return
-        }
-
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-        if (!allowedTypes.includes(file.type)) {
-          alert('Only PDF and image files are allowed')
-          return
-        }
-
-        try {
-          const { url } = await getUploadParameters()
-          
-          // Upload file directly to object storage
-          const uploadResponse = await fetch(url, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': file.type }
-          })
-          
-          if (!uploadResponse.ok) {
-            throw new Error('Upload failed')
-          }
-          
-          // Simulate Uppy result format for handleUploadComplete
-          await handleUploadComplete({
-            successful: [{
-              uploadURL: url,
-              name: file.name,
-              size: file.size,
-              type: file.type
-            }]
-          })
-        } catch (error) {
-          console.error('Upload error:', error)
-          alert('Failed to upload document. Please try again.')
-        } finally {
-          setUploadingType(null)
-        }
-      }
-      input.click()
-    } catch (error) {
-      console.error('Error uploading document:', error)
-      alert('Failed to upload document. Please try again.')
-      setUploadingType(null)
+      await loadStatus();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to upload KYC document');
+    } finally {
+      setUploadingType(null);
+      setSelectedType(null);
+      if (inputRef.current) inputRef.current.value = '';
     }
   }
 
-  if (loading || isLoading) {
+  async function viewDocument(documentId: string) {
+    try {
+      const response = await fetch(`/api/kyc/documents/download?id=${encodeURIComponent(documentId)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.url) throw new Error(payload.error || 'Unable to open document');
+      window.open(payload.url, '_blank', 'noopener,noreferrer');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to open document');
+    }
+  }
+
+  const latestByType = useMemo(() => {
+    const map = new Map<DocumentType, KYCDocument>();
+    for (const document of data?.documents ?? []) {
+      if (!map.has(document.document_type)) map.set(document.document_type, document);
+    }
+    return map;
+  }, [data?.documents]);
+
+  if (loading || isLoading || !user || user.isSeller === false) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="opacity-80">Loading verification status...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!user || user.role !== 'seller') {
-    return null
-  }
+  const request = data?.verificationRequest;
+  const requestStatus = request?.verification_status ?? 'incomplete';
+  const required = new Set(request?.required_documents ?? []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'text-green-400 bg-green-600/20'
-      case 'rejected': return 'text-red-400 bg-red-600/20'
-      case 'under_review': return 'text-blue-400 bg-blue-600/20'
-      case 'pending': 
-      case 'incomplete':
-      default: return 'text-yellow-400 bg-yellow-600/20'
-    }
-  }
-
-  const getDocumentStatus = (docType: DocumentType) => {
-    const doc = documents.find(d => d.document_type === docType)
-    if (!doc) return 'not_uploaded'
-    return doc.verification_status
-  }
-
-  const isDocumentUploaded = (docType: DocumentType) => {
-    return documents.some(d => d.document_type === docType)
-  }
+  const statusClasses =
+    requestStatus === 'approved'
+      ? 'border-green-500/30 bg-green-500/10 text-green-400'
+      : requestStatus === 'rejected'
+        ? 'border-red-500/30 bg-red-500/10 text-red-400'
+        : requestStatus === 'under_review'
+          ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-400';
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="glass-card p-8">
-        <div className="flex items-center justify-between">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => void uploadSelectedFile(event.target.files?.[0])}
+      />
+
+      <div className="glass-card p-6 md:p-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
-              Seller Verification
-            </h1>
-            <p className="opacity-80">
-              Complete your verification to start selling on EntizNet
-            </p>
+            <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">Seller Verification</h1>
+            <p className="opacity-80">Secure KYC is required before products can be published.</p>
           </div>
-          {verificationRequest && (
-            <div className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(verificationRequest.verification_status)}`}>
-              {verificationRequest.verification_status.replace('_', ' ').toUpperCase()}
-            </div>
-          )}
+          <span className={`w-fit rounded-full border px-4 py-2 text-sm font-medium capitalize ${statusClasses}`}>
+            {requestStatus.replace('_', ' ')}
+          </span>
         </div>
       </div>
 
-      {/* Verification Status */}
-      {verificationRequest && (
-        <div className="glass-card p-6">
-          <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">Verification Status</h2>
-          
-          {verificationRequest.verification_status === 'approved' && (
-            <div className="p-4 rounded-lg bg-green-600/20 border border-green-600/30 text-green-400">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <h3 className="font-semibold">Verification Complete!</h3>
-                  <p className="text-sm opacity-80">You can now start selling on EntizNet.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {verificationRequest.verification_status === 'rejected' && (
-            <div className="p-4 rounded-lg bg-red-600/20 border border-red-600/30 text-red-400">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <h3 className="font-semibold">Verification Rejected</h3>
-                  <p className="text-sm opacity-80">Please review the feedback and resubmit documents.</p>
-                  {verificationRequest.reviewer_notes && (
-                    <p className="text-sm mt-2 p-2 bg-red-600/10 rounded border border-red-600/20">
-                      {verificationRequest.reviewer_notes}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {verificationRequest.verification_status === 'under_review' && (
-            <div className="p-4 rounded-lg bg-blue-600/20 border border-blue-600/30 text-blue-400">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <div>
-                  <h3 className="font-semibold">Under Review</h3>
-                  <p className="text-sm opacity-80">Our team is reviewing your documents. This typically takes 2-3 business days.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {['pending', 'incomplete'].includes(verificationRequest.verification_status) && (
-            <div className="p-4 rounded-lg bg-yellow-600/20 border border-yellow-600/30 text-yellow-400">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <div>
-                  <h3 className="font-semibold">Documents Required</h3>
-                  <p className="text-sm opacity-80">Please upload all required documents to complete verification.</p>
-                </div>
-              </div>
-            </div>
-          )}
+      {error && (
+        <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+          {error}
         </div>
       )}
 
-      {/* Document Upload Section */}
-      <div className="glass-card p-6">
-        <h2 className="font-serif text-xl font-bold text-accent-gold mb-6">Required Documents</h2>
-        
-        <div className="space-y-6">
-          {Object.entries(DOCUMENT_TYPES).map(([type, config]) => {
-            const docType = type as DocumentType
-            const status = getDocumentStatus(docType)
-            const isUploaded = isDocumentUploaded(docType)
-            const isUploading = uploadingType === docType
-            
+      {requestStatus === 'approved' && (
+        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-green-400">
+          Verification complete. Your Seller capability is verified.
+        </div>
+      )}
+      {requestStatus === 'under_review' && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-blue-400">
+          All required documents are submitted and your verification is under review.
+        </div>
+      )}
+      {requestStatus === 'rejected' && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+          <p className="font-semibold">Verification needs resubmission.</p>
+          {request?.reviewer_notes && <p className="mt-2 text-sm">{request.reviewer_notes}</p>}
+        </div>
+      )}
+      {requestStatus === 'needs_information' && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-400">
+          <p className="font-semibold">More information is required.</p>
+          {request?.reviewer_notes && <p className="mt-2 text-sm">{request.reviewer_notes}</p>}
+        </div>
+      )}
+
+      <section className="glass-card p-6">
+        <div className="mb-6">
+          <h2 className="font-serif text-xl font-bold text-accent-gold">Verification documents</h2>
+          <p className="mt-1 text-sm opacity-70">
+            Files stay in private Supabase Storage. EntizNetStore validates their real byte signatures after upload.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {(Object.keys(DOCUMENT_TYPES) as DocumentType[]).map((type) => {
+            const config = DOCUMENT_TYPES[type];
+            const document = latestByType.get(type);
+            const isRequired = required.has(type);
+            const isUploading = uploadingType === type;
+
             return (
-              <div key={type} className="border border-accent-gold/20 rounded-lg p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+              <div key={type} className="rounded-lg border border-white/10 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold">{config.label}</h3>
-                      {config.required && (
-                        <span className="text-xs px-2 py-1 bg-accent-gold/20 text-accent-gold rounded">
-                          Required
-                        </span>
+                      {isRequired && (
+                        <span className="rounded bg-accent-gold/20 px-2 py-1 text-xs text-accent-gold">Required</span>
                       )}
-                      {status === 'approved' && (
-                        <span className="text-xs px-2 py-1 bg-green-600/20 text-green-400 rounded">
-                          Approved
-                        </span>
-                      )}
-                      {status === 'rejected' && (
-                        <span className="text-xs px-2 py-1 bg-red-600/20 text-red-400 rounded">
-                          Rejected
-                        </span>
-                      )}
-                      {status === 'pending' && isUploaded && (
-                        <span className="text-xs px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded">
-                          Pending Review
+                      {document && (
+                        <span className="rounded bg-white/10 px-2 py-1 text-xs capitalize">
+                          {document.verification_status}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm opacity-80 mb-4">{config.description}</p>
-                    
-                    {isUploaded && (
-                      <div className="text-sm">
-                        <p className="text-accent-gold">
-                          {documents.find(d => d.document_type === docType)?.file_name}
-                        </p>
-                        <p className="opacity-60 text-xs">
-                          Uploaded {new Date(documents.find(d => d.document_type === docType)?.uploaded_at || '').toLocaleDateString()}
-                        </p>
-                        {status === 'rejected' && (
-                          <p className="text-red-400 text-xs mt-2">
-                            {documents.find(d => d.document_type === docType)?.rejection_reason}
-                          </p>
-                        )}
+                    <p className="mt-2 text-sm opacity-70">{config.description}</p>
+                    {document && (
+                      <div className="mt-3 text-xs opacity-75">
+                        <p>{document.file_name}</p>
+                        <p>{new Date(document.uploaded_at).toLocaleDateString()}</p>
+                        {document.rejection_reason && <p className="mt-1 text-red-400">{document.rejection_reason}</p>}
                       </div>
                     )}
                   </div>
-                  
-                  <div className="ml-6">
-                    {isUploading ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-4 h-4 border-2 border-accent-gold border-t-transparent rounded-full animate-spin"></div>
-                        Uploading...
-                      </div>
-                    ) : (
-                      <button 
-                        className="luxury-button-outline px-4 py-2"
-                        onClick={() => handleFileUpload(docType)}
-                        disabled={isUploading}
-                      >
-                        {isUploaded ? 'Replace' : 'Upload'}
+
+                  <div className="flex shrink-0 gap-2">
+                    {document && (
+                      <button type="button" onClick={() => void viewDocument(document.id)} className="luxury-button-outline px-3 py-2 text-sm">
+                        View
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={isUploading || requestStatus === 'approved' || data?.sellerStatus === 'suspended'}
+                      onClick={() => chooseFile(type)}
+                      className="luxury-button-outline px-3 py-2 text-sm disabled:opacity-50"
+                    >
+                      {isUploading ? 'Uploading…' : document?.verification_status === 'rejected' ? 'Replace' : 'Upload'}
+                    </button>
                   </div>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
-      </div>
-
-      {/* Help Section */}
-      <div className="glass-card p-6">
-        <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">Need Help?</h2>
-        <div className="space-y-4 text-sm">
-          <div>
-            <h3 className="font-semibold mb-1">Accepted File Formats</h3>
-            <p className="opacity-80">PDF, JPG, JPEG, PNG (Maximum 10MB per file)</p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-1">Document Requirements</h3>
-            <ul className="opacity-80 space-y-1 list-disc list-inside ml-4">
-              <li>Documents must be clear and readable</li>
-              <li>All corners and edges must be visible</li>
-              <li>Information must not be obscured or redacted</li>
-              <li>Documents must be current and not expired</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-1">Processing Time</h3>
-            <p className="opacity-80">Verification typically takes 2-3 business days once all documents are submitted.</p>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
-  )
+  );
 }

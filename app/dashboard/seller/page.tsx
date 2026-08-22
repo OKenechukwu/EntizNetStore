@@ -49,9 +49,8 @@ export default function SellerDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Header */}
       <div className="glass-card p-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
               Welcome back, {userName}
@@ -66,7 +65,6 @@ export default function SellerDashboardPage() {
           </div>
         </div>
 
-        {/* Shareable store link */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href={publicStorePath}
@@ -82,12 +80,15 @@ export default function SellerDashboardPage() {
                 typeof window !== "undefined"
                   ? new URL(publicStorePath, window.location.origin).toString()
                   : publicStorePath;
-              navigator.clipboard.writeText(url);
+              void navigator.clipboard.writeText(url);
               alert("Public store link copied!");
             }}
           >
             Copy Store Link
           </button>
+          <Link href="/dashboard/seller/branding" className="luxury-button-outline px-4 py-2">
+            Store Branding
+          </Link>
         </div>
       </div>
 
@@ -99,13 +100,12 @@ export default function SellerDashboardPage() {
 function SellerDashboardCards({ profile }: { profile: unknown }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Quick Actions */}
       <div className="lg:col-span-2 space-y-6">
         <div className="glass-card p-6">
           <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Link
               href="/dashboard/store/new"
               className="luxury-button text-center py-4"
@@ -125,10 +125,10 @@ function SellerDashboardCards({ profile }: { profile: unknown }) {
               View Orders
             </Link>
             <Link
-              href="/dashboard/seller/analytics"
+              href="/dashboard/seller/branding"
               className="luxury-button-outline text-center py-4"
             >
-              Analytics
+              Logo & Banner
             </Link>
           </div>
         </div>
@@ -154,7 +154,6 @@ function SellerDashboardCards({ profile }: { profile: unknown }) {
         </div>
       </div>
 
-      {/* Profile Sidebar */}
       <div className="space-y-6">
         <div className="glass-card p-6">
           <h2 className="font-serif text-xl font-bold text-accent-gold mb-4">
@@ -168,10 +167,10 @@ function SellerDashboardCards({ profile }: { profile: unknown }) {
               <p className="capitalize opacity-80">{(profile as any)?.business_type || "individual"}</p>
             </div>
             <Link
-              href="/dashboard/profile"
-              className="luxury-button-outline w-full text-center py-3"
+              href="/dashboard/seller/branding"
+              className="luxury-button-outline block w-full text-center py-3"
             >
-              Edit Profile
+              Edit Logo & Banner
             </Link>
           </div>
         </div>
