@@ -20,8 +20,10 @@ values ('81000000-0000-0000-0000-000000000001', 'Provider Buyer');
 insert into public.profiles_seller(id, storefront_name, verification_status)
 values ('82000000-0000-0000-0000-000000000002', 'Provider Seller', 'verified');
 
+-- This fixture represents a listing that already passed M2 moderation. This
+-- suite validates the payment-provider contract rather than product review.
 insert into public.products(
-  id, seller_id, title, slug, status, base_price, requires_shipping, marketplace_brand
+  id, seller_id, title, slug, status, moderation_status, base_price, requires_shipping, marketplace_brand
 )
 values (
   '83000000-0000-0000-0000-000000000003',
@@ -29,6 +31,7 @@ values (
   'Provider Contract Product',
   'provider-contract-product',
   'active',
+  'approved',
   12.00,
   true,
   'entiznetstore'
