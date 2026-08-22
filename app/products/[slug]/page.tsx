@@ -1,5 +1,6 @@
 // app/products/[slug]/page.tsx
 import { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getProductBySlug,
@@ -93,7 +94,15 @@ export default async function ProductPage({ params }: Props) {
             <ProductInfoPanelClient product={product} />
 
             {product.store && (
-              <div className="mt-6 border-t border-white/10 pt-6">
+              <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/10 pt-6">
+                {canonicalStoreSlug ? (
+                  <Link
+                    href={`/store/${canonicalStoreSlug}`}
+                    className="luxury-button-outline px-4 py-2 text-sm"
+                  >
+                    Visit {product.store.name}
+                  </Link>
+                ) : null}
                 <ChatSellerButton
                   sellerId={product.store.id}
                   productId={product.id}
