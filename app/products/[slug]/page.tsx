@@ -8,7 +8,7 @@ import {
   getFeaturedProducts,
   getSellerProducts,
 } from "@/lib/data/products";
-import { getSellerStorefrontSlug } from "@/lib/data/storefront";
+import { getSellerStorefrontPublicDetails } from "@/lib/data/storefront";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductInfoPanelClient from "@/components/product/ProductInfoPanelClient";
 import ProductTabs from "@/components/product/ProductTabs";
@@ -75,38 +75,65 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound();
 
-  const [recommendations, sponsored, storeProducts, canonicalStoreSlug] = await Promise.all([
+  const [recommendations, sponsored, storeProducts, storefrontDetails] = await Promise.all([
     getRecommendationsFromDb(slug),
     getSponsoredProductsDb(),
     product.store ? getStoreProducts(product.store.id, product.id) : Promise.resolve([] as Product[]),
-    product.store ? getSellerStorefrontSlug(product.store.id) : Promise.resolve(null),
+    product.store ? getSellerStorefrontPublicDetails(product.store.id) : Promise.resolve(null),
   ]);
+
+  // Older data-access code supplied placeholder U.S. origin/free-delivery data.
+  // M2 intentionally removes those claims. Public products must now have real
+  // Seller return terms and, where shipping is required, a real shipping policy
+  // before review can proceed.
+  const displayProduct: Product = {
+    ...product,
+    shippingOrigin: undefined,
+    deliveryOptions: undefined,
+    returnPolicy: storefrontDetails?.returnPolicy
+      ? {
+          shortLabel: "Seller return policy",
+          fullText: storefrontDetails.returnPolicy,
+        }
+      : undefined,
+  };
+
+  const canonicalStoreSlug = storefrontDetails?.storeSlug ?? null;
 
   return (
     <main className="min-h-screen w-full bg-background px-4 py-8 md:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
-            <ProductGallery images={product.images} productName={product.title} />
+            <ProductGallery images={displayProduct.images} productName={displayProduct.title} />
           </div>
 
           <div>
-            <ProductInfoPanelClient product={product} />
+            <ProductInfoPanelClient product={displayProduct} />
 
-            {product.store && (
+            {storefrontDetails?.shippingPolicy ? (
+              <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                <h2 className="text-sm font-semibold">Seller shipping policy</h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm opacity-75">
+                  {storefrontDetails.shippingPolicy}
+                </p>
+              </div>
+            ) : null}
+
+            {displayProduct.store && (
               <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/10 pt-6">
                 {canonicalStoreSlug ? (
                   <Link
                     href={`/store/${canonicalStoreSlug}`}
                     className="luxury-button-outline px-4 py-2 text-sm"
                   >
-                    Visit {product.store.name}
+                    Visit {displayProduct.store.name}
                   </Link>
                 ) : null}
                 <ChatSellerButton
-                  sellerId={product.store.id}
-                  productId={product.id}
-                  productTitle={product.title}
+                  sellerId={displayProduct.store.id}
+                  productId={displayProduct.id}
+                  productTitle={displayProduct.title}
                 />
               </div>
             )}
@@ -115,11 +142,11 @@ export default async function ProductPage({ params }: Props) {
 
         {sponsored.length > 0 && <SponsoredProductsRow products={sponsored} />}
 
-        <ProductTabs product={product} recommendations={recommendations} />
+        <ProductTabs product={displayProduct} recommendations={recommendations} />
 
-        {product.store && canonicalStoreSlug && storeProducts.length > 0 && (
+        {displayProduct.store && canonicalStoreSlug && storeProducts.length > 0 && (
           <MoreFromStoreRow
-            storeName={product.store.name}
+            storeName={displayProduct.store.name}
             storeSlug={canonicalStoreSlug}
             products={storeProducts}
           />
