@@ -5,6 +5,7 @@ do $$
 declare
   v_constraint text;
   v_trigger text;
+  v_index text;
   v_nullable text;
 begin
   select is_nullable into v_nullable
@@ -19,6 +20,15 @@ begin
   if to_regclass('public.profiles_seller_store_slug_key') is null then
     raise exception 'Unique Seller store_slug index is missing';
   end if;
+
+  foreach v_index in array array[
+    'idx_products_moderated_by',
+    'idx_product_moderation_events_actor_id'
+  ] loop
+    if to_regclass('public.' || v_index) is null then
+      raise exception 'Required M2 moderation FK index missing: %', v_index;
+    end if;
+  end loop;
 
   select pg_get_constraintdef(c.oid) into v_constraint
   from pg_constraint c
