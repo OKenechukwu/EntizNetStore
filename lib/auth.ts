@@ -102,8 +102,7 @@ export async function getCurrentSession(): Promise<Session | null> {
 }
 
 // Capability creation and mutation are server-only through trusted /api routes.
-// Browser code may read the current user's profiles through RLS, but must never
-// receive direct profile UPDATE helpers that can drift from the server contract.
+// Browser code may read the current user's profiles through RLS.
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
   const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
   if (error) return null;
@@ -120,6 +119,20 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).single();
   if (error) return null;
   return data;
+}
+
+// Compatibility helper for the existing Buyer dashboard. The userId argument is
+// intentionally not trusted or sent to the backend; the server derives identity
+// from the authenticated session and updates only that Buyer projection.
+export async function updateBuyerProfile(_userId: string, updates: Partial<BuyerProfile>) {
+  const response = await fetch('/api/buyer/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Unable to update buyer profile');
+  return result.profile as BuyerProfile;
 }
 
 export async function getUserRole(userId: string): Promise<UserRole> {
