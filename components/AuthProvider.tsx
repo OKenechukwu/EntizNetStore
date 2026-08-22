@@ -1,117 +1,116 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentUser, getBuyerProfile, getSellerProfile, type AuthUser, type UserRole } from '@/lib/auth'
-import type { User } from '@supabase/supabase-js'
+import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import {
+  getCurrentUser,
+  getBuyerProfile,
+  getSellerProfile,
+  getBusinessProfile,
+  type AuthUser,
+  type UserRole,
+} from '@/lib/auth';
 
 type AuthContextType = {
-  user: AuthUser | null
-  loading: boolean
-  signOut: () => Promise<void>
-  refreshProfile: () => Promise<void>
-}
+  user: AuthUser | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const refreshProfile = async () => {
     try {
-      const currentUser = await getCurrentUser()
+      const currentUser = await getCurrentUser();
       if (!currentUser) {
-        setUser(null)
-        return
+        setUser(null);
+        return;
       }
 
-      // Get both profiles in parallel for better performance
-      const [sellerProfile, buyerProfile] = await Promise.allSettled([
+      const [sellerProfile, businessProfile, buyerProfile] = await Promise.allSettled([
         getSellerProfile(currentUser.id),
-        getBuyerProfile(currentUser.id)
-      ])
+        getBusinessProfile(currentUser.id),
+        getBuyerProfile(currentUser.id),
+      ]);
 
-      const seller = sellerProfile.status === 'fulfilled' ? sellerProfile.value : null
-      const buyer = buyerProfile.status === 'fulfilled' ? buyerProfile.value : null
+      const seller = sellerProfile.status === 'fulfilled' ? sellerProfile.value : null;
+      const business = businessProfile.status === 'fulfilled' ? businessProfile.value : null;
+      const buyer = buyerProfile.status === 'fulfilled' ? buyerProfile.value : null;
 
-      const role: UserRole = seller ? 'seller' : 'buyer'
-      const profile = seller || buyer
+      // Compatibility role chooses one default presentation only. Capability
+      // flags retain every permission-bearing identity the account owns.
+      const role: UserRole = seller ? 'seller' : business ? 'bsm' : 'buyer';
+      const profile = seller || business || buyer;
 
       setUser({
         id: currentUser.id,
         email: currentUser.email!,
         role,
         profile: profile || undefined,
-        // Capability flags from canonical profile presence; a user may
-        // hold both (buyer+seller) — routing must not collapse them.
         isBuyer: !!buyer,
         isSeller: !!seller,
-      })
+        isBusiness: !!business,
+      });
     } catch (error) {
-      console.error('Error refreshing profile:', error)
-      setUser(null)
+      console.error('Error refreshing profile:', error);
+      setUser(null);
     }
-  }
+  };
 
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
-        await refreshProfile()
+        await refreshProfile();
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    getInitialSession()
+    void getInitialSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          setUser(null)
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          await refreshProfile()
-        }
-        setLoading(false)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await refreshProfile();
       }
-    )
+      setLoading(false);
+    });
 
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setUser(null)
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
     } catch (error) {
-      console.error('Error signing out:', error)
+      console.error('Error signing out:', error);
     }
-  }
-
-  const value = {
-    user,
-    loading,
-    signOut: handleSignOut,
-    refreshProfile
-  }
+  };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{ user, loading, signOut: handleSignOut, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context
+  return context;
 }

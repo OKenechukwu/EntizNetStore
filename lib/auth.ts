@@ -1,19 +1,19 @@
 // lib/auth.ts
-import { supabase } from "./supabase";
-import type { User, Session } from "@supabase/supabase-js";
+import { supabase } from './supabase';
+import type { User, Session } from '@supabase/supabase-js';
 
-export type UserRole = "buyer" | "seller" | "admin";
+export type UserRole = 'buyer' | 'seller' | 'bsm' | 'admin';
 
 export type AuthUser = {
   id: string;
   email: string;
   role: UserRole;
-  profile?: BuyerProfile | SellerProfile;
-  // Capability flags derived from canonical profile-row presence
-  // (profiles_buyer / profiles_seller). A user may hold both — never
-  // collapse capabilities into the single `role` field for routing.
+  profile?: BuyerProfile | SellerProfile | BusinessProfile;
+  // Additive capability flags. `role` remains only a compatibility/default-UI
+  // hint; authorization and routing must use canonical capability presence.
   isBuyer?: boolean;
   isSeller?: boolean;
+  isBusiness?: boolean;
 };
 
 export type BuyerProfile = {
@@ -21,9 +21,9 @@ export type BuyerProfile = {
   display_name?: string;
   first_name?: string;
   last_name?: string;
-  gender?: "male" | "female" | "non-binary" | "prefer-not-to-say";
+  gender?: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say';
   date_of_birth?: string;
-  country?: string; // stored as ISO alpha-2 (e.g., "DE", "PH")
+  country?: string;
   phone?: string;
   communication_preferences: any;
   interests: string[];
@@ -31,15 +31,22 @@ export type BuyerProfile = {
   updated_at: string;
 };
 
+export type SellerVerificationStatus =
+  | 'pending'
+  | 'under_review'
+  | 'verified'
+  | 'rejected'
+  | 'suspended';
+
 export type SellerProfile = {
   id: string;
   storefront_name: string;
   bio?: string;
   logo_url?: string;
   banner_url?: string;
-  business_type: "individual" | "business" | "creator";
+  business_type: 'individual' | 'business' | 'creator';
   tax_id?: string;
-  verification_status: "pending" | "verified" | "rejected";
+  verification_status: SellerVerificationStatus;
   verification_documents?: any;
   payout_method?: any;
   return_policy?: string;
@@ -48,38 +55,47 @@ export type SellerProfile = {
   updated_at: string;
 };
 
-/** Normalize a country string to ISO alpha-2 uppercase (or undefined) */
+export type BusinessProfile = {
+  id: string;
+  display_name: string;
+  legal_name?: string;
+  business_kind:
+    | 'brand'
+    | 'supplier'
+    | 'manufacturer'
+    | 'distributor'
+    | 'wholesaler'
+    | 'retailer'
+    | 'other';
+  description?: string;
+  website?: string;
+  country?: string;
+  logo_url?: string;
+  banner_url?: string;
+  verification_status: SellerVerificationStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 function normalizeCountryInput(value?: string | null): string | undefined {
   if (!value) return undefined;
   const s = value.trim();
   if (!s) return undefined;
-  // If 2+ chars, take first 2 and uppercase (DB constraint enforces ^[A-Z]{2}$ or NULL)
   return s.slice(0, 2).toUpperCase();
 }
-
-// ---------------------- Authentication ----------------------
 
 export async function signUp(
   email: string,
   password: string,
-  // NOTE: role is intentionally NOT written to user_metadata. Capability is
-  // determined server-side (profile presence / trusted app_metadata), never
-  // by client-supplied metadata.
-  _role: UserRole = "buyer",
+  _role: UserRole = 'buyer',
 ) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
+  const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   return data;
 }
 
 export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
@@ -103,108 +119,73 @@ export async function getCurrentSession(): Promise<Session | null> {
   return session;
 }
 
-// ------------------------ Profiles -------------------------
-
-// CREATE
-// Profile creation happens ONLY via the trusted server onboarding endpoints
-// (/api/onboarding/buyer and /api/onboarding/seller). Client-side profile
-// creation against legacy tables was removed intentionally.
-
-// READ
-
-export async function getBuyerProfile(
-  userId: string,
-): Promise<BuyerProfile | null> {
+// Profile creation is server-only through /api/onboarding/*.
+export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
   const { data, error } = await supabase
-    .from("profiles_buyer")
-    .select("*")
-    .eq("id", userId)
+    .from('profiles_buyer')
+    .select('*')
+    .eq('id', userId)
     .single();
-
   if (error) return null;
   return data;
 }
 
-export async function getSellerProfile(
-  userId: string,
-): Promise<SellerProfile | null> {
+export async function getSellerProfile(userId: string): Promise<SellerProfile | null> {
   const { data, error } = await supabase
-    .from("profiles_seller")
-    .select("*")
-    .eq("id", userId)
+    .from('profiles_seller')
+    .select('*')
+    .eq('id', userId)
     .single();
-
   if (error) return null;
   return data;
 }
 
-// UPDATE
+export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
+  const { data, error } = await supabase
+    .from('profiles_business')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error) return null;
+  return data;
+}
 
-export async function updateBuyerProfile(
-  userId: string,
-  updates: Partial<BuyerProfile>,
-) {
+export async function updateBuyerProfile(userId: string, updates: Partial<BuyerProfile>) {
   const normalized = {
     ...updates,
     country: normalizeCountryInput(updates.country),
     updated_at: new Date().toISOString(),
   };
-
   const { data, error } = await supabase
-    .from("profiles_buyer")
+    .from('profiles_buyer')
     .update(normalized)
-    .eq("id", userId)
+    .eq('id', userId)
     .select()
     .single();
-
   if (error) throw error;
   return data;
 }
 
-export async function updateSellerProfile(
-  userId: string,
-  updates: Partial<SellerProfile>,
-) {
-  const payload = {
-    ...updates,
-    updated_at: new Date().toISOString(),
-  };
-
+export async function updateSellerProfile(userId: string, updates: Partial<SellerProfile>) {
+  const payload = { ...updates, updated_at: new Date().toISOString() };
   const { data, error } = await supabase
-    .from("profiles_seller")
+    .from('profiles_seller')
     .update(payload)
-    .eq("id", userId)
+    .eq('id', userId)
     .select()
     .single();
-
   if (error) throw error;
   return data;
 }
-
-// -------------------- KYC / Verification -------------------
-// KYC document submission happens via the trusted server endpoints
-// (/api/kyc/*). The legacy client-side submitKYCDocuments helper was
-// removed (unreferenced, targeted a phantom table).
-
-// ------------------------ Roles ----------------------------
 
 export async function getUserRole(userId: string): Promise<UserRole> {
-  // Seller wins if both exist
-  const { data: seller } = await supabase
-    .from("profiles_seller")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (seller) return "seller";
-
-  const { data: buyer } = await supabase
-    .from("profiles_buyer")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (buyer) return "buyer";
-
-  return "buyer";
+  const [sellerResult, businessResult, buyerResult] = await Promise.all([
+    supabase.from('profiles_seller').select('id').eq('id', userId).maybeSingle(),
+    supabase.from('profiles_business').select('id').eq('id', userId).maybeSingle(),
+    supabase.from('profiles_buyer').select('id').eq('id', userId).maybeSingle(),
+  ]);
+  if (sellerResult.data) return 'seller';
+  if (businessResult.data) return 'bsm';
+  if (buyerResult.data) return 'buyer';
+  return 'buyer';
 }
