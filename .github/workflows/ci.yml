@@ -23,6 +23,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
       PAYMENT_PROVIDER: unconfigured
       NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
+      PAYOUT_PROVIDER: unconfigured
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -77,6 +78,14 @@ jobs:
 
       - name: Run terminal payment-state regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-terminal-state.sql
+
+      - name: Run provider-neutral payout ledger regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payout-ledger.sql
+
+      - name: Run concurrent payout escrow-claim regression
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: bash scripts/test-payout-concurrency.sh
 
       - name: Stop local Supabase stack
         if: always()

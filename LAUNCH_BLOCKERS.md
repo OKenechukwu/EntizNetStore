@@ -26,17 +26,17 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Remove Replit runtime/debug assumptions | VERIFIED | `.replit`, Replit sidecar storage, and routable debug/dev/test surfaces removed; runtime client no longer depends on Replit preview behavior. |
 | Remove unused legacy dependencies | VERIFIED | `package.json`/`package-lock.json` synchronized; clean locked `npm ci` and production dependency audit pass in CI. |
 | Replace template README | VERIFIED | Production-oriented EntizNetStore README committed. |
-| Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`; payment-provider configuration is provider-neutral and fail-closed when unconfigured. |
+| Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`; buyer-payment and seller-payout configuration are provider-neutral and fail closed when unconfigured. |
 | Database security-advisor cleanup | VERIFIED WITH DOCUMENTED EXCEPTIONS | Remaining advisor entries are intentional deny-by-default tables and audited authenticated `SECURITY DEFINER` RPCs. |
-| RLS audit | VERIFIED | All 27 exposed public tables have RLS enabled; intentional no-policy tables deny by default. |
-| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment finalization remains service-role-only. |
+| RLS audit | VERIFIED | Canonical CI baseline now requires RLS on all 30 public tables, including the three payout-ledger tables; intentional no-policy tables deny by default. |
+| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment and payout finalization remain service-role-only. |
 | Performance indexes/policy optimization | VERIFIED | Missing FK indexes, auth-init-plan and overlapping permissive-policy warnings removed. |
 | Capability architecture decision | VERIFIED | `docs/architecture/ADR-0001-account-capabilities.md`. |
 | Backup/recovery procedure | VERIFIED | Operational runbook committed; managed backup requirement remains a separate P0 before customer/payment data. |
 | Canonical launch blocker record | VERIFIED | This document. |
 | Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints, anonymous DeepL proxy, and client translation callers removed; static localization remains. |
 | Clean dependency/install/build verification | VERIFIED | Locked install, production-foundation scan, TypeScript, production build, dependency audit and fresh database reproduction are enforced by CI. |
-| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs commerce regressions, and shuts down cleanly. |
+| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs commerce/payment/payout regressions, and shuts down cleanly. |
 
 **M0 status: VERIFIED.** The production-foundation exit gate is complete. M0 verification does **not** clear the independent P0 launch blockers below.
 
@@ -69,7 +69,7 @@ Before launch, all remaining production credentials must be stored in the deploy
 **Status: IN PROGRESS — external processor onboarding deferred until pre-launch**
 
 Verified internal commerce/payment layer:
-- checkout and payment processing are now separated by the provider boundary in `docs/architecture/ADR-0002-payment-provider-boundary.md`;
+- checkout and payment processing are separated by the provider boundary in `docs/architecture/ADR-0002-payment-provider-boundary.md`;
 - the marketplace owns server-side price calculation, checkout idempotency, inventory reservation/consumption/release, seller order splitting, payment-session state, escrow and fulfillment state;
 - canonical `payment_provider` / `provider_payment_id` references replace processor-specific identity in new application code;
 - provider callbacks normalize to `succeeded`, `retryable_failure`, `terminal_failure`, or `cancelled` before touching commerce state;
@@ -78,8 +78,8 @@ Verified internal commerce/payment layer:
 - failed/cancelled sessions cannot be reopened by later retryable/terminal callbacks, while a late success against released inventory is rejected as a reconciliation incident;
 - legacy Stripe RPC signatures remain compatibility wrappers only and preserve strict Stripe event/outcome validation;
 - the public application has a safe `unconfigured` payment state: no external charge is attempted and no fake-payment production route exists;
-- CI run #88 rebuilt PostgreSQL 17/Supabase and passed the original P0 commerce/security suite plus the provider-neutral payment simulator suite; subsequent terminal-state regression coverage is enforced by the same CI workflow;
-- Vercel preview builds of the provider-neutral application are successful.
+- clean PostgreSQL 17/Supabase CI continuously exercises the original P0 commerce/security suite plus provider-neutral and terminal-state payment suites;
+- Vercel builds of the provider-neutral application are successful.
 
 Still required before real payment processing/public launch:
 - select a processor that accepts the final marketplace business model and contracting legal entity;
@@ -87,8 +87,7 @@ Still required before real payment processing/public launch:
 - complete provider sandbox/test payment initialization through the deployed application;
 - verify actual signed webhook/callback deliveries, retries, duplicates and out-of-order events at the HTTP boundary;
 - define and test refunds/partial refunds where exposed at launch;
-- implement provider reconciliation and operational incident procedures;
-- connect provider payout/disbursement behavior only after seller payout controls are independently hardened and verified.
+- implement provider reconciliation and operational incident procedures.
 
 The missing external processor does **not** block continued engineering or internal commerce-state verification. It remains a hard gate before accepting real payment data or enabling public checkout.
 
@@ -96,7 +95,7 @@ The missing external processor does **not** block continued engineering or inter
 
 **Status: IN PROGRESS**
 
-Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Live verification confirms all 27 public tables remain RLS-enabled, authenticated transaction readers have SELECT-only table privileges, raw webhook records remain API-inaccessible, payment finalization remains service-role-only, and the service role has an explicit trusted-worker DML contract across the canonical schema.
+Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Payout regression coverage additionally verifies seller-only payout reads, cross-seller isolation, no authenticated payout mutation RPC execution, no authenticated access to raw payout provider events, and service-role-only payout state mutation. The canonical database reproduction requires RLS on all 30 public tables.
 
 Still required: representative automated anon/buyer/seller/cross-account/admin boundaries for catalog, profiles, messages, KYC, product uploads and remaining privileged routes/RPCs.
 
@@ -123,11 +122,11 @@ Still required before launch: complete route-level ownership regression coverage
 **Status: IN PROGRESS**
 
 Verified:
-- EntizNetStore now has a dedicated Vercel project (`entiznetstore`) linked only to `OKenechukwu/EntizNetStore`;
+- EntizNetStore has a dedicated Vercel project (`entiznetstore`) linked only to `OKenechukwu/EntizNetStore`;
 - the incorrectly linked EntizNet Vercel projects were disconnected and no longer consume EntizNetStore builds;
 - the canonical Vercel HTTPS alias serves the production deployment successfully;
 - production build uses the canonical npm lockfile and stale Replit/Yarn/pnpm deployment artifacts are blocked by the foundation guard;
-- the deployed home page returns HTTP 200 with security headers and Vercel reported no runtime-error clusters during initial verification.
+- provider-neutral payment/payout code compiles and deploys with both processors intentionally unconfigured.
 
 Still required before public launch:
 - canonical owned production domain and DNS/HTTPS validation;
@@ -142,13 +141,43 @@ Still required before public launch:
 
 **Status: OPEN**
 
-Production needs actionable monitoring for payment callback failures, checkout/order inconsistencies, elevated server errors, auth/admin failures, storage failures, and database health. Define alert ownership and the first incident-response runbook.
+Production needs actionable monitoring for payment/payout callback failures, checkout/order/payout inconsistencies, elevated server errors, auth/admin failures, storage failures, and database health. Define alert ownership and the first incident-response runbook.
 
 ## P0-08 — EntizNet identity/capability integration contract
 
 **Status: OPEN for EntizNet entry; does not block standalone internal testing**
 
 Before EntizNet-linked launch, implement and verify the secure identity/capability handoff described by ADR-0001. Standalone and EntizNet entry must resolve to the same identity/permissions without duplicated credentials or permanent single-role assumptions.
+
+## P0-09 — Seller payout/disbursement end-to-end verification
+
+**Status: IN PROGRESS — external payout provider onboarding deferred until pre-launch**
+
+Verified internal payout layer:
+- `docs/architecture/ADR-0003-payout-provider-boundary.md` defines a provider-neutral payout contract independent of the future disbursement processor;
+- payout requests are idempotent per seller and claim eligible escrow atomically;
+- only held, undisputed escrow from paid + delivered + fulfilled seller orders older than the trusted-server eligibility cutoff can be claimed;
+- payout creation reserves escrow without marking money released;
+- each escrow transaction can have at most one active `reserved`/`settled` payout claim;
+- terminal payout failure or operator cancellation releases the payout claim while preserving the underlying held escrow for a safe later request;
+- only verified provider success changes escrow from `held` to `released` and settles payout items;
+- exact provider-event replay is deduplicated and late failure cannot downgrade a succeeded payout;
+- late success against a locally terminal request is rejected as a manual reconciliation incident;
+- ambiguous provider initialization failures intentionally keep escrow reserved instead of risking a duplicate transfer;
+- seller payout destination data stays server-only in `profiles_seller_private`;
+- `PAYOUT_PROVIDER=unconfigured` fails closed and there is no public fake-payout endpoint;
+- CI verifies the full payout state machine and launches two real concurrent PostgreSQL sessions against one eligible escrow row; exactly one request may claim it.
+
+Still required before real seller disbursement/public launch:
+- choose an approved payout-capable processor/legal-entity relationship;
+- implement the real payout adapter with provider-side idempotency keyed by internal payout request ID;
+- approve and configure the production `PAYOUT_HOLD_DAYS` release policy;
+- complete seller payout-account onboarding/validation appropriate to the provider;
+- verify actual signed provider callbacks, duplicates, retries, terminal failures and out-of-order events;
+- define provider reconciliation, payout support and money-movement incident procedures;
+- exercise sandbox payouts end-to-end before enabling production disbursement.
+
+The missing external payout provider does **not** block continued internal marketplace engineering. It is a hard gate before money is actually disbursed to sellers.
 
 ---
 
