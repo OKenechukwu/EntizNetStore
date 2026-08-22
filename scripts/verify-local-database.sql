@@ -17,8 +17,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
 
-  if v_public_tables <> 30 then
-    raise exception 'Expected 30 public tables, found %', v_public_tables;
+  if v_public_tables <> 31 then
+    raise exception 'Expected 31 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
@@ -26,8 +26,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_rls_tables <> 30 then
-    raise exception 'Expected RLS on all 30 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 31 then
+    raise exception 'Expected RLS on all 31 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -40,10 +40,10 @@ begin
       select 1 from pg_policy p where p.polrelid = c.oid
     );
 
-  -- payout_provider_events is intentionally trusted-worker-only and therefore
-  -- increases the deny-by-default table count by one.
-  if v_no_policy_tables <> 12 then
-    raise exception 'Expected 12 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- M1 adds scoped read policies to KYC documents, KYC requests, and message
+  -- attachments, reducing the intentional deny-by-default count from 12 to 9.
+  if v_no_policy_tables <> 9 then
+    raise exception 'Expected 9 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -69,7 +69,8 @@ with expected(name) as (
     ('payment_sessions'), ('payment_webhook_events'),
     ('payout_items'), ('payout_provider_events'), ('payout_requests'),
     ('product_categories'), ('product_media'), ('product_variants'), ('products'),
-    ('profiles_buyer'), ('profiles_seller'), ('profiles_seller_private'), ('reviews')
+    ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
+    ('profiles_seller_private'), ('reviews')
 ), actual(name) as (
   select c.relname::text
   from pg_class c
@@ -138,14 +139,52 @@ begin
   if not coalesce(bucket_mimes @> array[
     'image/jpeg', 'image/jpg', 'image/png', 'image/webp'
   ]::text[], false) then
-    raise exception 'Product media MIME allow-list differs from P0 baseline';
+    raise exception 'Product media MIME allow-list differs from baseline';
+  end if;
+
+  select public, file_size_limit, allowed_mime_types
+    into bucket_public, bucket_limit, bucket_mimes
+  from storage.buckets
+  where id = 'seller-branding';
+
+  if not found then
+    raise exception 'Required seller-branding storage bucket is missing';
+  end if;
+  if not bucket_public then
+    raise exception 'Seller branding bucket must be public for storefront rendering';
+  end if;
+  if bucket_limit is distinct from 5242880 then
+    raise exception 'Seller branding bucket must enforce a 5MB file limit, found %', bucket_limit;
+  end if;
+  if not coalesce(bucket_mimes @> array[
+    'image/jpeg', 'image/jpg', 'image/png', 'image/webp'
+  ]::text[], false) then
+    raise exception 'Seller branding MIME allow-list differs from M1 baseline';
+  end if;
+
+  select public, file_size_limit, allowed_mime_types
+    into bucket_public, bucket_limit, bucket_mimes
+  from storage.buckets
+  where id = 'message-attachments';
+
+  if not found then
+    raise exception 'Required private message-attachments storage bucket is missing';
+  end if;
+  if bucket_public then
+    raise exception 'Message attachments bucket must remain private';
+  end if;
+  if bucket_limit is distinct from 15728640 then
+    raise exception 'Message attachments bucket must enforce a 15MB file limit, found %', bucket_limit;
+  end if;
+  if not coalesce(bucket_mimes @> array[
+    'application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'
+  ]::text[], false) then
+    raise exception 'Message attachment MIME allow-list differs from M1 baseline';
   end if;
 end
 $$;
 
--- Transaction table grants must agree with RLS: authenticated participants can
--- read only their own rows, trusted workers can operate the ledgers, and API
--- users cannot write directly.
+-- Transaction and private M1 table grants must agree with RLS.
 do $$
 declare
   table_name text;
@@ -175,6 +214,26 @@ begin
     end if;
   end loop;
 
+  foreach table_name in array array[
+    'kyc_documents',
+    'kyc_verification_requests',
+    'message_attachments'
+  ] loop
+    if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
+      raise exception 'authenticated is missing scoped SELECT on %', table_name;
+    end if;
+    if has_table_privilege('authenticated', format('public.%I', table_name), 'INSERT')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'UPDATE')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'DELETE') then
+      raise exception 'authenticated must not directly mutate private M1 table %', table_name;
+    end if;
+  end loop;
+
+  if has_table_privilege('anon', 'public.admin_audit_logs', 'SELECT')
+     or has_table_privilege('authenticated', 'public.admin_audit_logs', 'SELECT') then
+    raise exception 'Admin audit logs must remain trusted-worker-only';
+  end if;
+
   if has_table_privilege('anon', 'public.payment_webhook_events', 'SELECT')
      or has_table_privilege('authenticated', 'public.payment_webhook_events', 'SELECT') then
     raise exception 'Raw payment webhook records must remain trusted-worker-only';
@@ -194,7 +253,7 @@ begin
 end
 $$;
 
--- Canonical supporting indexes introduced/required by M0 and the money ledgers.
+-- Canonical supporting indexes introduced/required by M0, M1, and money ledgers.
 do $$
 declare
   idx text;
@@ -220,7 +279,11 @@ begin
     'idx_payout_items_request',
     'idx_payout_items_escrow',
     'idx_payout_items_active_escrow',
-    'idx_payout_provider_events_request'
+    'idx_payout_provider_events_request',
+    'idx_profiles_business_verification_status',
+    'idx_kyc_documents_seller_status',
+    'idx_kyc_requests_seller_status',
+    'idx_message_attachments_message_id'
   ] loop
     if to_regclass('public.' || idx) is null then
       raise exception 'Required supporting index missing: %', idx;
@@ -233,6 +296,7 @@ $$;
 do $$
 declare
   payout_fn text;
+  kyc_fn text;
 begin
   if has_function_privilege('anon', 'public.create_checkout_session(jsonb,jsonb,uuid)', 'EXECUTE') then
     raise exception 'anon must not execute create_checkout_session';
@@ -296,10 +360,23 @@ begin
       raise exception 'service_role must execute payout mutation RPC: %', payout_fn;
     end if;
   end loop;
+
+  foreach kyc_fn in array array[
+    'public.admin_review_kyc_document(uuid,uuid,text,text)',
+    'public.admin_complete_seller_kyc(uuid,uuid,text,text)'
+  ] loop
+    if has_function_privilege('anon', kyc_fn, 'EXECUTE')
+       or has_function_privilege('authenticated', kyc_fn, 'EXECUTE') then
+      raise exception 'Admin KYC mutation RPC must be trusted-worker-only: %', kyc_fn;
+    end if;
+    if not has_function_privilege('service_role', kyc_fn, 'EXECUTE') then
+      raise exception 'service_role must execute admin KYC RPC: %', kyc_fn;
+    end if;
+  end loop;
 end
 $$;
 
--- Search-path hardening for privileged checkout/order/payout functions.
+-- Search-path hardening for privileged checkout/order/payout/KYC functions.
 do $$
 declare
   bad_count integer;
@@ -323,6 +400,17 @@ begin
 
   if bad_count <> 0 then
     raise exception '% privileged money/order functions lack hardened search_path', bad_count;
+  end if;
+
+  select count(*) into bad_count
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname in ('admin_review_kyc_document', 'admin_complete_seller_kyc')
+    and not ('search_path=public, pg_temp' = any(coalesce(p.proconfig, array[]::text[])));
+
+  if bad_count <> 0 then
+    raise exception '% privileged KYC functions lack hardened search_path', bad_count;
   end if;
 end
 $$;
