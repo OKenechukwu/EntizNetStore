@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { PLACEHOLDER_IMAGE } from "@/lib/data/products";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type StorefrontOptions = {
   q?: string;
@@ -16,6 +16,8 @@ type SellerRow = {
   bio: string | null;
   logo_url: string | null;
   banner_url: string | null;
+  shipping_policy: string | null;
+  return_policy: string | null;
 };
 
 type ProductRow = {
@@ -35,19 +37,27 @@ function firstImage(row: ProductRow) {
     ?.url ?? PLACEHOLDER_IMAGE;
 }
 
-/** Canonical public URL identity for a verified Seller storefront. */
-export async function getSellerStorefrontSlug(sellerId: string) {
+/** Canonical public identity/policies for a verified Seller storefront. */
+export async function getSellerStorefrontPublicDetails(sellerId: string) {
   if (!UUID_RE.test(sellerId)) return null;
 
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("profiles_seller")
-    .select("store_slug")
+    .select("store_slug, shipping_policy, return_policy")
     .eq("id", sellerId)
     .maybeSingle();
 
   if (error || !data?.store_slug) return null;
-  return data.store_slug as string;
+  return {
+    storeSlug: data.store_slug as string,
+    shippingPolicy: (data.shipping_policy as string | null) ?? null,
+    returnPolicy: (data.return_policy as string | null) ?? null,
+  };
+}
+
+export async function getSellerStorefrontSlug(sellerId: string) {
+  return (await getSellerStorefrontPublicDetails(sellerId))?.storeSlug ?? null;
 }
 
 export async function getStorefrontByIdentity(
@@ -60,7 +70,7 @@ export async function getStorefrontByIdentity(
 
   let sellerQuery = supabase
     .from("profiles_seller")
-    .select("id, storefront_name, store_slug, bio, logo_url, banner_url")
+    .select("id, storefront_name, store_slug, bio, logo_url, banner_url, shipping_policy, return_policy")
     .limit(1);
 
   sellerQuery = UUID_RE.test(identity)
