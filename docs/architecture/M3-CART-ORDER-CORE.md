@@ -6,9 +6,7 @@ Canonical milestone: `M3-MARKETPLACE-OPERATIONS-ENTIZNET-INTEGRATION.md`
 
 ## Purpose
 
-This work began before the combined M3 scope was locked. It is retained because persistent carts, trusted addresses, server-authoritative quotes, checkout snapshots, reservations and order state are prerequisites for the combined M3 operational surfaces covering orders, refunds, disputes, escrow, payouts, revenue and transaction search.
-
-It is not a separate roadmap milestone.
+Persistent carts, trusted addresses, server-authoritative quotes, checkout snapshots, reservations and order state are prerequisites for the combined M3 operational surfaces covering orders, refunds, disputes, escrow, payouts, revenue and transaction search. This is supporting work inside the combined milestone, not a separate roadmap milestone.
 
 ## Supporting scope
 
