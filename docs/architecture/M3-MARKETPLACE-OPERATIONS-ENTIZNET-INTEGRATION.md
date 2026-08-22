@@ -158,6 +158,14 @@ Dashboards prioritize actionable marketplace health:
 - recent audit/security actions;
 - EntizNet integration/link/session failures or revocations requiring attention.
 
+## Execution order
+
+1. **Trusted commerce foundation** — finish persistent cart/address/quote/checkout snapshot work already underway so operational order/refund/dispute tooling rests on authoritative records.
+2. **Identity/suspension enforcement foundation** — establish unified local capability state, Seller/Buyer suspension semantics and integration mapping/revocation tables so both Admin and EntizNet entry enforce the same permissions.
+3. **EntizNet handoff contract** — signed short-lived entry, account linking, standalone-account coexistence, session origin metadata, return-link allow-list and revocation behavior.
+4. **Admin control plane** — account management, KYC, catalogue, orders, refunds, disputes, escrow, payouts, revenue, transaction search, reports, reviews, content and notifications.
+5. **Operational dashboards & regressions** — actionable metrics, audit/reconciliation surfaces, database/HTTP/cross-product authorization tests, failure/recovery states and launch-blocker closure.
+
 ## Engineering method
 
 - inspect and reuse M0–M2 commerce/KYC/moderation/order/payment/escrow/payout state machines;
