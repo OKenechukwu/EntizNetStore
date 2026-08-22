@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!isConfiguredPayoutMethod(privateProfile?.payout_method)) {
+  const payoutMethod = privateProfile?.payout_method;
+  if (!isConfiguredPayoutMethod(payoutMethod)) {
     return NextResponse.json(
       { error: "Configure a payout method before requesting funds", code: "PAYOUT_METHOD_REQUIRED" },
       { status: 409 },
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
       sellerId: user.id,
       amountCents,
       currency: "usd",
-      payoutMethod: privateProfile.payout_method as Record<string, unknown>,
+      payoutMethod,
     });
 
     const { error: attachError } = await admin.rpc(
