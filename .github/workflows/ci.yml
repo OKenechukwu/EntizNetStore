@@ -73,6 +73,9 @@ jobs:
       - name: Run M1 identity, KYC and storage regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-identity-kyc-storage.sql
 
+      - name: Run M1 BSM verification regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-bsm-verification.sql
+
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
