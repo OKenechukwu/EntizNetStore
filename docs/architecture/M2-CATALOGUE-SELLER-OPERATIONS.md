@@ -1,6 +1,6 @@
 # M2 — Catalogue & Seller Operations
 
-Status: **LIVE DATABASE VERIFIED; merge-to-main and production deployment verification pending**
+Status: **ENGINEERING + LIVE DATABASE VERIFIED; MERGED TO MAIN; PRODUCTION PROMOTION BLOCKED BY VERCEL HOBBY BUILD-RATE LIMIT**
 
 ## Goal
 
@@ -224,18 +224,22 @@ CI continues to run the production foundation scan, TypeScript, production build
 - CI #187 passed the entire release stack including the new FK-index assertions.
 - The eighth migration was applied live successfully. A repeat performance-advisor check no longer reports unindexed foreign keys; only expected unused-index INFO remains on the currently empty marketplace dataset.
 - Security-advisor review adds four M2 Seller RPC warnings because authenticated users intentionally execute the `SECURITY DEFINER` catalogue boundary. These are reviewed exceptions, not unreviewed findings: ownership/state enforcement is inside the RPCs, direct table DML is denied, search paths are hardened, and cross-Seller attacks are regression-tested.
-- Pre-merge Vercel production runtime baseline reports no runtime-error clusters.
+- Final evidence-head CI #189 passed the complete release stack again, including production build and every database/commerce/payment/payout/concurrency regression.
+- Final release-head commit `b5e51be858b81267710d93ee945cf18f5fc1c605` has a READY Vercel preview that serves HTTP 200 with expected production-style security headers.
+- PR #8 merged that exact tested head into `main` at `de1558d292d2e92fd256796b61e9f9bb47ac2160`.
+- Post-merge GitHub status inspection shows Vercel rejected `de1558d...` with `upgradeToPro=build-rate-limit`. A docs-only `main` retrigger was rejected for the same reason, confirming a Vercel Hobby build-capacity limit rather than an M2 application failure.
 
 ## M2 exit gate
 
-Engineering/database portions of the M2 exit gate are verified:
+Engineering/database/main-merge portions of the M2 exit gate are verified:
 
 - final application/database branch CI is green;
 - all eight forward M2 migrations are applied to the correct live EntizNetStore Supabase project;
 - live RLS/table/RPC/trigger/constraint/index invariants match the fresh-database baseline;
-- Supabase security/performance advisors contain no new unreviewed launch-severity M2 findings.
+- Supabase security/performance advisors contain no new unreviewed launch-severity M2 findings;
+- the exact tested release head is merged into `main`.
 
-The remaining release condition is the merged `main` build/deployment and production runtime verification.
+The remaining release condition is production alias promotion and runtime verification. It is currently blocked by Vercel Hobby build-rate limiting, not by code or database failure. The preferred recovery is to promote the already-validated READY preview deployment for `b5e51be...` to production without rebuilding, then verify HTTP 200 and production runtime errors.
 
 Functional exit condition: **a verified Seller can operate a stable storefront, create and manage a complete product/variant/inventory listing, submit it for independent Admin review, and expose only the approved revision publicly without any Replit catalogue infrastructure.**
 
