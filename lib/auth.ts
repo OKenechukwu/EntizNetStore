@@ -40,14 +40,12 @@ export type SellerVerificationStatus =
 export type SellerProfile = {
   id: string;
   storefront_name: string;
+  store_slug: string;
   bio?: string;
   logo_url?: string;
   banner_url?: string;
   business_type: 'individual' | 'business' | 'creator';
-  tax_id?: string;
   verification_status: SellerVerificationStatus;
-  verification_documents?: any;
-  payout_method?: any;
   return_policy?: string;
   shipping_policy?: string;
   created_at: string;
@@ -76,13 +74,6 @@ export type BusinessProfile = {
   updated_at: string;
 };
 
-function normalizeCountryInput(value?: string | null): string | undefined {
-  if (!value) return undefined;
-  const s = value.trim();
-  if (!s) return undefined;
-  return s.slice(0, 2).toUpperCase();
-}
-
 export async function signUp(email: string, password: string, _role: UserRole = 'buyer') {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
@@ -110,7 +101,9 @@ export async function getCurrentSession(): Promise<Session | null> {
   return session;
 }
 
-// Capability creation is server-only through /api/onboarding/*.
+// Capability creation and mutation are server-only through trusted /api routes.
+// Browser code may read the current user's profiles through RLS, but must never
+// receive direct profile UPDATE helpers that can drift from the server contract.
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
   const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
   if (error) return null;
@@ -126,24 +119,6 @@ export async function getSellerProfile(userId: string): Promise<SellerProfile | 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
   const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).single();
   if (error) return null;
-  return data;
-}
-
-export async function updateBuyerProfile(userId: string, updates: Partial<BuyerProfile>) {
-  const normalized = {
-    ...updates,
-    country: normalizeCountryInput(updates.country),
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabase.from('profiles_buyer').update(normalized).eq('id', userId).select().single();
-  if (error) throw error;
-  return data;
-}
-
-export async function updateSellerProfile(userId: string, updates: Partial<SellerProfile>) {
-  const payload = { ...updates, updated_at: new Date().toISOString() };
-  const { data, error } = await supabase.from('profiles_seller').update(payload).eq('id', userId).select().single();
-  if (error) throw error;
   return data;
 }
 
