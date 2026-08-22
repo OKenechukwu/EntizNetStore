@@ -29,12 +29,14 @@ values
   ('30000000-0000-0000-0000-000000000003', 'P0 Seller One', 'verified'),
   ('40000000-0000-0000-0000-000000000004', 'P0 Seller Two', 'verified');
 
+-- These products represent listings that already passed M2 moderation. The
+-- checkout suite tests commerce state, not the moderation transition itself.
 insert into public.products(
-  id, seller_id, title, slug, status, base_price, requires_shipping, marketplace_brand
+  id, seller_id, title, slug, status, moderation_status, base_price, requires_shipping, marketplace_brand
 )
 values
-  ('50000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000003', 'P0 Product One', 'p0-product-one', 'active', 10.00, true, 'entiznetstore'),
-  ('60000000-0000-0000-0000-000000000006', '40000000-0000-0000-0000-000000000004', 'P0 Product Two', 'p0-product-two', 'active', 15.00, true, 'entiznetstore');
+  ('50000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000003', 'P0 Product One', 'p0-product-one', 'active', 'approved', 10.00, true, 'entiznetstore'),
+  ('60000000-0000-0000-0000-000000000006', '40000000-0000-0000-0000-000000000004', 'P0 Product Two', 'p0-product-two', 'active', 'approved', 15.00, true, 'entiznetstore');
 
 insert into public.product_variants(
   id, product_id, title, sku, price, track_inventory, inventory_quantity,
