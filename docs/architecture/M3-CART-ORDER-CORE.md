@@ -30,7 +30,7 @@ Normal browser clients must not be able to manufacture arbitrary checkout item a
 
 ## Relationship to combined M3
 
-This foundation is part of the combined M3 execution because Admin order/refund/dispute/revenue tooling cannot be trustworthy while checkout is still browser-authoritative. It should be completed and verified early, then reused by the operational control plane and EntizNet integration work rather than replaced.
+This foundation is the first execution block of combined M3 because Admin order/refund/dispute/revenue tooling cannot be trustworthy while checkout is still browser-authoritative. It will be completed and verified early, then reused by the operational control plane and EntizNet integration work rather than replaced.
 
 ## Deployment discipline
 
