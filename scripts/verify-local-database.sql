@@ -17,8 +17,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
 
-  if v_public_tables <> 27 then
-    raise exception 'Expected 27 public tables, found %', v_public_tables;
+  if v_public_tables <> 30 then
+    raise exception 'Expected 30 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
@@ -26,8 +26,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_rls_tables <> 27 then
-    raise exception 'Expected RLS on all 27 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 30 then
+    raise exception 'Expected RLS on all 30 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -40,8 +40,10 @@ begin
       select 1 from pg_policy p where p.polrelid = c.oid
     );
 
-  if v_no_policy_tables <> 11 then
-    raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- payout_provider_events is intentionally trusted-worker-only and therefore
+  -- increases the deny-by-default table count by one.
+  if v_no_policy_tables <> 12 then
+    raise exception 'Expected 12 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -64,9 +66,10 @@ with expected(name) as (
     ('escrow_transactions'), ('featured_products'), ('inventory_reservations'),
     ('kyc_documents'), ('kyc_verification_requests'), ('message_attachments'),
     ('messages'), ('notifications'), ('order_items'), ('orders'),
-    ('payment_sessions'), ('payment_webhook_events'), ('product_categories'),
-    ('product_media'), ('product_variants'), ('products'), ('profiles_buyer'),
-    ('profiles_seller'), ('profiles_seller_private'), ('reviews')
+    ('payment_sessions'), ('payment_webhook_events'),
+    ('payout_items'), ('payout_provider_events'), ('payout_requests'),
+    ('product_categories'), ('product_media'), ('product_variants'), ('products'),
+    ('profiles_buyer'), ('profiles_seller'), ('profiles_seller_private'), ('reviews')
 ), actual(name) as (
   select c.relname::text
   from pg_class c
@@ -140,9 +143,9 @@ begin
 end
 $$;
 
--- RLS policies and table grants must agree: authenticated participants can
--- read only their own transaction rows, trusted workers can operate the ledger,
--- and no API role can write directly.
+-- Transaction table grants must agree with RLS: authenticated participants can
+-- read only their own rows, trusted workers can operate the ledgers, and API
+-- users cannot write directly.
 do $$
 declare
   table_name text;
@@ -152,7 +155,9 @@ begin
     'inventory_reservations',
     'orders',
     'order_items',
-    'escrow_transactions'
+    'escrow_transactions',
+    'payout_requests',
+    'payout_items'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
       raise exception 'authenticated is missing SELECT on %', table_name;
@@ -172,15 +177,24 @@ begin
 
   if has_table_privilege('anon', 'public.payment_webhook_events', 'SELECT')
      or has_table_privilege('authenticated', 'public.payment_webhook_events', 'SELECT') then
-    raise exception 'Raw webhook records must remain trusted-worker-only';
+    raise exception 'Raw payment webhook records must remain trusted-worker-only';
   end if;
   if not has_table_privilege('service_role', 'public.payment_webhook_events', 'SELECT') then
-    raise exception 'service_role must inspect webhook deduplication records';
+    raise exception 'service_role must inspect payment webhook deduplication records';
+  end if;
+
+  if has_table_privilege('anon', 'public.payout_provider_events', 'SELECT')
+     or has_table_privilege('authenticated', 'public.payout_provider_events', 'SELECT') then
+    raise exception 'Raw payout provider events must remain trusted-worker-only';
+  end if;
+  if not has_table_privilege('service_role', 'public.payout_provider_events', 'SELECT')
+     or not has_table_privilege('service_role', 'public.payout_provider_events', 'INSERT') then
+    raise exception 'service_role payout-event privileges are incomplete';
   end if;
 end
 $$;
 
--- Canonical supporting indexes introduced/required by M0.
+-- Canonical supporting indexes introduced/required by M0 and the money ledgers.
 do $$
 declare
   idx text;
@@ -199,7 +213,14 @@ begin
     'idx_product_media_variant_id',
     'idx_product_variants_product_id',
     'idx_products_brand_id',
-    'idx_reviews_buyer_id'
+    'idx_reviews_buyer_id',
+    'idx_payout_requests_seller_created',
+    'idx_payout_requests_status',
+    'idx_payout_requests_provider_reference',
+    'idx_payout_items_request',
+    'idx_payout_items_escrow',
+    'idx_payout_items_active_escrow',
+    'idx_payout_provider_events_request'
   ] loop
     if to_regclass('public.' || idx) is null then
       raise exception 'Required supporting index missing: %', idx;
@@ -210,6 +231,8 @@ $$;
 
 -- Privileged RPC availability and explicit execution boundaries.
 do $$
+declare
+  payout_fn text;
 begin
   if has_function_privilege('anon', 'public.create_checkout_session(jsonb,jsonb,uuid)', 'EXECUTE') then
     raise exception 'anon must not execute create_checkout_session';
@@ -258,10 +281,25 @@ begin
      or has_function_privilege('authenticated', 'public.touch_conversation_after_message()', 'EXECUTE') then
     raise exception 'trigger helper must not be API-user executable';
   end if;
+
+  foreach payout_fn in array array[
+    'public.request_seller_payout(uuid,uuid,timestamp with time zone)',
+    'public.attach_seller_payout_provider_reference(uuid,text,text)',
+    'public.cancel_seller_payout_request(uuid,text)',
+    'public.finalize_seller_payout_v1(text,text,text,uuid,text,text)'
+  ] loop
+    if has_function_privilege('anon', payout_fn, 'EXECUTE')
+       or has_function_privilege('authenticated', payout_fn, 'EXECUTE') then
+      raise exception 'Payout mutation RPC must be trusted-worker-only: %', payout_fn;
+    end if;
+    if not has_function_privilege('service_role', payout_fn, 'EXECUTE') then
+      raise exception 'service_role must execute payout mutation RPC: %', payout_fn;
+    end if;
+  end loop;
 end
 $$;
 
--- Search-path hardening for privileged checkout/order functions.
+-- Search-path hardening for privileged checkout/order/payout functions.
 do $$
 declare
   bad_count integer;
@@ -275,12 +313,16 @@ begin
       'attach_checkout_payment_intent',
       'cancel_checkout_session',
       'finalize_checkout_payment',
-      'transition_seller_order'
+      'transition_seller_order',
+      'request_seller_payout',
+      'attach_seller_payout_provider_reference',
+      'cancel_seller_payout_request',
+      'finalize_seller_payout_v1'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
 
   if bad_count <> 0 then
-    raise exception '% privileged checkout/order functions lack hardened search_path', bad_count;
+    raise exception '% privileged money/order functions lack hardened search_path', bad_count;
   end if;
 end
 $$;
