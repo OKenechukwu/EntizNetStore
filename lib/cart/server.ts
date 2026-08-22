@@ -67,8 +67,8 @@ export async function hydrateActiveCart(buyerId: string): Promise<CanonicalCart 
     };
   }
 
-  const productIds = [...new Set(rawItems.map((item) => item.product_id))];
-  const variantIds = [...new Set(rawItems.map((item) => item.variant_id))];
+  const productIds = Array.from(new Set(rawItems.map((item) => item.product_id)));
+  const variantIds = Array.from(new Set(rawItems.map((item) => item.variant_id)));
 
   const [{ data: products, error: productsError }, { data: variants, error: variantsError }] = await Promise.all([
     admin
@@ -84,7 +84,9 @@ export async function hydrateActiveCart(buyerId: string): Promise<CanonicalCart 
   if (productsError) throw productsError;
   if (variantsError) throw variantsError;
 
-  const sellerIds = [...new Set((products || []).map((product) => product.seller_id).filter(Boolean))] as string[];
+  const sellerIds = Array.from(
+    new Set((products || []).map((product) => product.seller_id).filter(Boolean)),
+  ) as string[];
 
   const [{ data: sellers, error: sellersError }, { data: media, error: mediaError }, { data: reservations, error: reservationsError }] = await Promise.all([
     sellerIds.length
