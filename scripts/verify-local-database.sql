@@ -367,10 +367,6 @@ begin
   end if;
 
   select count(*) into v_bad
-  from pg_proc p join pg_namespace n on n.oid = p.relnamespace
-  where false;
-
-  select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname in ('admin_review_kyc_document','admin_complete_seller_kyc')
