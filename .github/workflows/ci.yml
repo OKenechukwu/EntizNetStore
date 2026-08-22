@@ -82,6 +82,9 @@ jobs:
       - name: Run M2 active product approval invariant regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-active-approval-invariant.sql
 
+      - name: Run M2 Seller policy completeness regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-product-policy-completeness.sql
+
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
