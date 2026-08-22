@@ -19,16 +19,16 @@ begin
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
 
-  if v_public_tables <> 35 then
-    raise exception 'Expected 35 public tables, found %', v_public_tables;
+  if v_public_tables <> 39 then
+    raise exception 'Expected 39 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_rls_tables <> 35 then
-    raise exception 'Expected RLS on all 35 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 39 then
+    raise exception 'Expected RLS on all 39 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -38,9 +38,11 @@ begin
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
 
-  -- M3 turns addresses from deny-by-default into Buyer-own scoped reads.
-  if v_no_policy_tables <> 8 then
-    raise exception 'Expected 8 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- M3 gives addresses, capability-state rows and identity links scoped owner
+  -- reads. Immutable capability events and handoff replay/audit rows are added
+  -- as trusted-server-only tables, so the deny-by-default total becomes 10.
+  if v_no_policy_tables <> 10 then
+    raise exception 'Expected 10 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -54,14 +56,15 @@ with expected(name) as (
   values
     ('addresses'), ('admin_audit_logs'), ('brands'), ('cart_items'),
     ('cart_quotes'), ('carts'), ('categories'), ('content_pages'),
-    ('conversation_keys'), ('conversations'), ('escrow_transactions'),
-    ('featured_products'), ('inventory_reservations'), ('kyc_documents'),
-    ('kyc_verification_requests'), ('message_attachments'), ('messages'),
-    ('notifications'), ('order_items'), ('orders'), ('payment_sessions'),
-    ('payment_webhook_events'), ('payout_items'), ('payout_provider_events'),
-    ('payout_requests'), ('product_categories'), ('product_media'),
-    ('product_moderation_events'), ('product_variants'), ('products'),
-    ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
+    ('conversation_keys'), ('conversations'), ('entiznet_handoff_events'),
+    ('entiznet_identity_links'), ('escrow_transactions'), ('featured_products'),
+    ('inventory_reservations'), ('kyc_documents'), ('kyc_verification_requests'),
+    ('marketplace_capability_state_events'), ('marketplace_capability_states'),
+    ('message_attachments'), ('messages'), ('notifications'), ('order_items'),
+    ('orders'), ('payment_sessions'), ('payment_webhook_events'), ('payout_items'),
+    ('payout_provider_events'), ('payout_requests'), ('product_categories'),
+    ('product_media'), ('product_moderation_events'), ('product_variants'),
+    ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
     ('profiles_seller_private'), ('reviews')
 ), actual(name) as (
   select c.relname::text
@@ -153,7 +156,8 @@ begin
 
   foreach v_table in array array[
     'kyc_documents','kyc_verification_requests','message_attachments',
-    'product_moderation_events','addresses','carts','cart_items','cart_quotes'
+    'product_moderation_events','addresses','carts','cart_items','cart_quotes',
+    'marketplace_capability_states','entiznet_identity_links'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
       raise exception 'authenticated missing scoped SELECT on %', v_table;
@@ -176,18 +180,18 @@ begin
     end if;
   end loop;
 
-  if has_table_privilege('anon','public.admin_audit_logs','SELECT')
-     or has_table_privilege('authenticated','public.admin_audit_logs','SELECT') then
-    raise exception 'Admin audit logs must remain trusted-worker-only';
-  end if;
-  if has_table_privilege('anon','public.payment_webhook_events','SELECT')
-     or has_table_privilege('authenticated','public.payment_webhook_events','SELECT') then
-    raise exception 'Payment webhook records must remain trusted-worker-only';
-  end if;
-  if has_table_privilege('anon','public.payout_provider_events','SELECT')
-     or has_table_privilege('authenticated','public.payout_provider_events','SELECT') then
-    raise exception 'Payout provider events must remain trusted-worker-only';
-  end if;
+  foreach v_table in array array[
+    'admin_audit_logs','payment_webhook_events','payout_provider_events',
+    'marketplace_capability_state_events','entiznet_handoff_events'
+  ] loop
+    if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
+      raise exception 'Trusted operational table leaked to browser roles: %', v_table;
+    end if;
+    if not has_table_privilege('service_role', format('public.%I', v_table), 'SELECT') then
+      raise exception 'service_role missing operational table access: %', v_table;
+    end if;
+  end loop;
 end
 $$;
 
@@ -213,7 +217,12 @@ begin
     'idx_payout_requests_status','idx_payout_requests_provider_reference','idx_payout_items_request',
     'idx_payout_items_escrow','idx_payout_items_active_escrow','idx_payout_provider_events_request',
     'idx_profiles_business_verification_status','idx_kyc_documents_seller_status',
-    'idx_kyc_requests_seller_status','idx_message_attachments_message_id'
+    'idx_kyc_requests_seller_status','idx_message_attachments_message_id',
+    'idx_marketplace_capability_states_status',
+    'idx_marketplace_capability_state_events_user_created',
+    'idx_marketplace_capability_state_events_capability_created',
+    'idx_entiznet_identity_links_status','idx_entiznet_handoff_events_entiznet_created',
+    'idx_entiznet_handoff_events_store_created','idx_entiznet_handoff_events_status_expiry'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -264,7 +273,14 @@ begin
     'public.finalize_seller_payout_v1(text,text,text,uuid,text,text)',
     'public.admin_review_kyc_document(uuid,uuid,text,text)',
     'public.admin_complete_seller_kyc(uuid,uuid,text,text)',
-    'public.admin_review_product(uuid,uuid,text,text)'
+    'public.admin_review_product(uuid,uuid,text,text)',
+    'public.admin_set_marketplace_capability_state(uuid,uuid,text,text,text)',
+    'public.upsert_entiznet_identity_link(uuid,uuid,text[],text,text,jsonb)',
+    'public.revoke_entiznet_identity_link(uuid,text)',
+    'public.register_entiznet_handoff(text,uuid,text,text,text,text[],timestamp with time zone,timestamp with time zone,jsonb)',
+    'public.complete_entiznet_handoff(uuid,uuid,text,text)',
+    'public.admin_search_marketplace_accounts(uuid,text,text,text,integer,integer)',
+    'public.admin_get_marketplace_account(uuid,uuid)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE')
@@ -276,6 +292,23 @@ begin
   if has_function_privilege('anon','public.touch_conversation_after_message()','EXECUTE')
      or has_function_privilege('authenticated','public.touch_conversation_after_message()','EXECUTE') then
     raise exception 'Trigger helper must not be API-user executable';
+  end if;
+
+  foreach v_fn in array array[
+    'public.guard_seller_capability_for_product_mutation()',
+    'public.guard_buyer_capability_for_cart_mutation()',
+    'public.guard_capabilities_for_cart_item_mutation()',
+    'public.guard_buyer_capability_for_checkout_insert()'
+  ] loop
+    if has_function_privilege('anon', v_fn, 'EXECUTE')
+       or has_function_privilege('authenticated', v_fn, 'EXECUTE') then
+      raise exception 'Capability trigger helper leaked browser execution: %', v_fn;
+    end if;
+  end loop;
+
+  if not has_function_privilege('anon','public.marketplace_capability_is_active(uuid,text)','EXECUTE')
+     or not has_function_privilege('authenticated','public.marketplace_capability_is_active(uuid,text)','EXECUTE') then
+    raise exception 'Capability-state predicate must remain executable for RLS/browser-safe state checks';
   end if;
 
   if has_function_privilege('authenticated','public.seller_save_product(uuid,text,text,numeric,numeric,text,uuid[],text[],integer)','EXECUTE')
@@ -322,12 +355,20 @@ begin
       'seller_save_product_v3','seller_submit_product_for_review',
       'seller_set_product_publication','seller_delete_product',
       'buyer_save_address','buyer_delete_address','buyer_get_or_create_cart',
-      'buyer_set_cart_item','buyer_remove_cart_item','buyer_clear_cart'
+      'buyer_set_cart_item','buyer_remove_cart_item','buyer_clear_cart',
+      'marketplace_capability_is_active','upsert_entiznet_identity_link',
+      'revoke_entiznet_identity_link','register_entiznet_handoff','complete_entiznet_handoff',
+      'guard_seller_capability_for_product_mutation','guard_buyer_capability_for_cart_mutation',
+      'guard_capabilities_for_cart_item_mutation','guard_buyer_capability_for_checkout_insert'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then
-    raise exception '% privileged marketplace functions lack hardened search_path', v_bad;
+    raise exception '% privileged marketplace/integration functions lack hardened search_path', v_bad;
   end if;
+
+  select count(*) into v_bad
+  from pg_proc p join pg_namespace n on n.oid = p.relnamespace
+  where false;
 
   select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -339,9 +380,12 @@ begin
   select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
-    and p.proname = 'admin_review_product'
+    and p.proname in (
+      'admin_review_product','admin_set_marketplace_capability_state',
+      'admin_search_marketplace_accounts','admin_get_marketplace_account'
+    )
     and not ('search_path=pg_catalog, public, auth' = any(coalesce(p.proconfig, array[]::text[])));
-  if v_bad <> 0 then raise exception 'admin_review_product lacks hardened search_path'; end if;
+  if v_bad <> 0 then raise exception '% privileged Admin operations lack hardened search_path', v_bad; end if;
 end
 $$;
 
