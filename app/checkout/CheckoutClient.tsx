@@ -20,7 +20,7 @@ import {
   type CartItem,
 } from "@/lib/cart";
 import { T } from "@/components/i18n/I18nProvider";
-import CartStripePayment from "@/components/payments/CartStripePayment";
+import CartPayment from "@/components/payments/CartPayment";
 
 export default function CheckoutClient() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -28,11 +28,9 @@ export default function CheckoutClient() {
   const [rates, setRates] = useState<FxRates>({} as FxRates);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  // Load cart and currency on mount
   useEffect(() => {
     const updateCart = () => setCart(getCart());
-    
-    // Initial load
+
     updateCart();
 
     window.addEventListener("storage", updateCart);
@@ -53,7 +51,6 @@ export default function CheckoutClient() {
     };
   }, []);
 
-  // Fetch FX rates when currency changes
   useEffect(() => {
     async function fetchRates() {
       try {
@@ -200,7 +197,7 @@ export default function CheckoutClient() {
               </span>
             </div>
 
-            <CartStripePayment cart={cart} onSuccess={handlePaymentSuccess} />
+            <CartPayment cart={cart} onSuccess={handlePaymentSuccess} />
           </div>
         </>
       )}

@@ -1,6 +1,6 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-21**
+Last reviewed: **2026-08-22**
 
 This document is the canonical launch-readiness record. A feature looking complete in the UI does not clear a blocker. A blocker is cleared only by verified production-safe behavior, authorization, failure handling, and relevant tests/evidence.
 
@@ -26,17 +26,17 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Remove Replit runtime/debug assumptions | VERIFIED | `.replit`, Replit sidecar storage, and routable debug/dev/test surfaces removed; runtime client no longer depends on Replit preview behavior. |
 | Remove unused legacy dependencies | VERIFIED | `package.json`/`package-lock.json` synchronized; clean locked `npm ci` and production dependency audit pass in CI. |
 | Replace template README | VERIFIED | Production-oriented EntizNetStore README committed. |
-| Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`. |
+| Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`; payment-provider configuration is provider-neutral and fail-closed when unconfigured. |
 | Database security-advisor cleanup | VERIFIED WITH DOCUMENTED EXCEPTIONS | Remaining advisor entries are intentional deny-by-default tables and audited authenticated `SECURITY DEFINER` RPCs. |
 | RLS audit | VERIFIED | All 27 exposed public tables have RLS enabled; intentional no-policy tables deny by default. |
-| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; webhook finalization remains service-role-only. |
+| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment finalization remains service-role-only. |
 | Performance indexes/policy optimization | VERIFIED | Missing FK indexes, auth-init-plan and overlapping permissive-policy warnings removed. |
 | Capability architecture decision | VERIFIED | `docs/architecture/ADR-0001-account-capabilities.md`. |
 | Backup/recovery procedure | VERIFIED | Operational runbook committed; managed backup requirement remains a separate P0 before customer/payment data. |
 | Canonical launch blocker record | VERIFIED | This document. |
 | Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints, anonymous DeepL proxy, and client translation callers removed; static localization remains. |
-| Clean dependency/install/build verification | VERIFIED | CI run #49 proved locked `npm ci`, production-foundation scan, TypeScript, and Next.js production build on commit `4f715ae475b477ae114089c3d9a682bb97773c91`. |
-| Fresh database reproduction | VERIFIED | CI run #49 started a fresh PostgreSQL 17/Supabase stack, rebuilt from all migrations + seed, verified schema/RLS/RPC/index invariants, and shut down cleanly. Final reproduction assertions also cover the private `kyc-documents` storage bucket. |
+| Clean dependency/install/build verification | VERIFIED | Locked install, production-foundation scan, TypeScript, production build, dependency audit and fresh database reproduction are enforced by CI. |
+| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs commerce regressions, and shuts down cleanly. |
 
 **M0 status: VERIFIED.** The production-foundation exit gate is complete. M0 verification does **not** clear the independent P0 launch blockers below.
 
@@ -60,34 +60,43 @@ Owner evidence:
 
 **Status: IN PROGRESS**
 
-The secret contract is documented. Before launch, real production credentials must be provisioned in the deployment secret store, privilege-scoped, and ownership/rotation responsibility recorded. No production secret may live in Git or a browser/mobile bundle.
+The provider-neutral secret contract is documented and the dedicated EntizNetStore Vercel project is established. Supabase production configuration is provisioned without exposing privileged values to browser/mobile code. Real payment-provider merchant/webhook/payout credentials are intentionally not provisioned until an approved processor and contracting legal entity are selected.
 
-## P0-03 — Stripe end-to-end commerce verification
+Before launch, all remaining production credentials must be stored in the deployment secret store, privilege-scoped, environment-isolated, and assigned an owner/rotation procedure. No production secret may live in Git or a browser/mobile bundle.
 
-**Status: IN PROGRESS**
+## P0-03 — Production payment processor end-to-end verification
 
-Verified repository/database layer:
-- CI run #68 rebuilt a fresh PostgreSQL 17/Supabase environment and passed the P0 commerce/security regression suite;
-- server-side price recalculation and multi-seller order splitting;
-- checkout idempotency and changed-cart idempotency-key rejection;
-- inventory reservation, consumption and cancellation/release;
-- Stripe event replay deduplication and out-of-order `payment_failed`/`payment_intent.succeeded` safety;
-- paid-state protection against late failure events;
-- cross-account cancellation denial and seller fulfillment ownership/state transitions;
-- live production P0 migrations applied and repository migration versions synchronized to production history.
+**Status: IN PROGRESS — external processor onboarding deferred until pre-launch**
 
-Still required before real card processing:
-- Stripe test-mode API/payment-intent exercise through the deployed application;
-- webhook signature verification against actual Stripe test webhook delivery;
-- controlled failure/retry verification at the HTTP boundary;
-- refund/partial-refund behavior if exposed at launch;
-- production reconciliation/audit procedure.
+Verified internal commerce/payment layer:
+- checkout and payment processing are now separated by the provider boundary in `docs/architecture/ADR-0002-payment-provider-boundary.md`;
+- the marketplace owns server-side price calculation, checkout idempotency, inventory reservation/consumption/release, seller order splitting, payment-session state, escrow and fulfillment state;
+- canonical `payment_provider` / `provider_payment_id` references replace processor-specific identity in new application code;
+- provider callbacks normalize to `succeeded`, `retryable_failure`, `terminal_failure`, or `cancelled` before touching commerce state;
+- exact event replay is deduplicated and provider IDs namespace event identities;
+- paid sessions cannot be downgraded by late failures;
+- failed/cancelled sessions cannot be reopened by later retryable/terminal callbacks, while a late success against released inventory is rejected as a reconciliation incident;
+- legacy Stripe RPC signatures remain compatibility wrappers only and preserve strict Stripe event/outcome validation;
+- the public application has a safe `unconfigured` payment state: no external charge is attempted and no fake-payment production route exists;
+- CI run #88 rebuilt PostgreSQL 17/Supabase and passed the original P0 commerce/security suite plus the provider-neutral payment simulator suite; subsequent terminal-state regression coverage is enforced by the same CI workflow;
+- Vercel preview builds of the provider-neutral application are successful.
+
+Still required before real payment processing/public launch:
+- select a processor that accepts the final marketplace business model and contracting legal entity;
+- implement that provider through the adapter contract rather than rewriting checkout/order logic;
+- complete provider sandbox/test payment initialization through the deployed application;
+- verify actual signed webhook/callback deliveries, retries, duplicates and out-of-order events at the HTTP boundary;
+- define and test refunds/partial refunds where exposed at launch;
+- implement provider reconciliation and operational incident procedures;
+- connect provider payout/disbursement behavior only after seller payout controls are independently hardened and verified.
+
+The missing external processor does **not** block continued engineering or internal commerce-state verification. It remains a hard gate before accepting real payment data or enabling public checkout.
 
 ## P0-04 — Authorization/RLS regression suite
 
 **Status: IN PROGRESS**
 
-CI run #68 now provides automated buyer/seller/cross-account/service-role coverage for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Live verification confirms all 27 public tables remain RLS-enabled, authenticated transaction readers have SELECT-only table privileges, raw webhook records remain API-inaccessible, `finalize_checkout_payment` remains service-role-only, and the service role has an explicit trusted-worker DML contract across the canonical schema.
+Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Live verification confirms all 27 public tables remain RLS-enabled, authenticated transaction readers have SELECT-only table privileges, raw webhook records remain API-inaccessible, payment finalization remains service-role-only, and the service role has an explicit trusted-worker DML contract across the canonical schema.
 
 Still required: representative automated anon/buyer/seller/cross-account/admin boundaries for catalog, profiles, messages, KYC, product uploads and remaining privileged routes/RPCs.
 
@@ -111,22 +120,29 @@ Still required before launch: complete route-level ownership regression coverage
 
 ## P0-06 — Production deployment hardening
 
-**Status: OPEN**
+**Status: IN PROGRESS**
 
-Verify:
-- canonical production domain and HTTPS;
-- deployment environment isolation;
-- security headers/CSP appropriate to Stripe/Supabase;
-- no debug/test/admin maintenance route accidentally public;
-- structured error handling without secret leakage;
-- health/deployment rollback procedure;
-- database migration deployment procedure.
+Verified:
+- EntizNetStore now has a dedicated Vercel project (`entiznetstore`) linked only to `OKenechukwu/EntizNetStore`;
+- the incorrectly linked EntizNet Vercel projects were disconnected and no longer consume EntizNetStore builds;
+- the canonical Vercel HTTPS alias serves the production deployment successfully;
+- production build uses the canonical npm lockfile and stale Replit/Yarn/pnpm deployment artifacts are blocked by the foundation guard;
+- the deployed home page returns HTTP 200 with security headers and Vercel reported no runtime-error clusters during initial verification.
+
+Still required before public launch:
+- canonical owned production domain and DNS/HTTPS validation;
+- final production/preview/staging environment isolation review;
+- final CSP/header review for the selected payment provider and Supabase flows;
+- confirm no debug/test/admin maintenance route is accidentally public;
+- structured error/logging review without secret leakage;
+- documented deployment rollback/health procedure;
+- finalized database migration deployment procedure and production release checklist.
 
 ## P0-07 — Observability and commerce incident response
 
 **Status: OPEN**
 
-Production needs actionable monitoring for payment webhook failures, checkout/order inconsistencies, elevated server errors, auth/admin failures, storage failures, and database health. Define alert ownership and the first incident-response runbook.
+Production needs actionable monitoring for payment callback failures, checkout/order inconsistencies, elevated server errors, auth/admin failures, storage failures, and database health. Define alert ownership and the first incident-response runbook.
 
 ## P0-08 — EntizNet identity/capability integration contract
 
