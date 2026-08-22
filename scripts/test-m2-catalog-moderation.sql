@@ -20,10 +20,26 @@ values
   ('91000000-0000-0000-0000-000000000001', 'M2 Seller One'),
   ('92000000-0000-0000-0000-000000000002', 'M2 Seller Two');
 
-insert into public.profiles_seller(id, storefront_name, business_type, verification_status)
+insert into public.profiles_seller(
+  id, storefront_name, business_type, verification_status, shipping_policy, return_policy
+)
 values
-  ('91000000-0000-0000-0000-000000000001', 'M2 Seller One Store', 'individual', 'verified'),
-  ('92000000-0000-0000-0000-000000000002', 'M2 Seller Two Store', 'individual', 'verified');
+  (
+    '91000000-0000-0000-0000-000000000001',
+    'M2 Seller One Store',
+    'individual',
+    'verified',
+    'Tracked shipping with clear delivery expectations.',
+    'Returns accepted under the Seller return policy.'
+  ),
+  (
+    '92000000-0000-0000-0000-000000000002',
+    'M2 Seller Two Store',
+    'individual',
+    'verified',
+    'Tracked shipping with clear delivery expectations.',
+    'Returns accepted under the Seller return policy.'
+  );
 
 -- Store slugs are persisted, clean and unique instead of derived by scanning.
 do $$
