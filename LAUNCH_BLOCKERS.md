@@ -97,13 +97,14 @@ Architecture/evidence: `docs/architecture/M1-IDENTITY-KYC-STORAGE.md`, `docs/arc
 | Public storefront/product links | VERIFIED | Public storefront uses persisted slug; product pages link to canonical Seller store and expose only approved catalogue rows. |
 | Seller operating UX | VERIFIED | Product list/detail/editor show moderation, rejection notes, inventory, Submit for Review, Unpublish/Republish and rich catalogue management states. |
 | M2 fresh-database regression gates | VERIFIED | CI verifies structural invariants/indexes, catalogue/moderation isolation, inventory-reservation guard, active-product approval invariant and Seller policy completeness alongside all M1 and commerce/payment/payout suites. |
-| Branch release CI | VERIFIED | CI #185 passed the full M2 release stack; CI #187 re-passed the complete stack after adding moderation FK indexes and structural assertions. |
+| Branch release CI | VERIFIED | CI #185 and #187 passed the full release stack; final evidence-head CI #189 again passed foundation, TypeScript, production build, fresh migration replay, all M1/M2, commerce/payment/payout and real concurrency regressions. |
 | Live M2 migrations/advisors | VERIFIED | All eight M2 forward migrations are live on `kllwwurklumhawfsilpd`; live baseline is 32 public tables / 32 RLS, 9 intentional deny-by-default tables. Two new FK advisor findings were fixed; remaining M2 `SECURITY DEFINER` Seller RPC warnings are reviewed intentional boundaries. |
-| Main/Vercel verification | PENDING MERGE | Pre-merge Vercel production runtime baseline has no error clusters. Final verification is required immediately after PR #8 reaches `main`. |
+| Main merge | VERIFIED | PR #8 merged the exact tested release head into `main` at `de1558d292d2e92fd256796b61e9f9bb47ac2160`. |
+| Vercel production verification | BLOCKED — BUILD RATE LIMIT | Exact final release-head preview `b5e51be858b81267710d93ee945cf18f5fc1c605` is READY and serves HTTP 200 with expected security headers. Vercel rejected both the merge commit and a docs-only `main` retrigger with `upgradeToPro=build-rate-limit`, so production still points to the prior M1 deployment. Promote the existing validated preview to production without rebuilding, then verify HTTP/runtime health. |
 
-**M2 status: RELEASE READY — engineering, fresh-database CI and live Supabase rollout are verified. Only merged-`main`/production deployment evidence remains before this milestone is marked fully VERIFIED.**
+**M2 status: ENGINEERING + LIVE DATABASE VERIFIED; MERGED TO MAIN. Final production promotion is blocked only by the Vercel Hobby build-rate limit. The tested M2 preview artifact is READY and can be promoted without a rebuild.**
 
-Architecture/evidence: `docs/architecture/M2-CATALOGUE-SELLER-OPERATIONS.md`, `scripts/verify-m2-database-invariants.sql`, `scripts/test-m2-catalog-moderation.sql`, `scripts/test-m2-inventory-reservation-guard.sql`, `scripts/test-m2-active-approval-invariant.sql`, `scripts/test-m2-product-policy-completeness.sql`.
+Architecture/evidence: `docs/architecture/M2-CATALOGUE-SELLER-OPERATIONS.md`, `docs/operations/M2_RELEASE_PROMOTION.md`, `scripts/verify-m2-database-invariants.sql`, `scripts/test-m2-catalog-moderation.sql`, `scripts/test-m2-inventory-reservation-guard.sql`, `scripts/test-m2-active-approval-invariant.sql`, `scripts/test-m2-product-policy-completeness.sql`.
 
 ---
 
@@ -195,11 +196,17 @@ Still required before public launch: complete HTTP ownership regression coverage
 Verified:
 - EntizNetStore has a dedicated Vercel project (`entiznetstore`) linked only to `OKenechukwu/EntizNetStore`;
 - the incorrectly linked EntizNet Vercel projects were disconnected and no longer consume EntizNetStore builds;
-- the canonical Vercel HTTPS alias serves the production deployment successfully;
+- the canonical Vercel HTTPS alias serves the existing production deployment successfully;
 - production build uses the canonical npm lockfile and stale Replit/Yarn/pnpm deployment artifacts are blocked by the foundation guard;
-- provider-neutral payment/payout code compiles and deploys with both processors intentionally unconfigured.
+- provider-neutral payment/payout code compiles and deploys with both processors intentionally unconfigured;
+- M2 final release-head preview is READY and serves HTTP 200 with CSP/HSTS and `noindex` protections.
+
+Current operational release issue:
+- Vercel Hobby build-rate limiting rejects new `main` builds (`upgradeToPro=build-rate-limit`), including M2 merge commit `de1558d...` and the docs-only promotion retrigger;
+- the validated M2 preview can be promoted directly to production without rebuilding, which is the preferred recovery path.
 
 Still required before public launch:
+- restore reliable production deployment capacity/automation so a normal `main` release is not dependent on a rate-limit window;
 - canonical owned production domain and DNS/HTTPS validation;
 - final production/preview/staging environment isolation review;
 - final CSP/header review for the selected payment provider and Supabase flows;
