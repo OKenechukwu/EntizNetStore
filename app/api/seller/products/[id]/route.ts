@@ -6,6 +6,7 @@ import {
   verifyOwnedProductMediaUrls,
 } from "@/lib/storage/productMediaServer";
 import { sellerProductSchema } from "../validation";
+import { sellerProductRpcArgs } from "../rpc";
 
 function canonicalPaths(userId: string, urls: string[]) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,22 +56,15 @@ export async function PATCH(
   const oldPaths = canonicalPaths(user.id, (oldMedia ?? []).map((item) => item.url));
   const nextPaths = new Set(media.paths);
 
-  const { data, error } = await supabase.rpc("seller_save_product_v2", {
-    p_product_id: id,
-    p_title: input.title,
-    p_description: input.description,
-    p_base_price: input.basePrice,
-    p_compare_at_price: input.compareAtPrice,
-    p_status: input.status,
-    p_category_ids: input.categoryIds,
-    p_media_urls: input.mediaUrls,
-    p_variants: input.variants,
-  });
+  const { data, error } = await supabase.rpc(
+    "seller_save_product_v3",
+    sellerProductRpcArgs(id, input),
+  );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   await deleteProductMediaPaths(oldPaths.filter((path) => !nextPaths.has(path)));
-  return NextResponse.json({ id: data });
+  return NextResponse.json({ id: data, moderationStatus: "not_submitted", status: "draft" });
 }
 
 export async function DELETE(
@@ -96,16 +90,11 @@ export async function DELETE(
     .eq("product_id", id);
   const oldPaths = canonicalPaths(user.id, (oldMedia ?? []).map((item) => item.url));
 
-  const { data, error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", id)
-    .eq("seller_id", user.id)
-    .select("id")
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  if (!data) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  const { error } = await supabase.rpc("seller_delete_product", { p_product_id: id });
+  if (error) {
+    const status = error.message.includes("product_has_order_history") ? 409 : 400;
+    return NextResponse.json({ error: error.message }, { status });
+  }
 
   await deleteProductMediaPaths(oldPaths);
   return NextResponse.json({ deleted: true });
