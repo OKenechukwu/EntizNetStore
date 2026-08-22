@@ -17,8 +17,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
 
-  if v_public_tables <> 32 then
-    raise exception 'Expected 32 public tables, found %', v_public_tables;
+  if v_public_tables <> 35 then
+    raise exception 'Expected 35 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
@@ -26,8 +26,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_rls_tables <> 32 then
-    raise exception 'Expected RLS on all 32 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 35 then
+    raise exception 'Expected RLS on all 35 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -41,8 +41,8 @@ begin
     );
 
   -- M1 adds scoped read policies to KYC documents, KYC requests, and message
-  -- attachments. M2's moderation-event table also has a scoped Seller read
-  -- policy, so the intentional deny-by-default count remains 9.
+  -- attachments. M2's moderation-event table and M3 cart/address tables also
+  -- have scoped owner reads, so the intentional deny-by-default count remains 9.
   if v_no_policy_tables <> 9 then
     raise exception 'Expected 9 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
@@ -62,15 +62,15 @@ $$;
 -- Expected public table set. EXCEPT in either direction must be empty.
 with expected(name) as (
   values
-    ('addresses'), ('admin_audit_logs'), ('brands'), ('categories'),
-    ('content_pages'), ('conversation_keys'), ('conversations'),
-    ('escrow_transactions'), ('featured_products'), ('inventory_reservations'),
-    ('kyc_documents'), ('kyc_verification_requests'), ('message_attachments'),
-    ('messages'), ('notifications'), ('order_items'), ('orders'),
-    ('payment_sessions'), ('payment_webhook_events'),
-    ('payout_items'), ('payout_provider_events'), ('payout_requests'),
-    ('product_categories'), ('product_media'), ('product_moderation_events'),
-    ('product_variants'), ('products'),
+    ('addresses'), ('admin_audit_logs'), ('brands'), ('cart_items'),
+    ('cart_quotes'), ('carts'), ('categories'), ('content_pages'),
+    ('conversation_keys'), ('conversations'), ('escrow_transactions'),
+    ('featured_products'), ('inventory_reservations'), ('kyc_documents'),
+    ('kyc_verification_requests'), ('message_attachments'), ('messages'),
+    ('notifications'), ('order_items'), ('orders'), ('payment_sessions'),
+    ('payment_webhook_events'), ('payout_items'), ('payout_provider_events'),
+    ('payout_requests'), ('product_categories'), ('product_media'),
+    ('product_moderation_events'), ('product_variants'), ('products'),
     ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
     ('profiles_seller_private'), ('reviews')
 ), actual(name) as (
@@ -186,7 +186,7 @@ begin
 end
 $$;
 
--- Transaction and private M1/M2 table grants must agree with RLS.
+-- Transaction and private M1/M2/M3 table grants must agree with RLS.
 do $$
 declare
   table_name text;
@@ -220,7 +220,11 @@ begin
     'kyc_documents',
     'kyc_verification_requests',
     'message_attachments',
-    'product_moderation_events'
+    'product_moderation_events',
+    'addresses',
+    'carts',
+    'cart_items',
+    'cart_quotes'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
       raise exception 'authenticated is missing scoped SELECT on %', table_name;
@@ -269,13 +273,23 @@ begin
 end
 $$;
 
--- Canonical supporting indexes introduced/required by M0, M1, M2 and money ledgers.
+-- Canonical supporting indexes introduced/required by M0-M3 and money ledgers.
 do $$
 declare
   idx text;
 begin
   foreach idx in array array[
     'idx_addresses_user_id',
+    'addresses_one_default_per_user_type',
+    'idx_addresses_user_created',
+    'carts_one_active_per_buyer',
+    'idx_carts_buyer_updated',
+    'cart_items_cart_variant_key',
+    'idx_cart_items_cart',
+    'idx_cart_items_variant',
+    'idx_cart_quotes_cart_created',
+    'idx_cart_quotes_buyer_created',
+    'idx_cart_quotes_expiry',
     'idx_categories_parent_id',
     'idx_featured_products_product_id',
     'idx_inventory_reservations_payment_session_id',
@@ -317,6 +331,7 @@ declare
   payout_fn text;
   kyc_fn text;
   catalog_fn text;
+  buyer_fn text;
 begin
   if has_function_privilege('anon', 'public.create_checkout_session(jsonb,jsonb,uuid)', 'EXECUTE') then
     raise exception 'anon must not execute create_checkout_session';
@@ -427,10 +442,26 @@ begin
   if not has_function_privilege('service_role', 'public.admin_review_product(uuid,uuid,text,text)', 'EXECUTE') then
     raise exception 'service_role must execute admin_review_product';
   end if;
+
+  foreach buyer_fn in array array[
+    'public.buyer_save_address(uuid,text,boolean,text,text,text,text,text,text,text,text,text,text,text)',
+    'public.buyer_delete_address(uuid)',
+    'public.buyer_get_or_create_cart()',
+    'public.buyer_set_cart_item(uuid,uuid,integer)',
+    'public.buyer_remove_cart_item(uuid)',
+    'public.buyer_clear_cart()'
+  ] loop
+    if has_function_privilege('anon', buyer_fn, 'EXECUTE') then
+      raise exception 'anon must not execute Buyer address/cart RPC: %', buyer_fn;
+    end if;
+    if not has_function_privilege('authenticated', buyer_fn, 'EXECUTE') then
+      raise exception 'authenticated must execute Buyer address/cart RPC: %', buyer_fn;
+    end if;
+  end loop;
 end
 $$;
 
--- Search-path hardening for privileged checkout/order/payout/KYC/catalogue functions.
+-- Search-path hardening for privileged checkout/order/payout/KYC/catalogue/cart functions.
 do $$
 declare
   bad_count integer;
@@ -452,12 +483,18 @@ begin
       'seller_save_product_v3',
       'seller_submit_product_for_review',
       'seller_set_product_publication',
-      'seller_delete_product'
+      'seller_delete_product',
+      'buyer_save_address',
+      'buyer_delete_address',
+      'buyer_get_or_create_cart',
+      'buyer_set_cart_item',
+      'buyer_remove_cart_item',
+      'buyer_clear_cart'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
 
   if bad_count <> 0 then
-    raise exception '% privileged money/order/catalogue functions lack hardened search_path', bad_count;
+    raise exception '% privileged money/order/catalogue/cart functions lack hardened search_path', bad_count;
   end if;
 
   select count(*) into bad_count
