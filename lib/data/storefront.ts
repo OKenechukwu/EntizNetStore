@@ -35,6 +35,21 @@ function firstImage(row: ProductRow) {
     ?.url ?? PLACEHOLDER_IMAGE;
 }
 
+/** Canonical public URL identity for a verified Seller storefront. */
+export async function getSellerStorefrontSlug(sellerId: string) {
+  if (!UUID_RE.test(sellerId)) return null;
+
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase
+    .from("profiles_seller")
+    .select("store_slug")
+    .eq("id", sellerId)
+    .maybeSingle();
+
+  if (error || !data?.store_slug) return null;
+  return data.store_slug as string;
+}
+
 export async function getStorefrontByIdentity(
   sellerIdOrSlug: string,
   opts: StorefrontOptions = {},
