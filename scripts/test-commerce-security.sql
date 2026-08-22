@@ -43,14 +43,15 @@ values
     'Tracked shipping is dispatched within three business days.'
   );
 
--- These products represent listings that already passed M2 moderation. The
--- checkout suite tests commerce state, not the moderation transition itself.
+-- Build complete draft catalogue rows first. M2 intentionally forbids inserting
+-- an already-approved product before its required category/media/variant rows
+-- exist, even for a trusted fixture.
 insert into public.products(
   id, seller_id, title, slug, status, moderation_status, base_price, requires_shipping, marketplace_brand
 )
 values
-  ('50000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000003', 'P0 Product One', 'p0-product-one', 'active', 'approved', 10.00, true, 'entiznetstore'),
-  ('60000000-0000-0000-0000-000000000006', '40000000-0000-0000-0000-000000000004', 'P0 Product Two', 'p0-product-two', 'active', 'approved', 15.00, true, 'entiznetstore');
+  ('50000000-0000-0000-0000-000000000005', '30000000-0000-0000-0000-000000000003', 'P0 Product One', 'p0-product-one', 'draft', 'not_submitted', 10.00, true, 'entiznetstore'),
+  ('60000000-0000-0000-0000-000000000006', '40000000-0000-0000-0000-000000000004', 'P0 Product Two', 'p0-product-two', 'draft', 'not_submitted', 15.00, true, 'entiznetstore');
 
 insert into public.product_variants(
   id, product_id, title, sku, price, track_inventory, inventory_quantity,
@@ -59,6 +60,31 @@ insert into public.product_variants(
 values
   ('51000000-0000-0000-0000-000000000005', '50000000-0000-0000-0000-000000000005', 'Default', 'P0-SKU-ONE', 10.00, true, 10, 'deny', true, 0),
   ('61000000-0000-0000-0000-000000000006', '60000000-0000-0000-0000-000000000006', 'Default', 'P0-SKU-TWO', 15.00, true, 8, 'deny', true, 0);
+
+insert into public.product_categories(product_id, category_id)
+select p.id, c.id
+from public.products p
+cross join lateral (
+  select id from public.categories where is_active order by name limit 1
+) c
+where p.id in (
+  '50000000-0000-0000-0000-000000000005',
+  '60000000-0000-0000-0000-000000000006'
+);
+
+insert into public.product_media(product_id, type, url, position)
+values
+  ('50000000-0000-0000-0000-000000000005', 'image', 'https://example.invalid/p0-product-one.webp', 0),
+  ('60000000-0000-0000-0000-000000000006', 'image', 'https://example.invalid/p0-product-two.webp', 0);
+
+-- The checkout suite begins from products that have already passed moderation;
+-- M2 moderation itself is exercised independently by test-m2-catalog-moderation.sql.
+update public.products
+set moderation_status = 'approved', status = 'active'
+where id in (
+  '50000000-0000-0000-0000-000000000005',
+  '60000000-0000-0000-0000-000000000006'
+);
 
 -- ---------------------------------------------------------------------------
 -- Buyer 1: authenticated checkout; prices must come only from live variants.
@@ -141,7 +167,6 @@ begin
 end
 $$;
 
--- Exact retry returns the durable session and must not duplicate anything.
 select *
 from public.create_checkout_session(
   jsonb_build_array(
@@ -190,7 +215,6 @@ begin
 end
 $$;
 
--- Same key + changed cart must be rejected rather than charging stale totals.
 do $$
 begin
   begin
@@ -225,7 +249,6 @@ select public.attach_checkout_payment_intent(
   'pi_p0_checkout_one'
 );
 
--- A different buyer must not be able to attach/cancel Buyer 1's checkout.
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
 select set_config(
   'request.jwt.claims',
@@ -259,9 +282,6 @@ select set_config(
   true
 );
 
--- ---------------------------------------------------------------------------
--- Stripe webhook ordering/replay: failed -> succeeded -> replay -> late failed.
--- ---------------------------------------------------------------------------
 reset role;
 set local role service_role;
 select set_config('request.jwt.claim.sub', '', true);
@@ -283,19 +303,14 @@ declare
   v_stock1 integer;
   v_stock2 integer;
 begin
-  select status into v_status
-  from public.payment_sessions
+  select status into v_status from public.payment_sessions
   where idempotency_key = '70000000-0000-0000-0000-000000000007';
-  select count(*) into v_pending
-  from public.inventory_reservations r
+  select count(*) into v_pending from public.inventory_reservations r
   join public.payment_sessions ps on ps.id = r.payment_session_id
-  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
-    and r.status = 'pending';
-  select count(*) into v_order_pending
-  from public.orders o
+  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007' and r.status = 'pending';
+  select count(*) into v_order_pending from public.orders o
   join public.payment_sessions ps on ps.id = o.payment_session_id
-  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
-    and o.payment_status = 'pending';
+  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007' and o.payment_status = 'pending';
   select inventory_quantity into v_stock1 from public.product_variants where id = '51000000-0000-0000-0000-000000000005';
   select inventory_quantity into v_stock2 from public.product_variants where id = '61000000-0000-0000-0000-000000000006';
 
@@ -326,26 +341,19 @@ declare
   v_stock1 integer;
   v_stock2 integer;
 begin
-  select status into v_status
-  from public.payment_sessions
+  select status into v_status from public.payment_sessions
   where idempotency_key = '70000000-0000-0000-0000-000000000007';
-  select count(*) into v_paid_orders
-  from public.orders o
+  select count(*) into v_paid_orders from public.orders o
   join public.payment_sessions ps on ps.id = o.payment_session_id
   where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
-    and o.status = 'confirmed'
-    and o.payment_status = 'paid';
-  select count(*) into v_consumed
-  from public.inventory_reservations r
+    and o.status = 'confirmed' and o.payment_status = 'paid';
+  select count(*) into v_consumed from public.inventory_reservations r
   join public.payment_sessions ps on ps.id = r.payment_session_id
-  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
-    and r.status = 'consumed';
-  select count(*) into v_escrow
-  from public.escrow_transactions e
+  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007' and r.status = 'consumed';
+  select count(*) into v_escrow from public.escrow_transactions e
   join public.orders o on o.id = e.order_id
   join public.payment_sessions ps on ps.id = o.payment_session_id
-  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
-    and e.status = 'held';
+  where ps.idempotency_key = '70000000-0000-0000-0000-000000000007' and e.status = 'held';
   select inventory_quantity into v_stock1 from public.product_variants where id = '51000000-0000-0000-0000-000000000005';
   select inventory_quantity into v_stock2 from public.product_variants where id = '61000000-0000-0000-0000-000000000006';
 
@@ -366,31 +374,21 @@ declare
   v_stock2 integer;
 begin
   select public.finalize_checkout_payment(
-    'evt_p0_succeeded',
-    'payment_intent.succeeded',
+    'evt_p0_succeeded', 'payment_intent.succeeded',
     (select id from public.payment_sessions where idempotency_key = '70000000-0000-0000-0000-000000000007'),
-    'pi_p0_checkout_one',
-    true
+    'pi_p0_checkout_one', true
   ) into v_processed;
-
-  if v_processed then
-    raise exception 'Exact Stripe webhook replay was not deduplicated';
-  end if;
-
+  if v_processed then raise exception 'Exact Stripe webhook replay was not deduplicated'; end if;
   select inventory_quantity into v_stock1 from public.product_variants where id = '51000000-0000-0000-0000-000000000005';
   select inventory_quantity into v_stock2 from public.product_variants where id = '61000000-0000-0000-0000-000000000006';
-  if v_stock1 <> 8 or v_stock2 <> 7 then
-    raise exception 'Webhook replay consumed inventory twice';
-  end if;
+  if v_stock1 <> 8 or v_stock2 <> 7 then raise exception 'Webhook replay consumed inventory twice'; end if;
 end
 $$;
 
 select public.finalize_checkout_payment(
-  'evt_p0_failed_late',
-  'payment_intent.payment_failed',
+  'evt_p0_failed_late', 'payment_intent.payment_failed',
   (select id from public.payment_sessions where idempotency_key = '70000000-0000-0000-0000-000000000007'),
-  'pi_p0_checkout_one',
-  false
+  'pi_p0_checkout_one', false
 );
 
 do $$
@@ -398,18 +396,13 @@ declare
   v_session_status text;
   v_bad_orders integer;
 begin
-  select status into v_session_status
-  from public.payment_sessions
+  select status into v_session_status from public.payment_sessions
   where idempotency_key = '70000000-0000-0000-0000-000000000007';
-  select count(*) into v_bad_orders
-  from public.orders o
+  select count(*) into v_bad_orders from public.orders o
   join public.payment_sessions ps on ps.id = o.payment_session_id
   where ps.idempotency_key = '70000000-0000-0000-0000-000000000007'
     and (o.status <> 'confirmed' or o.payment_status <> 'paid');
-
-  if v_session_status <> 'paid' or v_bad_orders <> 0 then
-    raise exception 'Late failure event downgraded paid commerce state';
-  end if;
+  if v_session_status <> 'paid' or v_bad_orders <> 0 then raise exception 'Late failure event downgraded paid commerce state'; end if;
 end
 $$;
 
@@ -417,130 +410,73 @@ do $$
 begin
   begin
     perform public.finalize_checkout_payment(
-      'evt_p0_mismatched_type',
-      'payment_intent.payment_failed',
+      'evt_p0_mismatched_type', 'payment_intent.payment_failed',
       (select id from public.payment_sessions where idempotency_key = '70000000-0000-0000-0000-000000000007'),
-      'pi_p0_checkout_one',
-      true
+      'pi_p0_checkout_one', true
     );
     raise exception 'Event type/outcome mismatch unexpectedly succeeded';
-  exception when sqlstate '22023' then
-    null;
+  exception when sqlstate '22023' then null;
   end;
 end
 $$;
 
--- ---------------------------------------------------------------------------
--- Seller fulfillment ownership and transition state machine
--- ---------------------------------------------------------------------------
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000004', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"40000000-0000-0000-0000-000000000004","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"40000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
 
 do $$
-declare
-  v_foreign_order uuid;
+declare v_foreign_order uuid;
 begin
   reset role;
-  select id into v_foreign_order
-  from public.orders
-  where seller_id = '30000000-0000-0000-0000-000000000003'
-  limit 1;
+  select id into v_foreign_order from public.orders
+  where seller_id = '30000000-0000-0000-0000-000000000003' limit 1;
   set local role authenticated;
-
   begin
     perform public.transition_seller_order(v_foreign_order, 'processing', null, null);
     raise exception 'Cross-seller fulfillment unexpectedly succeeded';
-  exception when sqlstate '42501' then
-    null;
+  exception when sqlstate '42501' then null;
   end;
 end
 $$;
 
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated"}',
-  true
-);
-
-select public.transition_seller_order(
-  (select id from public.orders where seller_id = auth.uid() limit 1),
-  'processing', null, null
-);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
+select public.transition_seller_order((select id from public.orders where seller_id = auth.uid() limit 1), 'processing', null, null);
 
 do $$
 begin
   begin
-    perform public.transition_seller_order(
-      (select id from public.orders where seller_id = auth.uid() limit 1),
-      'shipped', null, null
-    );
+    perform public.transition_seller_order((select id from public.orders where seller_id = auth.uid() limit 1), 'shipped', null, null);
     raise exception 'Shipping without carrier/tracking unexpectedly succeeded';
-  exception when sqlstate '22023' then
-    null;
+  exception when sqlstate '22023' then null;
   end;
 end
 $$;
 
-select public.transition_seller_order(
-  (select id from public.orders where seller_id = auth.uid() limit 1),
-  'shipped', 'TRACK-P0-001', 'P0 Carrier'
-);
-select public.transition_seller_order(
-  (select id from public.orders where seller_id = auth.uid() limit 1),
-  'delivered', null, null
-);
+select public.transition_seller_order((select id from public.orders where seller_id = auth.uid() limit 1), 'shipped', 'TRACK-P0-001', 'P0 Carrier');
+select public.transition_seller_order((select id from public.orders where seller_id = auth.uid() limit 1), 'delivered', null, null);
 
 do $$
-declare
-  v_status text;
-  v_fulfillment text;
-  v_tracking text;
+declare v_status text; v_fulfillment text; v_tracking text;
 begin
-  select status, fulfillment_status, tracking_number
-    into v_status, v_fulfillment, v_tracking
-  from public.orders
-  where seller_id = auth.uid()
-  limit 1;
-
+  select status, fulfillment_status, tracking_number into v_status, v_fulfillment, v_tracking
+  from public.orders where seller_id = auth.uid() limit 1;
   if v_status <> 'delivered' or v_fulfillment <> 'fulfilled' or v_tracking <> 'TRACK-P0-001' then
     raise exception 'Seller fulfillment transition state is incorrect';
   end if;
 end
 $$;
 
--- ---------------------------------------------------------------------------
--- Buyer 2 cancellation: releases inventory and terminal sessions stay terminal.
--- ---------------------------------------------------------------------------
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"20000000-0000-0000-0000-000000000002","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"20000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 
-select *
-from public.create_checkout_session(
-  jsonb_build_array(
-    jsonb_build_object(
-      'productId', '50000000-0000-0000-0000-000000000005',
-      'variantId', '51000000-0000-0000-0000-000000000005',
-      'quantity', 1
-    )
-  ),
-  jsonb_build_object(
-    'name', 'P0 Buyer Two',
-    'line1', '2 Test Street',
-    'city', 'Test City',
-    'postal_code', '10000',
-    'country', 'US'
-  ),
+select * from public.create_checkout_session(
+  jsonb_build_array(jsonb_build_object(
+    'productId', '50000000-0000-0000-0000-000000000005',
+    'variantId', '51000000-0000-0000-0000-000000000005', 'quantity', 1
+  )),
+  jsonb_build_object('name','P0 Buyer Two','line1','2 Test Street','city','Test City','postal_code','10000','country','US'),
   '80000000-0000-0000-0000-000000000008'
 );
 
@@ -553,29 +489,17 @@ select public.cancel_checkout_session(
 );
 
 do $$
-declare
-  v_status text;
-  v_released integer;
-  v_cancelled_orders integer;
+declare v_status text; v_released integer; v_cancelled_orders integer;
 begin
-  select status into v_status
-  from public.payment_sessions
-  where buyer_id = auth.uid()
-    and idempotency_key = '80000000-0000-0000-0000-000000000008';
-  select count(*) into v_released
-  from public.inventory_reservations r
+  select status into v_status from public.payment_sessions
+  where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008';
+  select count(*) into v_released from public.inventory_reservations r
   join public.payment_sessions ps on ps.id = r.payment_session_id
-  where ps.buyer_id = auth.uid()
-    and ps.idempotency_key = '80000000-0000-0000-0000-000000000008'
-    and r.status = 'released';
-  select count(*) into v_cancelled_orders
-  from public.orders o
+  where ps.buyer_id = auth.uid() and ps.idempotency_key = '80000000-0000-0000-0000-000000000008' and r.status = 'released';
+  select count(*) into v_cancelled_orders from public.orders o
   join public.payment_sessions ps on ps.id = o.payment_session_id
-  where ps.buyer_id = auth.uid()
-    and ps.idempotency_key = '80000000-0000-0000-0000-000000000008'
-    and o.status = 'cancelled'
-    and o.payment_status = 'failed';
-
+  where ps.buyer_id = auth.uid() and ps.idempotency_key = '80000000-0000-0000-0000-000000000008'
+    and o.status = 'cancelled' and o.payment_status = 'failed';
   if v_status <> 'cancelled' or v_released <> 1 or v_cancelled_orders <> 1 then
     raise exception 'Checkout cancellation did not release/terminalize state safely';
   end if;
@@ -588,97 +512,62 @@ do $$
 begin
   begin
     perform public.finalize_checkout_payment(
-      'evt_p0_cancelled_success',
-      'payment_intent.succeeded',
+      'evt_p0_cancelled_success', 'payment_intent.succeeded',
       (select id from public.payment_sessions where idempotency_key = '80000000-0000-0000-0000-000000000008'),
-      'pi_p0_checkout_cancelled',
-      true
+      'pi_p0_checkout_cancelled', true
     );
     raise exception 'Cancelled checkout unexpectedly accepted a success event';
   exception when others then
-    if sqlerrm not like 'Checkout session is no longer payable%' then
-      raise;
-    end if;
+    if sqlerrm not like 'Checkout session is no longer payable%' then raise; end if;
   end;
 end
 $$;
 
--- ---------------------------------------------------------------------------
--- Representative RLS visibility boundaries
--- ---------------------------------------------------------------------------
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 
 do $$
-declare
-  v_orders integer;
-  v_sessions integer;
+declare v_orders integer; v_sessions integer;
 begin
   select count(*) into v_orders from public.orders;
   select count(*) into v_sessions from public.payment_sessions;
-  if v_orders <> 2 or v_sessions <> 1 then
-    raise exception 'Buyer 1 RLS visibility incorrect: orders %, sessions %', v_orders, v_sessions;
-  end if;
+  if v_orders <> 2 or v_sessions <> 1 then raise exception 'Buyer 1 RLS visibility incorrect: orders %, sessions %', v_orders, v_sessions; end if;
 end
 $$;
 
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"20000000-0000-0000-0000-000000000002","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"20000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 
 do $$
-declare
-  v_orders integer;
-  v_sessions integer;
+declare v_orders integer; v_sessions integer;
 begin
   select count(*) into v_orders from public.orders;
   select count(*) into v_sessions from public.payment_sessions;
-  if v_orders <> 1 or v_sessions <> 1 then
-    raise exception 'Buyer 2 RLS visibility incorrect: orders %, sessions %', v_orders, v_sessions;
-  end if;
+  if v_orders <> 1 or v_sessions <> 1 then raise exception 'Buyer 2 RLS visibility incorrect: orders %, sessions %', v_orders, v_sessions; end if;
 end
 $$;
 
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
 
 do $$
 declare v_orders integer;
 begin
   select count(*) into v_orders from public.orders;
-  if v_orders <> 2 then
-    raise exception 'Seller 1 RLS visibility incorrect: orders %', v_orders;
-  end if;
+  if v_orders <> 2 then raise exception 'Seller 1 RLS visibility incorrect: orders %', v_orders; end if;
 end
 $$;
 
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000004', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"40000000-0000-0000-0000-000000000004","role":"authenticated"}',
-  true
-);
+select set_config('request.jwt.claims', '{"sub":"40000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
 
 do $$
 declare v_orders integer;
 begin
   select count(*) into v_orders from public.orders;
-  if v_orders <> 1 then
-    raise exception 'Seller 2 RLS visibility incorrect: orders %', v_orders;
-  end if;
+  if v_orders <> 1 then raise exception 'Seller 2 RLS visibility incorrect: orders %', v_orders; end if;
 end
 $$;
 
