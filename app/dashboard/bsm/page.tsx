@@ -46,8 +46,11 @@ export default async function BusinessDashboardPage() {
         <div className="rounded-xl border border-red-300/40 bg-red-50/10 p-5">
           <h2 className="font-semibold text-red-300">Seller capability needs recovery</h2>
           <p className="mt-2 text-sm opacity-75">
-            This Business profile predates the canonical BSM model. Re-run Business onboarding to attach the missing Seller capability safely.
+            This Business profile predates the canonical BSM model. Finish the safe upgrade to attach Seller capability and business-grade KYC.
           </p>
+          <Link href="/bsm/apply" className="luxury-button inline-block mt-4 px-4 py-2">
+            Finish BSM setup
+          </Link>
         </div>
       )}
 
@@ -92,11 +95,16 @@ export default async function BusinessDashboardPage() {
         <div className="glass-card p-6">
           <h2 className="font-serif text-xl font-bold text-accent-gold mb-3">Seller operations</h2>
           <p className="opacity-75 mb-5">
-            Orders, storefront operations and seller tools use the canonical Seller capability provisioned with your BSM account.
+            Orders, storefront operations and branding use the canonical Seller capability provisioned with your BSM account.
           </p>
-          <Link href="/dashboard/seller" className="luxury-button-outline inline-block px-4 py-2">
-            Seller dashboard
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/dashboard/seller" className="luxury-button-outline inline-block px-4 py-2">
+              Seller dashboard
+            </Link>
+            <Link href="/dashboard/seller/branding" className="luxury-button-outline inline-block px-4 py-2">
+              Branding
+            </Link>
+          </div>
         </div>
       </div>
     </div>
