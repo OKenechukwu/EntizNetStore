@@ -28,17 +28,50 @@ Status values: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 | Replace template README | VERIFIED | Production-oriented EntizNetStore README committed. |
 | Environment/secrets contract | VERIFIED | `.env.example` + `docs/operations/ENVIRONMENT_SECRETS.md`; buyer-payment and seller-payout configuration are provider-neutral and fail closed when unconfigured. |
 | Database security-advisor cleanup | VERIFIED WITH DOCUMENTED EXCEPTIONS | Remaining advisor entries are intentional deny-by-default tables and audited authenticated `SECURITY DEFINER` RPCs. |
-| RLS audit | VERIFIED | Canonical CI baseline now requires RLS on all 30 public tables, including the three payout-ledger tables; intentional no-policy tables deny by default. |
-| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment and payout finalization remain service-role-only. |
+| RLS audit | VERIFIED | Current canonical baseline requires RLS on all 31 public tables; the M1 Business projection is included and intentional no-policy tables deny by default. |
+| `SECURITY DEFINER` audit | VERIFIED | RPC execute grants and search paths explicitly controlled; payment/payout finalization and M1 admin KYC decisions remain restricted to their intended principals. |
 | Performance indexes/policy optimization | VERIFIED | Missing FK indexes, auth-init-plan and overlapping permissive-policy warnings removed. |
 | Capability architecture decision | VERIFIED | `docs/architecture/ADR-0001-account-capabilities.md`. |
 | Backup/recovery procedure | VERIFIED | Operational runbook committed; managed backup requirement remains a separate P0 before customer/payment data. |
 | Canonical launch blocker record | VERIFIED | This document. |
 | Broken/legacy translation surfaces | VERIFIED | Orphaned dynamic cache endpoints, anonymous DeepL proxy, and client translation callers removed; static localization remains. |
 | Clean dependency/install/build verification | VERIFIED | Locked install, production-foundation scan, TypeScript, production build, dependency audit and fresh database reproduction are enforced by CI. |
-| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs commerce/payment/payout regressions, and shuts down cleanly. |
+| Fresh database reproduction | VERIFIED | CI starts a fresh PostgreSQL 17/Supabase stack, rebuilds from all migrations + seed, verifies schema/RLS/RPC/index/storage invariants, runs M1 plus commerce/payment/payout regressions, and shuts down cleanly. |
 
 **M0 status: VERIFIED.** The production-foundation exit gate is complete. M0 verification does **not** clear the independent P0 launch blockers below.
+
+---
+
+## M1 — Identity, Seller, KYC & Storage exit gate
+
+**Exit gate:** a brand-new user can become a Seller without any Replit infrastructure.
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Canonical Buyer capability | VERIFIED | Buyer is the standalone marketplace baseline projection on `profiles_buyer`. |
+| Canonical Seller capability | VERIFIED | Seller is additive to Buyer and remains server-derived from `profiles_seller`, never client role metadata. |
+| Canonical Business/BSM capability | VERIFIED | `profiles_business` is the distinct Business projection; BSM onboarding provisions Buyer + Seller + Business on one UUID so BSM accounts can use canonical Seller commerce APIs. |
+| Multi-capability support | VERIFIED | Fresh-database regression proves one identity can simultaneously hold Buyer + Seller + Business projections. |
+| EntizNet account-model alignment | VERIFIED FOR M1 | ADR-0001 establishes one identity/multiple capabilities and a clean repository boundary. The actual cross-product EntizNet identity handoff remains P0-08. |
+| Registration/onboarding | VERIFIED | Seller and BSM signup choices resume through trusted server onboarding. `/seller/apply` and `/bsm/apply` can add/repair capabilities later without a second account. |
+| Seller/Business verification states | VERIFIED | Explicit pending → under_review → verified/rejected lifecycle with suspended reserved for operator restriction; BSM uses business-grade KYC. |
+| Replit KYC/storage dependency removal | VERIFIED | Canonical Seller/BSM onboarding and KYC use Supabase Auth, Postgres and Storage only. |
+| Supabase Storage buckets | VERIFIED | Live project and fresh CI contain `kyc-documents`, `product-media`, `seller-branding`, and `message-attachments` with required privacy/size/type contracts. |
+| KYC private access | VERIFIED | Seller-own metadata reads only, private object bucket, short-lived server-authorized signed views, actual byte-size/magic-byte validation, no browser KYC mutation grants. |
+| Product-media uploads | VERIFIED | Seller-scoped upload initialization plus server re-download/ownership/size/signature verification before product persistence. |
+| Seller logo/banner uploads | VERIFIED | Server-validated 5MB JPEG/PNG/WebP storage path plus usable Seller branding dashboard and replacement cleanup. |
+| Message attachment storage | VERIFIED | Private 15MB PDF/JPEG/PNG/WebP uploads, sender-only attachment creation, participant-only signed downloads, participant RLS metadata and integrated messaging UI. |
+| Unsafe-file reduction | VERIFIED FOR M1 | Narrow allow-lists and magic-byte checks reject executables/scripts/archives/arbitrary binaries; dedicated antivirus/content scanning remains a launch-policy item under P0-05. |
+| Trusted messaging boundary | VERIFIED | Conversation-key access, encryption/decryption, conversation listing and attachment metadata now stay behind authenticated server routes; `conversation_keys` remains browser-denied. |
+| Admin KYC workflow | VERIFIED | Trusted admin route, batched Seller/Business review queue, service-role-only transactional document/final review functions. |
+| Audit trails | VERIFIED | KYC decision and `admin_audit_logs` insertion occur in one database transaction; final BSM decision synchronizes Seller + Business state atomically. |
+| Database/RLS baseline | VERIFIED | Live EntizNetStore reports 31 public tables, 31 with RLS, 9 intentional deny-by-default tables, and all four M1 buckets. |
+| Fresh regression/build evidence | VERIFIED | PR #7 CI passed production-foundation scan, TypeScript, production build, dependency audit, fresh database replay, M1 identity/KYC/storage tests, BSM verification test, commerce/payment/payout suites and payout concurrency. |
+| Live migration state | VERIFIED | All three M1 forward migrations are applied to Supabase project `kllwwurklumhawfsilpd`, including final Seller/Business KYC synchronization. |
+
+**M1 status: VERIFIED.** A new standalone EntizNetStore account can establish Buyer/Seller or Buyer/Seller/Business capability and complete the canonical Supabase-backed verification/storage path without Replit infrastructure. This milestone does **not** mean public commercial launch is approved; the P0/P1 gates below remain authoritative.
+
+Architecture/evidence: `docs/architecture/M1-IDENTITY-KYC-STORAGE.md`, `docs/architecture/ADR-0001-account-capabilities.md`, `scripts/test-m1-identity-kyc-storage.sql`, `scripts/test-m1-bsm-verification.sql`.
 
 ---
 
@@ -95,27 +128,28 @@ The missing external processor does **not** block continued engineering or inter
 
 **Status: IN PROGRESS**
 
-Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Payout regression coverage additionally verifies seller-only payout reads, cross-seller isolation, no authenticated payout mutation RPC execution, no authenticated access to raw payout provider events, and service-role-only payout state mutation. The canonical database reproduction requires RLS on all 30 public tables.
+Automated buyer/seller/cross-account/service-role coverage exists for orders, order items, payment sessions, inventory reservations, escrow, checkout RPCs and fulfillment transitions. Payout coverage verifies seller-only reads, cross-seller isolation, no authenticated payout mutation RPC execution, no authenticated access to raw provider events, and service-role-only payout mutation.
 
-Still required: representative automated anon/buyer/seller/cross-account/admin boundaries for catalog, profiles, messages, KYC, product uploads and remaining privileged routes/RPCs.
+M1 now additionally covers multi-capability profile coexistence, Business visibility boundaries, own-vs-cross-seller KYC isolation, no direct authenticated KYC mutation, service-role-only KYC review RPCs, required-document approval gating, atomic audit logging and BSM Seller/Business synchronization. The canonical reproduction requires RLS on all 31 public tables.
+
+Still required before public launch: broader HTTP-level anon/buyer/seller/cross-account/admin ownership tests for catalog, messaging endpoints, product/branding/media routes and remaining privileged application routes. Database-level M1 isolation is verified; P0 requires representative end-to-end route coverage too.
 
 ## P0-05 — Seller/admin/KYC/storage security completion
 
 **Status: IN PROGRESS**
 
 Verified implementation now includes:
-- private `kyc-documents` Supabase Storage bucket with 10MB and PDF/JPEG/PNG/WebP restrictions;
-- seller-scoped signed KYC upload/view brokerage through server authorization;
-- KYC registration verifies the object exists, enforces actual downloaded byte size, and validates PDF/JPEG/PNG/WebP file signatures rather than trusting browser MIME/size claims;
-- KYC approval maps correctly to seller `verified` state and requires all mandatory documents to be approved;
-- public `product-media` Supabase Storage bucket with a 10MB JPEG/PNG/WebP contract;
-- seller-scoped signed product-image upload initialization;
-- product save verifies media belongs to the authenticated seller, is stored in the canonical bucket, exists, and has a valid image signature;
-- the seller editor uses real signed Storage uploads instead of arbitrary external URLs/placeholders;
-- the legacy direct browser multi-table product-write path redirects into the canonical atomic editor;
-- removed images and deleted products clean owned Storage objects.
+- private `kyc-documents` bucket with 10MB PDF/JPEG/PNG/WebP restrictions and Seller-scoped signed access;
+- KYC object re-download, actual size enforcement and PDF/JPEG/PNG/WebP magic-byte validation instead of trusting browser metadata;
+- Seller/Business lifecycle and final approval gated on every mandatory document being approved;
+- transactional admin document/final decisions with atomic audit rows and repeat-review protection;
+- public `product-media` bucket with server ownership/existence/size/signature verification before product save;
+- public `seller-branding` bucket plus usable logo/banner upload UI, server byte validation and replacement cleanup;
+- private `message-attachments` bucket plus sender-only upload, participant-only access, participant RLS and integrated message attachment UI;
+- trusted server conversation-key access so encryption keys remain behind a browser-denied table boundary;
+- no broad client Storage mutation policy and no Replit object-storage dependency.
 
-Still required before launch: complete route-level ownership regression coverage for all seller/admin/KYC/upload flows; verify recovery behavior under storage/database partial failures; define malware/content moderation handling; and verify remaining public-vs-signed media boundaries.
+Still required before public launch: complete HTTP ownership regression coverage for remaining seller/admin/upload routes; explicitly exercise storage/database partial-failure recovery paths; finalize malware/content moderation/scanning policy; and perform the final public-vs-private media-boundary review under production traffic/deployment conditions.
 
 ## P0-06 — Production deployment hardening
 
@@ -147,7 +181,7 @@ Production needs actionable monitoring for payment/payout callback failures, che
 
 **Status: OPEN for EntizNet entry; does not block standalone internal testing**
 
-Before EntizNet-linked launch, implement and verify the secure identity/capability handoff described by ADR-0001. Standalone and EntizNet entry must resolve to the same identity/permissions without duplicated credentials or permanent single-role assumptions.
+M1 has established compatible one-identity/multi-capability semantics in EntizNetStore. Before EntizNet-linked launch, implement and verify the secure identity/capability handoff described by ADR-0001. Standalone and EntizNet entry must resolve to the same identity/permissions without duplicated credentials or direct cross-product database coupling.
 
 ## P0-09 — Seller payout/disbursement end-to-end verification
 
@@ -159,7 +193,7 @@ Verified internal payout layer:
 - only held, undisputed escrow from paid + delivered + fulfilled seller orders older than the trusted-server eligibility cutoff can be claimed;
 - payout creation reserves escrow without marking money released;
 - each escrow transaction can have at most one active `reserved`/`settled` payout claim;
-- terminal payout failure or operator cancellation releases the payout claim while preserving the underlying held escrow for a safe later request;
+- terminal payout failure or operator cancellation releases the payout claim while preserving underlying held escrow for a safe later request;
 - only verified provider success changes escrow from `held` to `released` and settles payout items;
 - exact provider-event replay is deduplicated and late failure cannot downgrade a succeeded payout;
 - late success against a locally terminal request is rejected as a manual reconciliation incident;
