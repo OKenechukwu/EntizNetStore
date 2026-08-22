@@ -23,10 +23,9 @@ export default async function BusinessDashboardPage() {
   ]);
 
   if (!business) redirect('/bsm/apply');
-  if (!seller) redirect('/api/onboarding/business');
 
   const isVerified =
-    business.verification_status === 'verified' && seller.verification_status === 'verified';
+    business.verification_status === 'verified' && seller?.verification_status === 'verified';
 
   return (
     <div className="container mx-auto px-4 py-10 space-y-8">
@@ -43,11 +42,20 @@ export default async function BusinessDashboardPage() {
         </div>
       </div>
 
-      {!isVerified && (
+      {!seller && (
+        <div className="rounded-xl border border-red-300/40 bg-red-50/10 p-5">
+          <h2 className="font-semibold text-red-300">Seller capability needs recovery</h2>
+          <p className="mt-2 text-sm opacity-75">
+            This Business profile predates the canonical BSM model. Re-run Business onboarding to attach the missing Seller capability safely.
+          </p>
+        </div>
+      )}
+
+      {!isVerified && seller && (
         <div className="rounded-xl border border-amber-300/40 bg-amber-50/10 p-5">
           <h2 className="font-semibold text-accent-gold">Business verification required</h2>
           <p className="mt-2 text-sm opacity-75">
-            Your BSM account already includes Buyer and Seller capabilities. Complete business-grade KYC before publishing products publicly.
+            Your BSM account includes Buyer and Seller capabilities. Complete business-grade KYC before publishing products publicly.
           </p>
           <Link href="/dashboard/verification" className="luxury-button inline-block mt-4 px-4 py-2">
             Complete verification
@@ -84,7 +92,7 @@ export default async function BusinessDashboardPage() {
         <div className="glass-card p-6">
           <h2 className="font-serif text-xl font-bold text-accent-gold mb-3">Seller operations</h2>
           <p className="opacity-75 mb-5">
-            Orders, storefront operations and seller tools use the same canonical Seller capability provisioned with your BSM account.
+            Orders, storefront operations and seller tools use the canonical Seller capability provisioned with your BSM account.
           </p>
           <Link href="/dashboard/seller" className="luxury-button-outline inline-block px-4 py-2">
             Seller dashboard
