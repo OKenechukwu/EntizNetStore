@@ -1,23 +1,22 @@
-// Client-side persistence of the user's registration choice (buyer/seller)
-// across the email-verification / sign-in gap. This is a UX hint ONLY — it is
-// never used for authorization. The trusted /api/onboarding/* endpoints derive
-// the profile ID from the server-validated auth user and are idempotent.
-const KEY = "entiz_pending_onboarding";
+// Client-side persistence of the registration choice across email verification.
+// This is a UX hint only. Authorization and identity are always re-derived by
+// the trusted server endpoint after a real authenticated session exists.
+const KEY = 'entiz_pending_onboarding';
 
-export type OnboardingChoice = "buyer" | "seller";
+export type OnboardingChoice = 'buyer' | 'seller' | 'business';
 
 export function setPendingOnboarding(choice: OnboardingChoice) {
   try {
     localStorage.setItem(KEY, choice);
   } catch {
-    // storage unavailable — onboarding can still be completed later
+    // Storage unavailable: onboarding can still be resumed explicitly later.
   }
 }
 
 function getPendingOnboarding(): OnboardingChoice | null {
   try {
-    const v = localStorage.getItem(KEY);
-    return v === "buyer" || v === "seller" ? v : null;
+    const value = localStorage.getItem(KEY);
+    return value === 'buyer' || value === 'seller' || value === 'business' ? value : null;
   } catch {
     return null;
   }
@@ -27,26 +26,22 @@ function clearPendingOnboarding() {
   try {
     localStorage.removeItem(KEY);
   } catch {
-    // ignore
+    // Ignore unavailable browser storage.
   }
 }
 
-/**
- * Call after an authenticated session exists. If a registration choice is
- * pending, invokes the matching trusted onboarding endpoint (idempotent,
- * server-derived identity) and clears the pending flag on success.
- */
 export async function completePendingOnboarding(): Promise<void> {
   const choice = getPendingOnboarding();
   if (!choice) return;
+
   try {
     const res = await fetch(`/api/onboarding/${choice}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
     if (res.ok) clearPendingOnboarding();
   } catch {
-    // keep the pending flag; retried on next successful sign-in
+    // Keep the pending marker and retry after a later successful sign-in.
   }
 }
