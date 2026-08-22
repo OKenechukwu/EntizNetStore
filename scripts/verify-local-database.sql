@@ -17,8 +17,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
 
-  if v_public_tables <> 31 then
-    raise exception 'Expected 31 public tables, found %', v_public_tables;
+  if v_public_tables <> 32 then
+    raise exception 'Expected 32 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
@@ -26,8 +26,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_rls_tables <> 31 then
-    raise exception 'Expected RLS on all 31 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 32 then
+    raise exception 'Expected RLS on all 32 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -41,7 +41,8 @@ begin
     );
 
   -- M1 adds scoped read policies to KYC documents, KYC requests, and message
-  -- attachments, reducing the intentional deny-by-default count from 12 to 9.
+  -- attachments. M2's moderation-event table also has a scoped Seller read
+  -- policy, so the intentional deny-by-default count remains 9.
   if v_no_policy_tables <> 9 then
     raise exception 'Expected 9 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
@@ -68,7 +69,8 @@ with expected(name) as (
     ('messages'), ('notifications'), ('order_items'), ('orders'),
     ('payment_sessions'), ('payment_webhook_events'),
     ('payout_items'), ('payout_provider_events'), ('payout_requests'),
-    ('product_categories'), ('product_media'), ('product_variants'), ('products'),
+    ('product_categories'), ('product_media'), ('product_moderation_events'),
+    ('product_variants'), ('products'),
     ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
     ('profiles_seller_private'), ('reviews')
 ), actual(name) as (
@@ -184,7 +186,7 @@ begin
 end
 $$;
 
--- Transaction and private M1 table grants must agree with RLS.
+-- Transaction and private M1/M2 table grants must agree with RLS.
 do $$
 declare
   table_name text;
@@ -217,7 +219,8 @@ begin
   foreach table_name in array array[
     'kyc_documents',
     'kyc_verification_requests',
-    'message_attachments'
+    'message_attachments',
+    'product_moderation_events'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
       raise exception 'authenticated is missing scoped SELECT on %', table_name;
@@ -225,7 +228,20 @@ begin
     if has_table_privilege('authenticated', format('public.%I', table_name), 'INSERT')
        or has_table_privilege('authenticated', format('public.%I', table_name), 'UPDATE')
        or has_table_privilege('authenticated', format('public.%I', table_name), 'DELETE') then
-      raise exception 'authenticated must not directly mutate private M1 table %', table_name;
+      raise exception 'authenticated must not directly mutate private/scoped table %', table_name;
+    end if;
+  end loop;
+
+  foreach table_name in array array[
+    'products', 'product_variants', 'product_media', 'product_categories'
+  ] loop
+    if not has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT') then
+      raise exception 'authenticated is missing catalogue SELECT on %', table_name;
+    end if;
+    if has_table_privilege('authenticated', format('public.%I', table_name), 'INSERT')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'UPDATE')
+       or has_table_privilege('authenticated', format('public.%I', table_name), 'DELETE') then
+      raise exception 'M2 catalogue table must be RPC-mutation-only: %', table_name;
     end if;
   end loop;
 
@@ -253,7 +269,7 @@ begin
 end
 $$;
 
--- Canonical supporting indexes introduced/required by M0, M1, and money ledgers.
+-- Canonical supporting indexes introduced/required by M0, M1, M2 and money ledgers.
 do $$
 declare
   idx text;
@@ -272,6 +288,9 @@ begin
     'idx_product_media_variant_id',
     'idx_product_variants_product_id',
     'idx_products_brand_id',
+    'idx_products_moderation_status',
+    'idx_product_moderation_events_product_created',
+    'profiles_seller_store_slug_key',
     'idx_reviews_buyer_id',
     'idx_payout_requests_seller_created',
     'idx_payout_requests_status',
@@ -297,6 +316,7 @@ do $$
 declare
   payout_fn text;
   kyc_fn text;
+  catalog_fn text;
 begin
   if has_function_privilege('anon', 'public.create_checkout_session(jsonb,jsonb,uuid)', 'EXECUTE') then
     raise exception 'anon must not execute create_checkout_session';
@@ -373,10 +393,44 @@ begin
       raise exception 'service_role must execute admin KYC RPC: %', kyc_fn;
     end if;
   end loop;
+
+  if has_function_privilege(
+      'authenticated',
+      'public.seller_save_product(uuid,text,text,numeric,numeric,text,uuid[],text[],integer)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated',
+      'public.seller_save_product_v2(uuid,text,text,numeric,numeric,text,uuid[],text[],jsonb)',
+      'EXECUTE'
+    ) then
+    raise exception 'Legacy Seller save RPC remains authenticated-executable';
+  end if;
+
+  foreach catalog_fn in array array[
+    'public.seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])',
+    'public.seller_submit_product_for_review(uuid)',
+    'public.seller_set_product_publication(uuid,boolean)',
+    'public.seller_delete_product(uuid)'
+  ] loop
+    if has_function_privilege('anon', catalog_fn, 'EXECUTE') then
+      raise exception 'anon must not execute Seller catalogue RPC: %', catalog_fn;
+    end if;
+    if not has_function_privilege('authenticated', catalog_fn, 'EXECUTE') then
+      raise exception 'authenticated must execute Seller catalogue RPC: %', catalog_fn;
+    end if;
+  end loop;
+
+  if has_function_privilege('anon', 'public.admin_review_product(uuid,uuid,text,text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.admin_review_product(uuid,uuid,text,text)', 'EXECUTE') then
+    raise exception 'Admin product moderation RPC must be trusted-worker-only';
+  end if;
+  if not has_function_privilege('service_role', 'public.admin_review_product(uuid,uuid,text,text)', 'EXECUTE') then
+    raise exception 'service_role must execute admin_review_product';
+  end if;
 end
 $$;
 
--- Search-path hardening for privileged checkout/order/payout/KYC functions.
+-- Search-path hardening for privileged checkout/order/payout/KYC/catalogue functions.
 do $$
 declare
   bad_count integer;
@@ -394,12 +448,16 @@ begin
       'request_seller_payout',
       'attach_seller_payout_provider_reference',
       'cancel_seller_payout_request',
-      'finalize_seller_payout_v1'
+      'finalize_seller_payout_v1',
+      'seller_save_product_v3',
+      'seller_submit_product_for_review',
+      'seller_set_product_publication',
+      'seller_delete_product'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
 
   if bad_count <> 0 then
-    raise exception '% privileged money/order functions lack hardened search_path', bad_count;
+    raise exception '% privileged money/order/catalogue functions lack hardened search_path', bad_count;
   end if;
 
   select count(*) into bad_count
@@ -411,6 +469,17 @@ begin
 
   if bad_count <> 0 then
     raise exception '% privileged KYC functions lack hardened search_path', bad_count;
+  end if;
+
+  select count(*) into bad_count
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname = 'admin_review_product'
+    and not ('search_path=pg_catalog, public, auth' = any(coalesce(p.proconfig, array[]::text[])));
+
+  if bad_count <> 0 then
+    raise exception 'admin_review_product lacks hardened search_path';
   end if;
 end
 $$;
