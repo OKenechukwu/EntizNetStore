@@ -1,6 +1,6 @@
 # M2 — Catalogue & Seller Operations
 
-Status: **implementation complete on feature branch; verification/live rollout pending final green CI**
+Status: **LIVE DATABASE VERIFIED; merge-to-main and production deployment verification pending**
 
 ## Goal
 
@@ -48,6 +48,8 @@ Seller writes use authenticated database RPCs with explicit ownership and state 
 - `seller_delete_product`.
 
 Legacy Seller save RPCs are no longer authenticated-executable, preventing an older path from bypassing M2 moderation.
+
+The authenticated Seller RPCs are intentionally `SECURITY DEFINER` functions. They are an explicit reviewed Supabase advisor exception because direct browser table mutation is denied and the RPCs enforce `auth.uid()` ownership/state checks, hardened `search_path` configuration and cross-Seller regression coverage.
 
 ### Rich product save
 
@@ -128,6 +130,8 @@ Authenticated users additionally see their own Seller drafts for dashboard/edito
 
 `product_moderation_events` is RLS-enabled. A Seller can read moderation history only for their own products; browser roles cannot mutate that history.
 
+The live M2 Supabase baseline contains 32 public tables and all 32 have RLS enabled. Nine tables intentionally remain RLS-enabled with no browser policy so they deny by default.
+
 ## Product media
 
 M2 retains the M1 `product-media` security model:
@@ -170,6 +174,23 @@ The canonical Seller product management surface now exposes:
 
 The public product page links to the canonical persisted Seller storefront rather than a derived store-name slug.
 
+## Forward migrations
+
+M2 is forward-only. Applied migrations are never rewritten after live rollout.
+
+The eight M2 forward migrations applied to the live EntizNetStore project are:
+
+1. `m2_catalog_moderation_foundation`
+2. `m2_clean_store_slugs`
+3. `m2_profile_read_privilege_contract`
+4. `m2_inventory_reservation_guard`
+5. `m2_active_product_approval_invariant`
+6. `m2_product_policy_completeness_guard`
+7. `m2_product_policy_insert_guard`
+8. `m2_moderation_fk_indexes`
+
+The live Supabase management history records these migrations with management-generated timestamps. Repository migrations remain the canonical reproducible SQL source; applied live history is not rewritten to cosmetically force timestamp equality.
+
 ## Regression and reproduction gates
 
 Fresh Supabase CI replays every repository migration and seed, then runs M2-specific verification in addition to all M1 and existing commerce/payment/payout suites.
@@ -178,6 +199,7 @@ M2 gates cover:
 
 - structural moderation/storefront/inventory triggers and constraints;
 - stable unique storefront slugs;
+- moderation foreign-key covering indexes;
 - no authenticated execution of legacy save RPCs;
 - RPC-only Seller catalogue DML;
 - cross-Seller mutation denial;
@@ -193,15 +215,27 @@ M2 gates cover:
 
 CI continues to run the production foundation scan, TypeScript, production build, dependency audit, M1 identity/KYC/storage suites, commerce authorization, payment state-machine suites, payout ledger and concurrent payout tests.
 
+## Verified release evidence
+
+- CI #185 passed the full release stack: production foundation, TypeScript, production build, dependency audit, fresh database replay, M1 identity/KYC/BSM, all M2 catalogue/moderation/inventory/policy gates, P0 commerce authorization, provider-neutral payment/terminal-state, payout ledger and concurrent escrow-claim regression.
+- The first seven M2 forward migrations were then applied to live Supabase project `kllwwurklumhawfsilpd`.
+- Live verification confirmed 32 public tables / 32 RLS-enabled tables, nine intentional deny-by-default tables, required storefront/moderation/inventory triggers, the active→approved constraint, expected RPC grants/search paths, browser catalogue DML denial, and zero existing marketplace/order rows altered.
+- Live performance advisors identified two new moderation foreign keys without covering indexes. Those were fixed by the eighth forward migration, `m2_moderation_fk_indexes`, and the structural verifier was strengthened so either index disappearing fails CI.
+- CI #187 passed the entire release stack including the new FK-index assertions.
+- The eighth migration was applied live successfully. A repeat performance-advisor check no longer reports unindexed foreign keys; only expected unused-index INFO remains on the currently empty marketplace dataset.
+- Security-advisor review adds four M2 Seller RPC warnings because authenticated users intentionally execute the `SECURITY DEFINER` catalogue boundary. These are reviewed exceptions, not unreviewed findings: ownership/state enforcement is inside the RPCs, direct table DML is denied, search paths are hardened, and cross-Seller attacks are regression-tested.
+- Pre-merge Vercel production runtime baseline reports no runtime-error clusters.
+
 ## M2 exit gate
 
-M2 can be marked `VERIFIED` when:
+Engineering/database portions of the M2 exit gate are verified:
 
-- the final branch CI is fully green;
-- all forward M2 migrations are applied to the correct live EntizNetStore Supabase project;
-- live RLS/table/RPC/trigger/constraint invariants match the fresh-database baseline;
-- Supabase security/performance advisors show no new unreviewed launch-severity findings;
-- the merged `main` build/deployment is verified.
+- final application/database branch CI is green;
+- all eight forward M2 migrations are applied to the correct live EntizNetStore Supabase project;
+- live RLS/table/RPC/trigger/constraint/index invariants match the fresh-database baseline;
+- Supabase security/performance advisors contain no new unreviewed launch-severity M2 findings.
+
+The remaining release condition is the merged `main` build/deployment and production runtime verification.
 
 Functional exit condition: **a verified Seller can operate a stable storefront, create and manage a complete product/variant/inventory listing, submit it for independent Admin review, and expose only the approved revision publicly without any Replit catalogue infrastructure.**
 
