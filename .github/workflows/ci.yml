@@ -76,6 +76,9 @@ jobs:
       - name: Run M2 catalogue and moderation regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-catalog-moderation.sql
 
+      - name: Run M2 inventory reservation guard regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-inventory-reservation-guard.sql
+
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
