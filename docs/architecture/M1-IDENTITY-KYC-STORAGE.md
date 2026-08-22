@@ -45,7 +45,7 @@ Business/BSM onboarding:
 
 If an existing individual/creator Seller adds BSM, the Seller entity becomes business type and must satisfy the business KYC set before inheriting business verification. This prevents an individual identity check from silently becoming a verified company identity.
 
-The `/seller/apply` and `/bsm/apply` routes support adding capabilities later to an existing account.
+The `/seller/apply` and `/bsm/apply` routes support adding capabilities later to an existing account. BSM onboarding is idempotent and can also repair a historical/partial Business projection that is missing Seller capability.
 
 ## Seller and Business verification lifecycle
 
@@ -87,6 +87,8 @@ Bucket: `kyc-documents`
 - Seller document viewing uses a short-lived signed URL after ownership verification
 - KYC metadata tables expose authenticated own-row reads only; mutations are server/service-role controlled
 
+The Seller verification UI consumes only the trusted KYC APIs. It does not create or mutate KYC rows directly from the browser.
+
 No Replit object storage is required.
 
 ## Product media
@@ -111,8 +113,10 @@ Bucket: `seller-branding`
 - server receives multipart upload, validates actual bytes/signature, writes to seller-scoped path, then updates `logo_url`/`banner_url`
 - new object is removed if database persistence fails
 - prior seller-owned branding object is cleaned on replacement
+- `/dashboard/seller/branding` provides the Seller-facing logo/banner upload and replacement experience
+- Seller and BSM dashboards link to the canonical branding screen
 
-## Message attachments
+## Message attachments and trusted messaging
 
 Bucket: `message-attachments`
 
@@ -125,6 +129,10 @@ Bucket: `message-attachments`
 - only the message sender or recipient can mint a short-lived download URL
 - `message_attachments` metadata RLS independently limits reads to message participants
 
+M1 also removes the legacy route dependency on the browser-compatible Supabase client for conversation keys. Message creation, conversation-key access, decryption, conversation listing, and attachment metadata loading now use authenticated trusted server routes. `conversation_keys` can therefore remain deny-by-default to browser roles.
+
+The messaging UI can select, validate, upload, display, and privately open attachments. The small-screen layout now exposes the selected conversation instead of leaving the message pane desktop-only.
+
 The allow-list + magic-byte strategy is a strong unsafe-file reduction control but is not represented as antivirus scanning. A dedicated malware/content scanning provider can be inserted before files become usable if launch policy requires it.
 
 ## Admin KYC workflow and auditability
@@ -134,6 +142,8 @@ Admin HTTP routes require trusted server-side admin authorization. Document appr
 The database locks the target row and performs the state mutation plus `admin_audit_logs` insertion in one transaction. A reviewed document/finalized request cannot be silently overwritten. Final approval fails closed until every required document type has an approved submission.
 
 When the seller also has Business/BSM capability, the final Seller and Business verification states are synchronized atomically and the audit metadata records that the business projection was updated.
+
+The admin pending-review API batches KYC documents, Seller projections, and Business/BSM projections rather than issuing per-applicant query loops, and exposes the Business identity to the trusted admin workflow.
 
 The audit table is not browser-readable or browser-writable.
 
