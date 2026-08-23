@@ -56,6 +56,11 @@ const operations = [
     title: "Trust & Safety",
     description: "Moderate verified-purchase reviews, triage reports, maintain prohibited-product rules and enforce product policy with immutable evidence.",
   },
+  {
+    href: "/admin/communications",
+    title: "Content & Notifications",
+    description: "Publish marketplace-controlled pages and send targeted in-app notifications through audited trusted operations.",
+  },
 ] as const;
 
 export default async function AdminLandingPage() {
