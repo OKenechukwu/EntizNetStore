@@ -3,13 +3,14 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function PayoutPrepareAction() {
+export function PayoutPrepareAction({ enabled }: { enabled: boolean }) {
   const router = useRouter();
   const [sellerId, setSellerId] = useState("");
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!enabled) return;
     const seller = sellerId.trim();
     if (!seller) return;
 
@@ -37,12 +38,13 @@ export function PayoutPrepareAction() {
         value={sellerId}
         onChange={(event) => setSellerId(event.target.value)}
         placeholder="Verified Seller UUID"
-        className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+        className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm disabled:bg-slate-100"
         required
+        disabled={!enabled || pending}
       />
       <button
         type="submit"
-        disabled={pending}
+        disabled={!enabled || pending}
         className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? "Preparing…" : "Prepare eligible payout"}
