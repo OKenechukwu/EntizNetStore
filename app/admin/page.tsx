@@ -51,6 +51,11 @@ const operations = [
     title: "Catalogue Governance",
     description: "Manage category hierarchy, explicit adult/general classification, and verified or retired brands through audited controls.",
   },
+  {
+    href: "/admin/trust-safety",
+    title: "Trust & Safety",
+    description: "Moderate verified-purchase reviews, triage reports, maintain prohibited-product rules and enforce product policy with immutable evidence.",
+  },
 ] as const;
 
 export default async function AdminLandingPage() {
