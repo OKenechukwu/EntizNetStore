@@ -99,6 +99,9 @@ jobs:
       - name: Run M3 EntizNet linked capability authority regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-entiznet-linked-authority.sql
 
+      - name: Run M3 catalogue governance regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-catalog-governance.sql
+
       - name: Run M3 refund and dispute regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-refund-dispute-operations.sql
 
