@@ -249,7 +249,8 @@ select public.admin_set_marketplace_capability_state(
 );
 
 -- EntizNet mapping is one-to-one and accepts only canonical Store capability
--- slugs. Snapshot claims remain evidence, not local authorization authority.
+-- slugs. For linked accounts the active EntizNet snapshot is upstream authority;
+-- local Store suspension remains an independent additional deny layer.
 select public.upsert_entiznet_identity_link(
   'b1000000-0000-0000-0000-000000000001',
   'c1000000-0000-0000-0000-000000000001',
@@ -374,11 +375,12 @@ begin
 end
 $$;
 
--- Admin search/detail must reflect the same capability/link state and remain
--- trusted-worker-only.
+-- Admin search/detail must distinguish effective linked authorization from the
+-- local Store suspension layer and remain trusted-worker-only.
 do $$
 declare
   v_detail jsonb;
+  v_active_local_states integer;
 begin
   if has_function_privilege('authenticated', 'public.admin_search_marketplace_accounts(uuid,text,text,text,integer,integer)', 'EXECUTE')
      or not has_function_privilege('service_role', 'public.admin_search_marketplace_accounts(uuid,text,text,text,integer,integer)', 'EXECUTE') then
@@ -390,11 +392,26 @@ begin
     'b1000000-0000-0000-0000-000000000001'
   ) into v_detail;
 
-  if v_detail->'buyer'->>'status' <> 'active'
-     or v_detail->'seller'->>'status' <> 'active'
-     or v_detail->'business'->>'status' <> 'active'
+  if v_detail->'buyer'->>'status' <> 'suspended'
+     or v_detail->'seller'->>'status' <> 'suspended'
+     or v_detail->'business'->>'status' <> 'suspended'
      or v_detail->'entiznetLink'->>'status' <> 'revoked' then
-    raise exception 'Admin account detail does not reflect canonical capability/link state: %', v_detail;
+    raise exception 'Admin account detail does not reflect revoked linked effective state: %', v_detail;
+  end if;
+
+  select count(*) into v_active_local_states
+  from jsonb_array_elements(v_detail->'capabilityStates') state
+  where state->>'capability' in ('buyer', 'seller', 'business')
+    and state->>'status' = 'active';
+
+  if v_active_local_states <> 3 then
+    raise exception 'Admin account detail did not preserve the independent local capability-state layer: %', v_detail;
+  end if;
+
+  if public.marketplace_capability_is_active('b1000000-0000-0000-0000-000000000001', 'buyer')
+     or public.marketplace_capability_is_active('b1000000-0000-0000-0000-000000000001', 'seller')
+     or public.marketplace_capability_is_active('b1000000-0000-0000-0000-000000000001', 'business') then
+    raise exception 'Revoked linked EntizNet account retained effective Store capability';
   end if;
 end
 $$;
