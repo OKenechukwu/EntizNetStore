@@ -127,7 +127,16 @@ jobs:
           psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
       - name: Run provider-neutral payment regression suite
-        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          cleanup() {
+            psql "$DB" -v ON_ERROR_STOP=1 -c "revoke execute on function public.create_checkout_session(jsonb,jsonb,uuid) from authenticated" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/prepare-legacy-commerce-security-test.sql
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
 
       - name: Run terminal payment-state regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-terminal-state.sql
