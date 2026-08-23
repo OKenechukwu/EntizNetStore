@@ -11,7 +11,7 @@ const contentSchema = z.object({
   pageKey: z.string().trim().min(1).max(120),
   title: z.string().trim().min(1).max(240),
   content: z.string().max(200000).nullable().optional(),
-  metadata: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
   isActive: z.boolean().default(true),
 });
 
@@ -22,7 +22,7 @@ const notificationSchema = z.object({
   title: z.string().trim().min(1).max(240),
   message: z.string().trim().min(1).max(10000),
   actionUrl: z.string().trim().max(1000).nullable().optional(),
-  metadata: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 const actionSchema = z.discriminatedUnion("action", [contentSchema, notificationSchema]);
