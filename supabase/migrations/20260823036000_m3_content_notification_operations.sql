@@ -216,7 +216,7 @@ begin
   if p_user_id is null or not exists (select 1 from auth.users u where u.id = p_user_id) then
     raise exception 'notification_target_user_not_found' using errcode = '22023';
   end if;
-  if v_type = '' or v_type !~ '^[a-z0-9]+(?:_[a-z0-9]+)*$' or char_length(v_type) > 80 then
+  if v_type not in ('message','order','promo','system','payment','shipping') then
     raise exception 'invalid_notification_type' using errcode = '22023';
   end if;
   if v_title = '' or char_length(v_title) > 240 then
