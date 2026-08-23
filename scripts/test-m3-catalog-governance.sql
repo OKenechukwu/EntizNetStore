@@ -27,18 +27,6 @@ insert into public.profiles_seller(
 insert into public.categories(name, slug)
 values ('M3 Default General', 'm3-default-general')
 returning id as default_category_id \gset
-
-do $$
-begin
-  if (select is_adult from public.categories where id = current_setting('m3.default_category_id', true)::uuid) is distinct from false then
-    raise exception 'New category did not default to non-adult classification';
-  end if;
-exception when invalid_text_representation then
-  -- psql variables are persisted explicitly below when needed; this block is
-  -- replaced by the direct assertion after set_config.
-  null;
-end
-$$;
 select set_config('m3.default_category_id', :'default_category_id', false);
 do $$
 begin
