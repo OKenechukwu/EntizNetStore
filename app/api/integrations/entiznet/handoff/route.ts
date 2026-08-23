@@ -69,8 +69,9 @@ export async function POST(request: NextRequest) {
     if (linkLookupError) throw new Error("identity_link_lookup_failed");
 
     if (existingLink?.store_user_id) {
-      storeUserId = existingLink.store_user_id;
-      const { data: storeUserData, error: storeUserError } = await admin.auth.admin.getUserById(storeUserId);
+      const linkedStoreUserId = existingLink.store_user_id as string;
+      storeUserId = linkedStoreUserId;
+      const { data: storeUserData, error: storeUserError } = await admin.auth.admin.getUserById(linkedStoreUserId);
       if (storeUserError || !storeUserData.user) throw new Error("linked_store_user_missing");
 
       if ((storeUserData.user.email || "").toLowerCase() !== claims.email) {
@@ -78,9 +79,9 @@ export async function POST(request: NextRequest) {
           p_email: claims.email,
         });
         if (resolveError) throw new Error("store_email_resolution_failed");
-        if (resolvedId && resolvedId !== storeUserId) throw new Error("identity_link_email_conflict");
+        if (resolvedId && resolvedId !== linkedStoreUserId) throw new Error("identity_link_email_conflict");
 
-        const { error: updateEmailError } = await admin.auth.admin.updateUserById(storeUserId, {
+        const { error: updateEmailError } = await admin.auth.admin.updateUserById(linkedStoreUserId, {
           email: claims.email,
           email_confirm: true,
         });
@@ -104,8 +105,6 @@ export async function POST(request: NextRequest) {
         });
 
         if (createError || !created.user) {
-          // A concurrent valid handoff may have won the auth email insert. Resolve
-          // once more and rely on the one-to-one identity-link constraint below.
           const { data: racedId, error: racedResolveError } = await admin.rpc("resolve_store_auth_user_by_email", {
             p_email: claims.email,
           });
@@ -118,16 +117,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (!storeUserId) throw new Error("store_user_resolution_failed");
+    const resolvedStoreUserId = storeUserId;
 
     const { error: syncError } = await admin.rpc("sync_entiznet_store_capabilities", {
-      p_store_user_id: storeUserId,
+      p_store_user_id: resolvedStoreUserId,
       p_capabilities: claims.capabilities,
       p_display_name: claims.displayName,
     });
     if (syncError) throw new Error("store_capability_sync_failed");
 
     const { error: linkError } = await admin.rpc("upsert_entiznet_identity_link", {
-      p_store_user_id: storeUserId,
+      p_store_user_id: resolvedStoreUserId,
       p_entiznet_user_id: claims.sub,
       p_capabilities_snapshot: claims.capabilities,
       p_capabilities_version: claims.capabilitiesVersion,
@@ -146,9 +146,6 @@ export async function POST(request: NextRequest) {
       throw new Error("identity_link_update_failed");
     }
 
-    // Generate a one-time Store auth token server-side and immediately exchange
-    // it into the Store cookie session. The token is never emailed or exposed in
-    // a URL because EntizNet already proved control of the confirmed identity.
     const { data: magicLink, error: magicLinkError } = await admin.auth.admin.generateLink({
       type: "magiclink",
       email: claims.email,
@@ -161,13 +158,13 @@ export async function POST(request: NextRequest) {
       type: "magiclink",
       token_hash: tokenHash,
     });
-    if (sessionError || !sessionData.session || sessionData.user?.id !== storeUserId) {
+    if (sessionError || !sessionData.session || sessionData.user?.id !== resolvedStoreUserId) {
       throw new Error("store_session_establishment_failed");
     }
 
     const { error: completeError } = await admin.rpc("complete_entiznet_handoff", {
       p_event_id: eventId,
-      p_store_user_id: storeUserId,
+      p_store_user_id: resolvedStoreUserId,
       p_status: "consumed",
       p_failure_code: null,
     });
