@@ -283,10 +283,11 @@ select public.finalize_refund_v1(
   null,
   null
 ) as replay_result \gset
+select set_config('m3refund.replay_result', :'replay_result', false);
 reset role;
 do $$
 begin
-  if :'replay_result'::boolean then
+  if current_setting('m3refund.replay_result')::boolean then
     raise exception 'Refund provider event replay was processed twice';
   end if;
   if (select amount_cents from public.escrow_transactions where id='f1000000-0000-0000-0000-000000000001') <> 4500 then
