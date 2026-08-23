@@ -1,9 +1,4 @@
 // app/admin/page.tsx
-//
-// Canonical admin landing page. Server-side authorization only: admin
-// privilege comes from trusted app_metadata (set via the Supabase Admin
-// API / service role), never from client-mutable user_metadata, query
-// parameters, or browser state.
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -29,7 +24,17 @@ const operations = [
   {
     href: "/admin/refunds",
     title: "Refunds",
-    description: "Review refund requests separately from provider execution and surface payout/clawback blocks before money moves.",
+    description: "Review refund requests separately from provider execution and surface payout blocks before money moves.",
+  },
+  {
+    href: "/admin/finance",
+    title: "Finance & Transactions",
+    description: "Monitor GMV, platform revenue, refunds, escrow and payout exposure with global transaction search.",
+  },
+  {
+    href: "/admin/audit",
+    title: "Operational Audit Log",
+    description: "Search trusted Admin actions across accounts, KYC, moderation, disputes, refunds, payouts and other operations.",
   },
   {
     href: "/admin/kyc",
@@ -45,11 +50,7 @@ const operations = [
 
 export default async function AdminLandingPage() {
   const supabase = await createServerSupabase();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
+  const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/auth/sign-in");
   if (user.app_metadata?.role !== "admin") redirect("/store");
 
