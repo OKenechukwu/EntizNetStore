@@ -105,6 +105,9 @@ jobs:
       - name: Run M3 trust and safety regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-trust-safety-operations.sql
 
+      - name: Run M3 content and notification regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-content-notification-operations.sql
+
       - name: Run M3 refund and dispute regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-refund-dispute-operations.sql
 
