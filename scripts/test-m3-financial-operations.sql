@@ -17,6 +17,8 @@ insert into public.profiles_buyer(id,display_name) values
 insert into public.profiles_seller(id,storefront_name,verification_status,return_policy,shipping_policy)
 values ('fc000000-0000-0000-0000-000000000003','Finance Seller','verified','Returns policy','Shipping policy');
 
+-- Order 001 is intentionally partially refunded. It exercises GMV/refund/revenue
+-- reporting and must NOT be eligible for Seller payout.
 insert into public.orders(
   id,order_number,buyer_id,seller_id,status,subtotal_cents,total_cents,
   payment_status,fulfillment_status,delivered_at,metadata,created_at,updated_at
@@ -28,10 +30,23 @@ insert into public.orders(
   now()-interval '11 days',now()
 );
 
+-- Order 002 is a separate fully-paid delivered order. Its held escrow is the
+-- only payout-eligible balance in this fixture.
+insert into public.orders(
+  id,order_number,buyer_id,seller_id,status,subtotal_cents,total_cents,
+  payment_status,fulfillment_status,delivered_at,metadata,created_at,updated_at
+) values (
+  'fd100000-0000-0000-0000-000000000009','ENS-FINANCE-002',
+  'fb000000-0000-0000-0000-000000000002','fc000000-0000-0000-0000-000000000003',
+  'delivered',7200,7200,'paid','fulfilled',now()-interval '10 days',
+  jsonb_build_object('platform_fee_cents',720),
+  now()-interval '11 days',now()
+);
+
 insert into public.escrow_transactions(
   id,order_id,seller_id,amount_cents,status,created_at,updated_at
 ) values (
-  'fe000000-0000-0000-0000-000000000005','fd000000-0000-0000-0000-000000000004',
+  'fe000000-0000-0000-0000-000000000005','fd100000-0000-0000-0000-000000000009',
   'fc000000-0000-0000-0000-000000000003',7200,'held',now()-interval '10 days',now()
 );
 
@@ -95,13 +110,14 @@ select set_config(
 do $$
 declare v jsonb := current_setting('m3finance.summary')::jsonb;
 begin
-  if (v->>'grossSalesCents')::bigint <> 10000
+  if (v->>'grossSalesCents')::bigint <> 17200
      or (v->>'customerRefundedCents')::bigint <> 2000
-     or (v->>'netGmvCents')::bigint <> 8000
-     or (v->>'grossPlatformRevenueCents')::bigint <> 1000
+     or (v->>'netGmvCents')::bigint <> 15200
+     or (v->>'grossPlatformRevenueCents')::bigint <> 1720
      or (v->>'platformRevenueRefundedCents')::bigint <> 200
-     or (v->>'netPlatformRevenueCents')::bigint <> 800
-     or (v->>'escrowHeldCents')::bigint <> 7200 then
+     or (v->>'netPlatformRevenueCents')::bigint <> 1520
+     or (v->>'escrowHeldCents')::bigint <> 7200
+     or (v->>'paidOrders')::integer <> 2 then
     raise exception 'Finance summary math incorrect: %', v;
   end if;
 end
@@ -137,14 +153,15 @@ begin
 end
 $$;
 
--- Unified transaction search must find canonical refund, payout and escrow rows.
+-- Unified transaction search must find canonical refund, payout and escrow rows
+-- across both finance fixture orders.
 do $$
 declare
   v_types text[];
 begin
   select array_agg(distinct transaction_type order by transaction_type) into v_types
   from public.admin_search_financial_transactions(
-    'fa000000-0000-0000-0000-000000000001','ENS-FINANCE-001','all','all',100,0
+    'fa000000-0000-0000-0000-000000000001','ENS-FINANCE','all','all',100,0
   );
   if not (v_types @> array['escrow','refund','payout']::text[]) then
     raise exception 'Global transaction search missing finance ledger types: %', v_types;
@@ -163,7 +180,7 @@ begin
     'fa000000-0000-0000-0000-000000000001','finance-seller','pending',50,0
   );
   select count(*) into v_escrow from public.admin_search_escrow_transactions(
-    'fa000000-0000-0000-0000-000000000001','ENS-FINANCE-001','held',50,0
+    'fa000000-0000-0000-0000-000000000001','ENS-FINANCE-002','held',50,0
   ) where payout_request_id=v_payout_request_id;
   if v_payouts<>1 or v_escrow<>1 then raise exception 'Payout/escrow Admin read model failed'; end if;
 end
