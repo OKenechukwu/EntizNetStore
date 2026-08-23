@@ -22,6 +22,16 @@ const operations = [
     description: "Search global orders and inspect Buyer/Seller, payment, fulfillment, escrow, payout and audit state from one operational view.",
   },
   {
+    href: "/admin/disputes",
+    title: "Disputes",
+    description: "Review Buyer/Seller disputes, preserve escrow holds, record decisions and route Buyer-favoring outcomes into refunds safely.",
+  },
+  {
+    href: "/admin/refunds",
+    title: "Refunds",
+    description: "Review refund requests separately from provider execution and surface payout/clawback blocks before money moves.",
+  },
+  {
     href: "/admin/kyc",
     title: "KYC Review",
     description: "Review pending Seller verification requests and documents.",
