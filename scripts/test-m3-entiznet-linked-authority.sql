@@ -53,10 +53,11 @@ end
 $$;
 
 select public.resolve_store_auth_user_by_email(' LINKED@TEST.INVALID ') as resolved_id \gset
+select set_config('m3linked.resolved_id', :'resolved_id', false);
 
 do $$
 begin
-  if :'resolved_id' <> 'ec000000-0000-0000-0000-000000000003' then
+  if current_setting('m3linked.resolved_id') <> 'ec000000-0000-0000-0000-000000000003' then
     raise exception 'Store auth email resolution returned wrong identity';
   end if;
 end
