@@ -17,15 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-  if v_public_tables <> 43 then
-    raise exception 'Expected 43 public tables, found %', v_public_tables;
+  if v_public_tables <> 45 then
+    raise exception 'Expected 45 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-  if v_rls_tables <> 43 then
-    raise exception 'Expected RLS on all 43 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 45 then
+    raise exception 'Expected RLS on all 45 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -34,8 +34,8 @@ begin
     and c.relkind = 'r'
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-  -- M3 adds immutable capability/handoff/refund-provider ledgers that remain
-  -- trusted-worker-only while participant-facing dispute/refund rows use RLS.
+  -- Reviews now have scoped policies while prohibited-product rules are
+  -- intentionally trusted-worker-only, so the deny-by-default count stays 11.
   if v_no_policy_tables <> 11 then
     raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
@@ -55,14 +55,14 @@ with expected(name) as (
     ('entiznet_identity_links'), ('escrow_transactions'), ('featured_products'),
     ('inventory_reservations'), ('kyc_documents'), ('kyc_verification_requests'),
     ('marketplace_capability_state_events'), ('marketplace_capability_states'),
-    ('message_attachments'), ('messages'), ('notifications'),
+    ('marketplace_reports'), ('message_attachments'), ('messages'), ('notifications'),
     ('order_dispute_events'), ('order_disputes'), ('order_items'), ('orders'),
     ('payment_sessions'), ('payment_webhook_events'), ('payout_items'),
     ('payout_provider_events'), ('payout_requests'), ('product_categories'),
     ('product_media'), ('product_moderation_events'), ('product_variants'),
     ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
-    ('profiles_seller_private'), ('refund_provider_events'), ('refund_requests'),
-    ('reviews')
+    ('profiles_seller_private'), ('prohibited_product_rules'),
+    ('refund_provider_events'), ('refund_requests'), ('reviews')
 ), actual(name) as (
   select c.relname::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -80,7 +80,7 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical 43-table M3 baseline';
+    raise exception 'Public table set differs from canonical 45-table M3 baseline';
   end if;
 end
 $$;
@@ -155,7 +155,7 @@ begin
   foreach v_table in array array[
     'kyc_documents','kyc_verification_requests','message_attachments',
     'product_moderation_events','addresses','carts','cart_items','cart_quotes',
-    'marketplace_capability_states','entiznet_identity_links'
+    'marketplace_capability_states','entiznet_identity_links','marketplace_reports'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
       raise exception 'authenticated missing scoped SELECT on %', v_table;
@@ -167,20 +167,23 @@ begin
     end if;
   end loop;
 
-  foreach v_table in array array['products','product_variants','product_media','product_categories'] loop
+  foreach v_table in array array[
+    'products','product_variants','product_media','product_categories','categories','brands','reviews'
+  ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
-      raise exception 'authenticated missing catalogue SELECT on %', v_table;
+      raise exception 'authenticated missing catalogue/trust SELECT on %', v_table;
     end if;
     if has_table_privilege('authenticated', format('public.%I', v_table), 'INSERT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'UPDATE')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'DELETE') then
-      raise exception 'Catalogue table must remain RPC-mutation-only: %', v_table;
+      raise exception 'Catalogue/trust table must remain RPC-mutation-only: %', v_table;
     end if;
   end loop;
 
   foreach v_table in array array[
     'admin_audit_logs','payment_webhook_events','payout_provider_events',
-    'marketplace_capability_state_events','entiznet_handoff_events','refund_provider_events'
+    'marketplace_capability_state_events','entiznet_handoff_events','refund_provider_events',
+    'prohibited_product_rules'
   ] loop
     if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
@@ -205,19 +208,20 @@ begin
     'carts_one_active_per_buyer','idx_carts_buyer_updated','cart_items_cart_variant_key',
     'idx_cart_items_cart','idx_cart_items_variant','idx_cart_quotes_cart_created',
     'idx_cart_quotes_buyer_created','idx_cart_quotes_expiry',
-    'idx_categories_parent_id','idx_featured_products_product_id',
+    'idx_categories_parent_id','idx_categories_active_parent_sort','idx_brands_active_name',
+    'idx_featured_products_product_id',
     'idx_inventory_reservations_payment_session_id','idx_inventory_reservations_product_id',
     'idx_messages_order_id','idx_order_items_variant_id',
     'idx_payment_webhook_events_payment_session_id','idx_product_categories_category_id',
     'idx_product_media_product_id','idx_product_media_variant_id','idx_product_variants_product_id',
     'idx_products_brand_id','idx_products_moderation_status','idx_product_moderation_events_product_created',
-    'profiles_seller_store_slug_key','idx_reviews_buyer_id','idx_payout_requests_seller_created',
-    'idx_payout_requests_status','idx_payout_requests_provider_reference','idx_payout_items_request',
-    'idx_payout_items_escrow','idx_payout_items_active_escrow','idx_payout_provider_events_request',
-    'idx_profiles_business_verification_status','idx_kyc_documents_seller_status',
-    'idx_kyc_requests_seller_status','idx_message_attachments_message_id',
-    'idx_marketplace_capability_states_status',
-    'idx_marketplace_capability_state_events_user_created',
+    'profiles_seller_store_slug_key','idx_reviews_buyer_id','reviews_one_per_order_product_buyer',
+    'idx_reviews_status_created','idx_reviews_product_status_created','idx_reviews_order_id','idx_reviews_moderated_by',
+    'idx_payout_requests_seller_created','idx_payout_requests_status','idx_payout_requests_provider_reference',
+    'idx_payout_items_request','idx_payout_items_escrow','idx_payout_items_active_escrow',
+    'idx_payout_provider_events_request','idx_profiles_business_verification_status',
+    'idx_kyc_documents_seller_status','idx_kyc_requests_seller_status','idx_message_attachments_message_id',
+    'idx_marketplace_capability_states_status','idx_marketplace_capability_state_events_user_created',
     'idx_marketplace_capability_state_events_capability_created',
     'idx_entiznet_identity_links_status','idx_entiznet_handoff_events_entiznet_created',
     'idx_entiznet_handoff_events_store_created','idx_entiznet_handoff_events_status_expiry',
@@ -226,7 +230,10 @@ begin
     'idx_order_dispute_events_dispute_created','refund_requests_one_active_per_order',
     'idx_refund_requests_provider_reference','idx_refund_requests_status_created',
     'idx_refund_requests_order_created','idx_refund_requests_buyer_created',
-    'idx_refund_provider_events_request','idx_escrow_transactions_dispute_id'
+    'idx_refund_provider_events_request','idx_escrow_transactions_dispute_id',
+    'marketplace_reports_one_active_per_reporter_subject','idx_marketplace_reports_status_priority_created',
+    'idx_marketplace_reports_subject_created','idx_marketplace_reports_reporter_created',
+    'idx_marketplace_reports_assigned_admin','idx_prohibited_product_rules_active_severity'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -260,7 +267,9 @@ begin
     'public.mark_conversation_read(uuid)',
     'public.transition_seller_order(uuid,text,text,text)',
     'public.open_order_dispute(uuid,text,text)',
-    'public.buyer_request_order_refund(uuid,bigint,text,uuid)'
+    'public.buyer_request_order_refund(uuid,bigint,text,uuid)',
+    'public.buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
+    'public.submit_marketplace_report(text,uuid,text,text)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or not has_function_privilege('authenticated', v_fn, 'EXECUTE') then
@@ -290,7 +299,15 @@ begin
     'public.attach_refund_provider_reference(uuid,text,text)',
     'public.finalize_refund_v1(text,text,uuid,text,text,text,text,text)',
     'public.admin_search_order_disputes(uuid,text,text,text,integer,integer)',
-    'public.admin_search_refund_requests(uuid,text,text,integer,integer)'
+    'public.admin_search_refund_requests(uuid,text,text,integer,integer)',
+    'public.admin_save_category(uuid,uuid,text,text,text,uuid,boolean,boolean,integer)',
+    'public.admin_delete_category(uuid,uuid)',
+    'public.admin_save_brand(uuid,uuid,text,text,text,text,text,text,boolean,boolean)',
+    'public.admin_delete_brand(uuid,uuid)',
+    'public.admin_moderate_review(uuid,uuid,text,text)',
+    'public.admin_transition_marketplace_report(uuid,uuid,text,text,text,jsonb)',
+    'public.admin_save_prohibited_product_rule(uuid,uuid,text,text,text,text,text,boolean)',
+    'public.admin_enforce_prohibited_product(uuid,uuid,uuid,text,text,uuid)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE')
@@ -304,6 +321,8 @@ begin
     'public.guard_buyer_capability_for_cart_mutation()',
     'public.guard_capabilities_for_cart_item_mutation()',
     'public.guard_buyer_capability_for_checkout_insert()',
+    'public.guard_active_product_category()',
+    'public.guard_active_product_brand()',
     'public.touch_conversation_after_message()'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
@@ -362,10 +381,12 @@ begin
       'seller_set_product_publication','seller_delete_product',
       'buyer_save_address','buyer_delete_address','buyer_get_or_create_cart',
       'buyer_set_cart_item','buyer_remove_cart_item','buyer_clear_cart',
+      'buyer_submit_review','submit_marketplace_report',
       'marketplace_capability_is_active','upsert_entiznet_identity_link',
       'revoke_entiznet_identity_link','register_entiznet_handoff','complete_entiznet_handoff',
       'guard_seller_capability_for_product_mutation','guard_buyer_capability_for_cart_mutation',
       'guard_capabilities_for_cart_item_mutation','guard_buyer_capability_for_checkout_insert',
+      'guard_active_product_category','guard_active_product_brand',
       'open_order_dispute','buyer_request_order_refund','attach_refund_provider_reference','finalize_refund_v1'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
@@ -387,7 +408,10 @@ begin
       'admin_review_product','admin_set_marketplace_capability_state',
       'admin_search_marketplace_accounts','admin_get_marketplace_account',
       'admin_transition_order_dispute','admin_review_refund_request',
-      'admin_search_order_disputes','admin_search_refund_requests','admin_get_marketplace_order'
+      'admin_search_order_disputes','admin_search_refund_requests','admin_get_marketplace_order',
+      'admin_save_category','admin_delete_category','admin_save_brand','admin_delete_brand',
+      'admin_moderate_review','admin_transition_marketplace_report',
+      'admin_save_prohibited_product_rule','admin_enforce_prohibited_product'
     )
     and not ('search_path=pg_catalog, public, auth' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then raise exception '% privileged Admin operations lack hardened search_path', v_bad; end if;
