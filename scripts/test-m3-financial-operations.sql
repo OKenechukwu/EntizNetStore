@@ -86,10 +86,14 @@ begin
 end
 $$;
 
-select public.admin_get_financial_operations_summary('fa000000-0000-0000-0000-000000000001') as summary \gset
+select set_config(
+  'm3finance.summary',
+  public.admin_get_financial_operations_summary('fa000000-0000-0000-0000-000000000001')::text,
+  false
+);
 
 do $$
-declare v jsonb := :'summary'::jsonb;
+declare v jsonb := current_setting('m3finance.summary')::jsonb;
 begin
   if (v->>'grossSalesCents')::bigint <> 10000
      or (v->>'customerRefundedCents')::bigint <> 2000
@@ -111,19 +115,24 @@ select * from public.admin_create_seller_payout(
   'ff200000-0000-0000-0000-000000000008',
   now()-interval '7 days'
 ) \gset
+select set_config('m3finance.payout_request_id', :'payout_request_id', false);
+select set_config('m3finance.amount_cents', :'amount_cents', false);
+select set_config('m3finance.payout_status', :'payout_status', false);
 
 do $$
 declare
+  v_payout_request_id uuid := current_setting('m3finance.payout_request_id')::uuid;
   v_items integer;
   v_audit integer;
 begin
-  if :'amount_cents'::bigint <> 7200 or :'payout_status' <> 'pending' then
+  if current_setting('m3finance.amount_cents')::bigint <> 7200
+     or current_setting('m3finance.payout_status') <> 'pending' then
     raise exception 'Admin payout preparation returned wrong amount/status';
   end if;
   select count(*) into v_items from public.payout_items
-  where payout_request_id=:'payout_request_id'::uuid and status='reserved';
+  where payout_request_id=v_payout_request_id and status='reserved';
   select count(*) into v_audit from public.admin_audit_logs
-  where action='seller_payout_prepared' and target_id=:'payout_request_id';
+  where action='seller_payout_prepared' and target_id=v_payout_request_id::text;
   if v_items<>1 or v_audit<>1 then raise exception 'Admin payout reservation/audit failed'; end if;
 end
 $$;
@@ -146,6 +155,7 @@ $$;
 -- Payout and escrow queues expose the same canonical claim relationship.
 do $$
 declare
+  v_payout_request_id uuid := current_setting('m3finance.payout_request_id')::uuid;
   v_payouts integer;
   v_escrow integer;
 begin
@@ -154,7 +164,7 @@ begin
   );
   select count(*) into v_escrow from public.admin_search_escrow_transactions(
     'fa000000-0000-0000-0000-000000000001','ENS-FINANCE-001','held',50,0
-  ) where payout_request_id=:'payout_request_id'::uuid;
+  ) where payout_request_id=v_payout_request_id;
   if v_payouts<>1 or v_escrow<>1 then raise exception 'Payout/escrow Admin read model failed'; end if;
 end
 $$;
@@ -162,22 +172,23 @@ $$;
 -- Cancellation releases the claim but never releases Seller escrow itself.
 select public.admin_cancel_seller_payout(
   'fa000000-0000-0000-0000-000000000001',
-  :'payout_request_id'::uuid,
+  current_setting('m3finance.payout_request_id')::uuid,
   'Finance regression cancellation'
 );
 
 do $$
 declare
+  v_payout_request_id uuid := current_setting('m3finance.payout_request_id')::uuid;
   v_status text;
   v_item_status text;
   v_escrow_status text;
   v_audit integer;
 begin
-  select status into v_status from public.payout_requests where id=:'payout_request_id'::uuid;
-  select status into v_item_status from public.payout_items where payout_request_id=:'payout_request_id'::uuid;
+  select status into v_status from public.payout_requests where id=v_payout_request_id;
+  select status into v_item_status from public.payout_items where payout_request_id=v_payout_request_id;
   select status into v_escrow_status from public.escrow_transactions where id='fe000000-0000-0000-0000-000000000005';
   select count(*) into v_audit from public.admin_audit_logs
-  where action='seller_payout_cancelled' and target_id=:'payout_request_id';
+  where action='seller_payout_cancelled' and target_id=v_payout_request_id::text;
   if v_status<>'cancelled' or v_item_status<>'released' or v_escrow_status<>'held' or v_audit<>1 then
     raise exception 'Payout cancellation state/audit failed: %, %, %, %',v_status,v_item_status,v_escrow_status,v_audit;
   end if;
