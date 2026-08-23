@@ -1,11 +1,10 @@
 \set ON_ERROR_STOP on
 
 -- EntizNetStore canonical fresh-environment assertions.
--- This file verifies the cross-milestone database contract after every
--- repository migration + seed has been replayed on a clean Supabase stack.
+-- Replayed after every repository migration + seed on a clean Supabase stack.
 
 -- ---------------------------------------------------------------------------
--- Canonical public schema / RLS / seed baseline
+-- Exact public schema, RLS and seed baseline
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -18,17 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-
-  if v_public_tables <> 39 then
-    raise exception 'Expected 39 public tables, found %', v_public_tables;
+  if v_public_tables <> 43 then
+    raise exception 'Expected 43 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-
-  if v_rls_tables <> 39 then
-    raise exception 'Expected RLS on all 39 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 43 then
+    raise exception 'Expected RLS on all 43 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -37,12 +34,10 @@ begin
     and c.relkind = 'r'
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-
-  -- M3 gives addresses, capability-state rows and identity links scoped owner
-  -- reads. Immutable capability events and handoff replay/audit rows are added
-  -- as trusted-server-only tables, so the deny-by-default total becomes 10.
-  if v_no_policy_tables <> 10 then
-    raise exception 'Expected 10 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- M3 adds immutable capability/handoff/refund-provider ledgers that remain
+  -- trusted-worker-only while participant-facing dispute/refund rows use RLS.
+  if v_no_policy_tables <> 11 then
+    raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -60,12 +55,14 @@ with expected(name) as (
     ('entiznet_identity_links'), ('escrow_transactions'), ('featured_products'),
     ('inventory_reservations'), ('kyc_documents'), ('kyc_verification_requests'),
     ('marketplace_capability_state_events'), ('marketplace_capability_states'),
-    ('message_attachments'), ('messages'), ('notifications'), ('order_items'),
-    ('orders'), ('payment_sessions'), ('payment_webhook_events'), ('payout_items'),
+    ('message_attachments'), ('messages'), ('notifications'),
+    ('order_dispute_events'), ('order_disputes'), ('order_items'), ('orders'),
+    ('payment_sessions'), ('payment_webhook_events'), ('payout_items'),
     ('payout_provider_events'), ('payout_requests'), ('product_categories'),
     ('product_media'), ('product_moderation_events'), ('product_variants'),
     ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
-    ('profiles_seller_private'), ('reviews')
+    ('profiles_seller_private'), ('refund_provider_events'), ('refund_requests'),
+    ('reviews')
 ), actual(name) as (
   select c.relname::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -83,7 +80,7 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical baseline';
+    raise exception 'Public table set differs from canonical 43-table M3 baseline';
   end if;
 end
 $$;
@@ -128,7 +125,7 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- Table grants: browser roles read scoped state but do not mutate trusted state
+-- Browser/trusted-worker table privilege contracts
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -136,10 +133,11 @@ declare
 begin
   foreach v_table in array array[
     'payment_sessions','inventory_reservations','orders','order_items',
-    'escrow_transactions','payout_requests','payout_items'
+    'escrow_transactions','payout_requests','payout_items',
+    'order_disputes','order_dispute_events','refund_requests'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
-      raise exception 'authenticated missing SELECT on %', v_table;
+      raise exception 'authenticated missing scoped SELECT on %', v_table;
     end if;
     if has_table_privilege('authenticated', format('public.%I', v_table), 'INSERT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'UPDATE')
@@ -182,7 +180,7 @@ begin
 
   foreach v_table in array array[
     'admin_audit_logs','payment_webhook_events','payout_provider_events',
-    'marketplace_capability_state_events','entiznet_handoff_events'
+    'marketplace_capability_state_events','entiznet_handoff_events','refund_provider_events'
   ] loop
     if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
@@ -196,7 +194,7 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- Supporting indexes
+-- Supporting index contracts
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -222,7 +220,13 @@ begin
     'idx_marketplace_capability_state_events_user_created',
     'idx_marketplace_capability_state_events_capability_created',
     'idx_entiznet_identity_links_status','idx_entiznet_handoff_events_entiznet_created',
-    'idx_entiznet_handoff_events_store_created','idx_entiznet_handoff_events_status_expiry'
+    'idx_entiznet_handoff_events_store_created','idx_entiznet_handoff_events_status_expiry',
+    'order_disputes_one_nonclosed_per_order','idx_order_disputes_status_created',
+    'idx_order_disputes_order_created','idx_order_disputes_raised_by_created',
+    'idx_order_dispute_events_dispute_created','refund_requests_one_active_per_order',
+    'idx_refund_requests_provider_reference','idx_refund_requests_status_created',
+    'idx_refund_requests_order_created','idx_refund_requests_buyer_created',
+    'idx_refund_provider_events_request','idx_escrow_transactions_dispute_id'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -238,7 +242,6 @@ do $$
 declare
   v_fn text;
 begin
-  -- M3 closes the arbitrary browser item/address checkout path.
   if has_function_privilege('anon','public.create_checkout_session(jsonb,jsonb,uuid)','EXECUTE')
      or has_function_privilege('authenticated','public.create_checkout_session(jsonb,jsonb,uuid)','EXECUTE') then
     raise exception 'Legacy create_checkout_session must be trusted-worker-only';
@@ -246,7 +249,6 @@ begin
   if not has_function_privilege('service_role','public.create_checkout_session(jsonb,jsonb,uuid)','EXECUTE') then
     raise exception 'service_role must retain legacy checkout compatibility execution';
   end if;
-
   if has_function_privilege('anon','public.create_checkout_session_v2(uuid,uuid,uuid)','EXECUTE')
      or not has_function_privilege('authenticated','public.create_checkout_session_v2(uuid,uuid,uuid)','EXECUTE') then
     raise exception 'M3 create_checkout_session_v2 execution boundary is incorrect';
@@ -256,7 +258,9 @@ begin
     'public.attach_checkout_payment_intent(uuid,text)',
     'public.cancel_checkout_session(uuid)',
     'public.mark_conversation_read(uuid)',
-    'public.transition_seller_order(uuid,text,text,text)'
+    'public.transition_seller_order(uuid,text,text,text)',
+    'public.open_order_dispute(uuid,text,text)',
+    'public.buyer_request_order_refund(uuid,bigint,text,uuid)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or not has_function_privilege('authenticated', v_fn, 'EXECUTE') then
@@ -280,7 +284,13 @@ begin
     'public.register_entiznet_handoff(text,uuid,text,text,text,text[],timestamp with time zone,timestamp with time zone,jsonb)',
     'public.complete_entiznet_handoff(uuid,uuid,text,text)',
     'public.admin_search_marketplace_accounts(uuid,text,text,text,integer,integer)',
-    'public.admin_get_marketplace_account(uuid,uuid)'
+    'public.admin_get_marketplace_account(uuid,uuid)',
+    'public.admin_transition_order_dispute(uuid,uuid,text,text)',
+    'public.admin_review_refund_request(uuid,uuid,text,text)',
+    'public.attach_refund_provider_reference(uuid,text,text)',
+    'public.finalize_refund_v1(text,text,uuid,text,text,text,text,text)',
+    'public.admin_search_order_disputes(uuid,text,text,text,integer,integer)',
+    'public.admin_search_refund_requests(uuid,text,text,integer,integer)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE')
@@ -289,26 +299,22 @@ begin
     end if;
   end loop;
 
-  if has_function_privilege('anon','public.touch_conversation_after_message()','EXECUTE')
-     or has_function_privilege('authenticated','public.touch_conversation_after_message()','EXECUTE') then
-    raise exception 'Trigger helper must not be API-user executable';
-  end if;
-
   foreach v_fn in array array[
     'public.guard_seller_capability_for_product_mutation()',
     'public.guard_buyer_capability_for_cart_mutation()',
     'public.guard_capabilities_for_cart_item_mutation()',
-    'public.guard_buyer_capability_for_checkout_insert()'
+    'public.guard_buyer_capability_for_checkout_insert()',
+    'public.touch_conversation_after_message()'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE') then
-      raise exception 'Capability trigger helper leaked browser execution: %', v_fn;
+      raise exception 'Trigger helper leaked browser execution: %', v_fn;
     end if;
   end loop;
 
   if not has_function_privilege('anon','public.marketplace_capability_is_active(uuid,text)','EXECUTE')
      or not has_function_privilege('authenticated','public.marketplace_capability_is_active(uuid,text)','EXECUTE') then
-    raise exception 'Capability-state predicate must remain executable for RLS/browser-safe state checks';
+    raise exception 'Capability-state predicate must remain browser-safe executable';
   end if;
 
   if has_function_privilege('authenticated','public.seller_save_product(uuid,text,text,numeric,numeric,text,uuid[],text[],integer)','EXECUTE')
@@ -359,11 +365,12 @@ begin
       'marketplace_capability_is_active','upsert_entiznet_identity_link',
       'revoke_entiznet_identity_link','register_entiznet_handoff','complete_entiznet_handoff',
       'guard_seller_capability_for_product_mutation','guard_buyer_capability_for_cart_mutation',
-      'guard_capabilities_for_cart_item_mutation','guard_buyer_capability_for_checkout_insert'
+      'guard_capabilities_for_cart_item_mutation','guard_buyer_capability_for_checkout_insert',
+      'open_order_dispute','buyer_request_order_refund','attach_refund_provider_reference','finalize_refund_v1'
     )
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then
-    raise exception '% privileged marketplace/integration functions lack hardened search_path', v_bad;
+    raise exception '% privileged marketplace/integration functions lack hardened pg_catalog,public search_path', v_bad;
   end if;
 
   select count(*) into v_bad
@@ -378,7 +385,9 @@ begin
   where n.nspname = 'public'
     and p.proname in (
       'admin_review_product','admin_set_marketplace_capability_state',
-      'admin_search_marketplace_accounts','admin_get_marketplace_account'
+      'admin_search_marketplace_accounts','admin_get_marketplace_account',
+      'admin_transition_order_dispute','admin_review_refund_request',
+      'admin_search_order_disputes','admin_search_refund_requests','admin_get_marketplace_order'
     )
     and not ('search_path=pg_catalog, public, auth' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then raise exception '% privileged Admin operations lack hardened search_path', v_bad; end if;
