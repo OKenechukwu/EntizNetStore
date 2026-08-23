@@ -99,6 +99,9 @@ jobs:
       - name: Run M3 refund and dispute regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-refund-dispute-operations.sql
 
+      - name: Run M3 financial operations regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-financial-operations.sql
+
       - name: Run P0 commerce and authorization regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
