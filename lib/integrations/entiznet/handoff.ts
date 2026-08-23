@@ -115,7 +115,7 @@ export function verifyEntizNetHandoff(assertion: string): EntizNetHandoffClaims 
     email: (claims.email as string).trim().toLowerCase(),
     emailVerified: true,
     displayName: (claims.displayName as string).trim(),
-    capabilities: [...new Set(claims.capabilities as string[])].sort(),
+    capabilities: Array.from(new Set(claims.capabilities as string[])).sort(),
     capabilitiesVersion: claims.capabilitiesVersion as string,
     returnPath: claims.returnPath as string,
     jti: claims.jti as string,
