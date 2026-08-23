@@ -1,201 +1,115 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/auth/requireAdmin'
-import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+
+export const dynamic = "force-dynamic";
+
+const categorySchema = z.object({
+  id: z.string().uuid().nullable().optional(),
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().max(160).nullable().optional(),
+  description: z.string().trim().max(4000).nullable().optional(),
+  parentId: z.string().uuid().nullable().optional(),
+  isAdult: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  sortOrder: z.coerce.number().int().min(0).max(100000).default(0),
+});
+
+function rpcErrorResponse(error: { code?: string; message?: string }, fallback: string) {
+  if (error.code === "23505" || error.code === "23503") {
+    return NextResponse.json({ error: error.message || fallback }, { status: 409 });
+  }
+  if (error.code === "22023") {
+    return NextResponse.json({ error: error.message || fallback }, { status: 400 });
+  }
+  console.error(fallback, error);
+  return NextResponse.json({ error: fallback }, { status: 500 });
+}
 
 export async function GET() {
-  try {
-    const { errorResponse } = await requireAdmin()
-    if (errorResponse) return errorResponse
+  const { user, errorResponse } = await requireAdmin();
+  if (errorResponse || !user) return errorResponse;
 
-    const { data, error } = await getSupabaseAdmin()
-      .from('categories')
-      .select('*')
-      .order('sort_order')
+  const { data, error } = await getSupabaseAdmin()
+    .from("categories")
+    .select("id,parent_id,name,slug,description,image_url,is_adult,sort_order,is_active,created_at,updated_at")
+    .order("sort_order")
+    .order("name");
 
-    if (error) throw error
-    return NextResponse.json({ categories: data || [] })
-  } catch (error: any) {
-    console.error('Error fetching categories:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch categories' },
-      { status: 500 }
-    )
+  if (error) {
+    console.error("Unable to load categories", error);
+    return NextResponse.json({ error: "Unable to load categories" }, { status: 500 });
   }
+
+  return NextResponse.json({ categories: data ?? [] });
+}
+
+async function saveCategory(request: NextRequest) {
+  const { user, errorResponse } = await requireAdmin();
+  if (errorResponse || !user) return errorResponse;
+
+  const body = await request.json().catch(() => null);
+  const parsed = categorySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid category payload", details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const input = parsed.data;
+  const admin = getSupabaseAdmin();
+  const { data: categoryId, error } = await admin.rpc("admin_save_category", {
+    p_admin_id: user.id,
+    p_category_id: input.id ?? null,
+    p_name: input.name,
+    p_slug: input.slug ?? null,
+    p_description: input.description ?? null,
+    p_parent_id: input.parentId ?? null,
+    p_is_adult: input.isAdult,
+    p_is_active: input.isActive,
+    p_sort_order: input.sortOrder,
+  });
+
+  if (error || !categoryId) {
+    return rpcErrorResponse(error ?? { message: "Category was not saved" }, "Unable to save category");
+  }
+
+  const { data: category, error: readError } = await admin
+    .from("categories")
+    .select("id,parent_id,name,slug,description,image_url,is_adult,sort_order,is_active,created_at,updated_at")
+    .eq("id", categoryId)
+    .single();
+
+  if (readError) {
+    console.error("Category saved but could not be reloaded", readError);
+    return NextResponse.json({ id: categoryId }, { status: input.id ? 200 : 201 });
+  }
+
+  return NextResponse.json({ category }, { status: input.id ? 200 : 201 });
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const { errorResponse } = await requireAdmin()
-    if (errorResponse) return errorResponse
-
-    const body = await request.json()
-    const { name, slug, description, parent_id, is_active, sort_order } = body
-
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'Category name is required' }, { status: 400 })
-    }
-
-    const finalSlug = String(slug || name)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    if (!finalSlug) {
-      return NextResponse.json({ error: 'Category slug is invalid' }, { status: 400 })
-    }
-
-    const admin = getSupabaseAdmin()
-    const { data: existingCategory } = await admin
-      .from('categories')
-      .select('id')
-      .eq('slug', finalSlug)
-      .maybeSingle()
-
-    if (existingCategory) {
-      return NextResponse.json(
-        { error: 'A category with this slug already exists' },
-        { status: 409 }
-      )
-    }
-
-    const { data, error } = await admin
-      .from('categories')
-      .insert({
-        name: name.trim(),
-        slug: finalSlug,
-        description: description || null,
-        parent_id: parent_id || null,
-        is_adult: true,
-        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
-        is_active: is_active ?? true,
-        metadata: {}
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return NextResponse.json({ category: data }, { status: 201 })
-  } catch (error: any) {
-    console.error('Error creating category:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to create category' },
-      { status: 500 }
-    )
-  }
+  return saveCategory(request);
 }
 
 export async function PUT(request: NextRequest) {
-  try {
-    const { errorResponse } = await requireAdmin()
-    if (errorResponse) return errorResponse
-
-    const body = await request.json()
-    const { id, name, slug, description, parent_id, is_active, sort_order } = body
-
-    if (!id || !name || typeof name !== 'string') {
-      return NextResponse.json(
-        { error: 'Category ID and name are required' },
-        { status: 400 }
-      )
-    }
-
-    const finalSlug = String(slug || name)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    if (!finalSlug) {
-      return NextResponse.json({ error: 'Category slug is invalid' }, { status: 400 })
-    }
-
-    const admin = getSupabaseAdmin()
-    const { data: existingCategory } = await admin
-      .from('categories')
-      .select('id')
-      .eq('slug', finalSlug)
-      .neq('id', id)
-      .maybeSingle()
-
-    if (existingCategory) {
-      return NextResponse.json(
-        { error: 'A category with this slug already exists' },
-        { status: 409 }
-      )
-    }
-
-    const { data, error } = await admin
-      .from('categories')
-      .update({
-        name: name.trim(),
-        slug: finalSlug,
-        description: description || null,
-        parent_id: parent_id || null,
-        sort_order: Number.isInteger(sort_order) ? sort_order : 0,
-        is_active: is_active ?? true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return NextResponse.json({ category: data })
-  } catch (error: any) {
-    console.error('Error updating category:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update category' },
-      { status: 500 }
-    )
-  }
+  return saveCategory(request);
 }
 
 export async function DELETE(request: NextRequest) {
-  try {
-    const { errorResponse } = await requireAdmin()
-    if (errorResponse) return errorResponse
+  const { user, errorResponse } = await requireAdmin();
+  if (errorResponse || !user) return errorResponse;
 
-    const categoryId = new URL(request.url).searchParams.get('id')
-    if (!categoryId) {
-      return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
-    }
-
-    const admin = getSupabaseAdmin()
-    const [{ count: productCount }, { count: subcategoryCount }] = await Promise.all([
-      admin
-        .from('product_categories')
-        .select('*', { count: 'exact', head: true })
-        .eq('category_id', categoryId),
-      admin
-        .from('categories')
-        .select('*', { count: 'exact', head: true })
-        .eq('parent_id', categoryId)
-    ])
-
-    if ((productCount || 0) > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete category that has associated products' },
-        { status: 409 }
-      )
-    }
-
-    if ((subcategoryCount || 0) > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete category that has subcategories' },
-        { status: 409 }
-      )
-    }
-
-    const { error } = await admin.from('categories').delete().eq('id', categoryId)
-    if (error) throw error
-
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('Error deleting category:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete category' },
-      { status: 500 }
-    )
+  const categoryId = new URL(request.url).searchParams.get("id");
+  const parsed = z.string().uuid().safeParse(categoryId);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Valid category ID is required" }, { status: 400 });
   }
+
+  const { error } = await getSupabaseAdmin().rpc("admin_delete_category", {
+    p_admin_id: user.id,
+    p_category_id: parsed.data,
+  });
+
+  if (error) return rpcErrorResponse(error, "Unable to delete category");
+  return NextResponse.json({ success: true });
 }
