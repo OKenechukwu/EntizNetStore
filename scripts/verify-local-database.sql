@@ -34,10 +34,11 @@ begin
     and c.relkind = 'r'
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-  -- Reviews now have scoped policies while prohibited-product rules are
-  -- intentionally trusted-worker-only, so the deny-by-default count stays 11.
-  if v_no_policy_tables <> 11 then
-    raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- Reviews, content pages and notifications now have scoped policies while
+  -- prohibited-product rules remain trusted-worker-only. Nine operational
+  -- tables intentionally remain deny-by-default.
+  if v_no_policy_tables <> 9 then
+    raise exception 'Expected 9 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -155,7 +156,8 @@ begin
   foreach v_table in array array[
     'kyc_documents','kyc_verification_requests','message_attachments',
     'product_moderation_events','addresses','carts','cart_items','cart_quotes',
-    'marketplace_capability_states','entiznet_identity_links','marketplace_reports'
+    'marketplace_capability_states','entiznet_identity_links','marketplace_reports',
+    'content_pages','notifications'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
       raise exception 'authenticated missing scoped SELECT on %', v_table;
@@ -179,6 +181,13 @@ begin
       raise exception 'Catalogue/trust table must remain RPC-mutation-only: %', v_table;
     end if;
   end loop;
+
+  if not has_table_privilege('anon','public.content_pages','SELECT') then
+    raise exception 'anon must be able to read RLS-scoped active content pages';
+  end if;
+  if has_table_privilege('anon','public.notifications','SELECT') then
+    raise exception 'anon must not read notifications';
+  end if;
 
   foreach v_table in array array[
     'admin_audit_logs','payment_webhook_events','payout_provider_events',
@@ -209,6 +218,7 @@ begin
     'idx_cart_items_cart','idx_cart_items_variant','idx_cart_quotes_cart_created',
     'idx_cart_quotes_buyer_created','idx_cart_quotes_expiry',
     'idx_categories_parent_id','idx_categories_active_parent_sort','idx_brands_active_name',
+    'idx_content_pages_brand_active_key','idx_notifications_user_unread_created',
     'idx_featured_products_product_id',
     'idx_inventory_reservations_payment_session_id','idx_inventory_reservations_product_id',
     'idx_messages_order_id','idx_order_items_variant_id',
@@ -269,7 +279,9 @@ begin
     'public.open_order_dispute(uuid,text,text)',
     'public.buyer_request_order_refund(uuid,bigint,text,uuid)',
     'public.buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
-    'public.submit_marketplace_report(text,uuid,text,text)'
+    'public.submit_marketplace_report(text,uuid,text,text)',
+    'public.mark_notification_read(uuid)',
+    'public.mark_all_notifications_read()'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or not has_function_privilege('authenticated', v_fn, 'EXECUTE') then
@@ -307,7 +319,9 @@ begin
     'public.admin_moderate_review(uuid,uuid,text,text)',
     'public.admin_transition_marketplace_report(uuid,uuid,text,text,text,jsonb)',
     'public.admin_save_prohibited_product_rule(uuid,uuid,text,text,text,text,text,boolean)',
-    'public.admin_enforce_prohibited_product(uuid,uuid,uuid,text,text,uuid)'
+    'public.admin_enforce_prohibited_product(uuid,uuid,uuid,text,text,uuid)',
+    'public.admin_save_content_page(uuid,uuid,text,text,text,jsonb,boolean)',
+    'public.admin_send_notification(uuid,uuid,text,text,text,text,jsonb)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE')
@@ -381,7 +395,7 @@ begin
       'seller_set_product_publication','seller_delete_product',
       'buyer_save_address','buyer_delete_address','buyer_get_or_create_cart',
       'buyer_set_cart_item','buyer_remove_cart_item','buyer_clear_cart',
-      'buyer_submit_review','submit_marketplace_report',
+      'buyer_submit_review','submit_marketplace_report','mark_notification_read','mark_all_notifications_read',
       'marketplace_capability_is_active','upsert_entiznet_identity_link',
       'revoke_entiznet_identity_link','register_entiznet_handoff','complete_entiznet_handoff',
       'guard_seller_capability_for_product_mutation','guard_buyer_capability_for_cart_mutation',
@@ -411,7 +425,8 @@ begin
       'admin_search_order_disputes','admin_search_refund_requests','admin_get_marketplace_order',
       'admin_save_category','admin_delete_category','admin_save_brand','admin_delete_brand',
       'admin_moderate_review','admin_transition_marketplace_report',
-      'admin_save_prohibited_product_rule','admin_enforce_prohibited_product'
+      'admin_save_prohibited_product_rule','admin_enforce_prohibited_product',
+      'admin_save_content_page','admin_send_notification'
     )
     and not ('search_path=pg_catalog, public, auth' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then raise exception '% privileged Admin operations lack hardened search_path', v_bad; end if;
