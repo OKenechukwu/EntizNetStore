@@ -46,6 +46,11 @@ const operations = [
     title: "Product Moderation",
     description: "Approve or reject Seller catalogue submissions before publication.",
   },
+  {
+    href: "/admin/catalog",
+    title: "Catalogue Governance",
+    description: "Manage category hierarchy, explicit adult/general classification, and verified or retired brands through audited controls.",
+  },
 ] as const;
 
 export default async function AdminLandingPage() {
