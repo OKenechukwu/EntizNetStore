@@ -17,6 +17,11 @@ const operations = [
     description: "Search Buyers, Sellers and Businesses, inspect EntizNet links, and suspend or restore capabilities independently.",
   },
   {
+    href: "/admin/orders",
+    title: "Orders & Payments",
+    description: "Search global orders and inspect Buyer/Seller, payment, fulfillment, escrow, payout and audit state from one operational view.",
+  },
+  {
     href: "/admin/kyc",
     title: "KYC Review",
     description: "Review pending Seller verification requests and documents.",
