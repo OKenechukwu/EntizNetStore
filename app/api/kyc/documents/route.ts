@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { sanitizeInput } from '@/lib/security';
+import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
 
 const KYC_BUCKET = 'kyc-documents';
 const VALID_DOCUMENT_TYPES = [
@@ -77,12 +78,12 @@ function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null
   return null;
 }
 
-async function deleteRejectedUpload(filePath: string) {
-  try {
-    await getSupabaseAdmin().storage.from(KYC_BUCKET).remove([filePath]);
-  } catch (error) {
-    console.error('Failed to remove rejected KYC upload:', error);
-  }
+async function deleteRejectedUpload(filePath: string, ownerId: string, operation: string) {
+  await removeStorageObjectBestEffort(
+    getSupabaseAdmin().storage.from(KYC_BUCKET),
+    filePath,
+    { bucket: KYC_BUCKET, operation, ownerId },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -165,14 +166,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (blob.size <= 0 || blob.size > MAX_FILE_SIZE) {
-      await deleteRejectedUpload(filePath);
+      await deleteRejectedUpload(filePath, user.id, 'reject-oversized-kyc');
       return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 });
     }
 
     const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
     const inspected = inspectSignature(signature, blob.size);
     if (!inspected) {
-      await deleteRejectedUpload(filePath);
+      await deleteRejectedUpload(filePath, user.id, 'reject-invalid-kyc-signature');
       return NextResponse.json(
         { error: 'Unsupported KYC document. Upload a real PDF, JPEG, PNG, or WebP file.' },
         { status: 400 },
@@ -194,6 +195,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
+      await deleteRejectedUpload(filePath, user.id, 'rollback-kyc-registration');
       console.error('Error creating KYC document record:', insertError);
       return NextResponse.json({ error: 'Failed to save document record' }, { status: 500 });
     }
