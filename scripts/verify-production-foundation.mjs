@@ -134,18 +134,35 @@ for (const packageName of forbiddenPackages) {
 }
 
 // ---------------------------------------------------------------------------
-// Required production-foundation records.
+// Required production-foundation records and release safety controls.
 // ---------------------------------------------------------------------------
 for (const requiredPath of [
   ".env.example",
   "LAUNCH_BLOCKERS.md",
+  "app/api/health/route.ts",
   "docs/architecture/ADR-0001-account-capabilities.md",
   "docs/operations/BACKUP_RECOVERY.md",
   "docs/operations/ENVIRONMENT_SECRETS.md",
   "docs/operations/PRODUCTION_BASELINE_2026-08-21.md",
+  "docs/operations/PRODUCTION_RELEASE.md",
+  "scripts/test-production-http-smoke.mjs",
   "supabase/seed.sql",
 ]) {
-  if (!exists(requiredPath)) fail(`Required M0 production-foundation file missing: ${requiredPath}`);
+  if (!exists(requiredPath)) fail(`Required production-foundation file missing: ${requiredPath}`);
+}
+
+if (!pkg.scripts?.["test:production-http-smoke"]) {
+  fail("package.json must expose test:production-http-smoke");
+}
+
+if (exists("next.config.js")) {
+  const nextConfig = read("next.config.js");
+  if (!nextConfig.includes("private, no-store, max-age=0")) {
+    fail("API responses must retain the production no-store header baseline");
+  }
+  if (!nextConfig.includes("if (!isProduction) scriptSources.push(\"'unsafe-eval'\")")) {
+    fail("Production CSP must keep unsafe-eval restricted to non-production builds");
+  }
 }
 
 if (failures.length > 0) {
