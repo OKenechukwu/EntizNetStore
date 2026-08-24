@@ -111,7 +111,7 @@ export function verifyEntizNetAdminAssertion(assertion: string): EntizNetAdminSe
     aud: claims.aud as string,
     sub: claims.sub as string,
     purpose: "admin-api",
-    scopes: [...new Set(claims.scopes as string[])].sort(),
+    scopes: Array.from(new Set(claims.scopes as string[])).sort(),
     jti: claims.jti as string,
     iat: claims.iat as number,
     nbf: claims.nbf as number,
