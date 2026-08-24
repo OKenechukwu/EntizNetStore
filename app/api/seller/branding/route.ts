@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
 import { validateUploadedFile } from '@/lib/storage/validatedUpload';
 
 const BUCKET = 'seller-branding';
@@ -61,7 +62,8 @@ export async function POST(request: NextRequest) {
   const selectedSlot = slot as Slot;
   const filePath = `${user.id}/${selectedSlot}/${randomUUID()}${validated.extension}`;
   const admin = getSupabaseAdmin();
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(filePath, validated.bytes, {
+  const storage = admin.storage.from(BUCKET);
+  const { error: uploadError } = await storage.upload(filePath, validated.bytes, {
     contentType: validated.mimeType,
     upsert: false,
     cacheControl: '3600',
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to upload branding image' }, { status: 500 });
   }
 
-  const publicUrl = admin.storage.from(BUCKET).getPublicUrl(filePath).data.publicUrl;
+  const publicUrl = storage.getPublicUrl(filePath).data.publicUrl;
   const column = selectedSlot === 'logo' ? 'logo_url' : 'banner_url';
   const previousUrl = selectedSlot === 'logo' ? seller.logo_url : seller.banner_url;
   const { error: updateError } = await admin
@@ -81,14 +83,22 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id);
 
   if (updateError) {
-    await admin.storage.from(BUCKET).remove([filePath]);
+    await removeStorageObjectBestEffort(
+      storage,
+      filePath,
+      { bucket: BUCKET, operation: 'rollback-branding-update', ownerId: user.id },
+    );
     console.error('Seller branding profile update failed:', updateError);
     return NextResponse.json({ error: 'Unable to save branding image' }, { status: 500 });
   }
 
   const oldPath = storagePathFromPublicUrl(previousUrl);
   if (oldPath?.startsWith(`${user.id}/`)) {
-    await admin.storage.from(BUCKET).remove([oldPath]);
+    await removeStorageObjectBestEffort(
+      storage,
+      oldPath,
+      { bucket: BUCKET, operation: 'replace-previous-branding', ownerId: user.id },
+    );
   }
 
   return NextResponse.json({ slot: selectedSlot, url: publicUrl });
