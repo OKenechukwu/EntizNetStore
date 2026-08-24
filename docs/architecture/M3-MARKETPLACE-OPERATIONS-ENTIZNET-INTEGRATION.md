@@ -1,7 +1,7 @@
 # M3 — Marketplace Operations, Admin & EntizNet Integration
 
 **Schedule:** September 5–14, 2026  
-**Status:** ACTIVE — canonical combined milestone  
+**Status:** ENGINEERING + PRODUCTION DATABASE VERIFIED; FINAL MERGE/WEB/DEPLOYED INTEGRATION VERIFICATION PENDING  
 **Note:** This combines the former M3 Marketplace Operations & Admin and M4 EntizNet Integration milestones. Some overlap with M2 is intentional.
 
 ## Objective
@@ -178,6 +178,24 @@ Dashboards prioritize actionable marketplace health:
 - every operational list/detail/action surface gets loading, empty, error and recovery states;
 - add database, HTTP authorization and cross-product integration regressions;
 - keep `LAUNCH_BLOCKERS.md` synchronized.
+
+## Verified release evidence — August 24, 2026
+
+The combined M3 engineering and production-database gates are verified.
+
+- EntizNetStore CI #333 / run `32680825079` passed on exact implementation head `1ea6918176f09e689588ead0d8bd71d978b48267`.
+- The run passed production foundation, TypeScript, production build, dependency audit, clean Supabase/PostgreSQL 17 replay, M2/M3 structural invariants, every M1/M2/M3 regression, P0 commerce/authorization, provider-neutral and terminal payment state, payout ledger and concurrent payout escrow claim.
+- All fourteen M3 forward migrations are live on Supabase project `kllwwurklumhawfsilpd`; migration 14 is recorded live as `20260824014924_m3_advisor_hardening`.
+- Final live state is 45 public tables / 45 RLS enabled / zero RLS-disabled tables.
+- Supabase's eleven post-rollout unindexed-FK findings were fixed by forward migration; the post-hardening performance advisor reports no unindexed foreign keys.
+- The generic public capability helper is no longer executable by anon/authenticated. Catalogue RLS uses the non-exposed `app_private.marketplace_capability_is_active` helper with pinned search path, while trusted server code retains the public helper through service role.
+- Six critical capability/catalogue triggers and all eleven advisor indexes are present live.
+- Production data remained preserved: 16 seeded categories and 6 brands; zero products, Sellers, Businesses, carts, orders, payments, escrow, payouts, refunds, disputes, reports, reviews, EntizNet links or handoff events.
+- Paired EntizNet PR #29 exact head `5558bf1220d57cf38627023e777c977e3f15c431` passed EntizNet CI #123 production build.
+
+Detailed release evidence is recorded in `docs/operations/M3_RELEASE_VERIFICATION.md`.
+
+The remaining M3 conditions are repository merge, deployed Store runtime verification, paired EntizNet merge/deployment, production handoff key/secret provisioning and a deployed cross-product handoff/revocation/return-path verification. These conditions are deliberately separate from the already verified database/engineering gate.
 
 ## Combined exit gate
 
