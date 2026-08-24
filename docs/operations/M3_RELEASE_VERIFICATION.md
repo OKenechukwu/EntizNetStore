@@ -1,142 +1,168 @@
 # M3 Release Verification — Marketplace Operations, Admin & EntizNet Integration
 
-**Status:** PRODUCTION DATABASE VERIFIED; FINAL WEB/INTEGRATION PROMOTION PENDING  
-**Verified:** 2026-08-24  
-**Store release head before this evidence commit:** `1ea6918176f09e689588ead0d8bd71d978b48267`
+**Status:** ENGINEERING + LIVE DATABASE + PRODUCTION DEPLOYMENTS VERIFIED; PRODUCTION SIGNING KEYS + REAL CROSS-PRODUCT E2E PENDING  
+**Verified:** 2026-08-24
 
 ## Scope
 
-This record captures the release evidence for the combined M3 milestone covering trusted marketplace operations, Admin control planes, and the EntizNet identity/capability handoff boundary.
+This record captures release evidence for M3 marketplace operations, Admin control planes and EntizNet integration, including the post-M3 hardening that removed direct EntizNet access to EntizNetStore Supabase privileged credentials.
 
-It does not by itself approve public launch. Durable backups, production processor/payout integration, observability, deployment capacity, native mobile, accessibility and other canonical launch blockers remain independent gates.
+This does not approve public launch. `LAUNCH_BLOCKERS.md` remains authoritative for backups, production processors/payouts, observability, deployment operations, integration E2E, mobile, accessibility and policy readiness.
 
-## CI release evidence
+## Original M3 CI evidence
 
-EntizNetStore CI #333, run `32680825079`, passed on exact code head `1ea6918176f09e689588ead0d8bd71d978b48267`.
+EntizNetStore CI #333, run `32680825079`, passed exact code head `1ea6918176f09e689588ead0d8bd71d978b48267`.
 
-The successful release stack included:
+The release stack covered production-foundation verification, TypeScript, production Next.js build, dependency audit, clean Supabase/PostgreSQL 17 replay, M2/M3 structural invariants, M1/M2/M3 regressions, P0 commerce/authorization, provider-neutral/terminal payment state, payout ledger and real concurrent payout escrow claiming.
 
-- production-foundation verification;
-- TypeScript type-check;
-- production Next.js build;
-- production dependency audit;
-- clean Supabase/PostgreSQL 17 startup;
-- replay of every repository migration and seed;
-- canonical database verifier;
-- M2 and M3 structural database invariants;
-- M1 identity/KYC/storage and BSM regressions;
-- M2 catalogue/moderation, inventory, approval and policy regressions;
-- M3 cart/order, identity, linked-EntizNet authority, catalogue governance, Trust & Safety, content/notification, refund/dispute and financial-operation regressions;
-- P0 commerce/authorization regressions;
-- provider-neutral and terminal payment-state regressions;
-- payout-ledger regression;
-- concurrent payout escrow-claim regression.
-
-CI #332 intentionally failed before this final run because an older verification assertion still expected the generic capability predicate to remain browser executable. Migration 14 had already made that public RPC unavailable by design. The canonical verifier was corrected to enforce the safer non-exposed helper contract, and the complete clean-database stack then passed in CI #333.
-
-## Production Supabase rollout
+## Original M3 production database rollout
 
 Canonical production project: `kllwwurklumhawfsilpd`.
 
-Fourteen forward M3 migrations are live. The Supabase management API recorded the following live migration versions:
+Fourteen forward M3 migrations were applied. Final M3 advisor hardening is recorded live as `20260824014924_m3_advisor_hardening`.
 
-1. `20260823152121` — `m3_persistent_cart_address_foundation`
-2. `20260823152244` — `m3_quote_checkout_v2`
-3. `20260823152354` — `m3_identity_operations_entiznet_foundation`
-4. `20260823152435` — `m3_capability_enforcement`
-5. `20260823152524` — `m3_admin_account_operations`
-6. `20260823152612` — `m3_admin_order_operations`
-7. `20260823152816` — `m3_refund_dispute_foundation`
-8. `20260823152946` — `m3_refund_dispute_admin_operations`
-9. `20260823153102` — `m3_financial_operations_admin_console`
-10. `20260823153236` — `m3_linked_entiznet_capability_authority`
-11. `20260823153344` — `m3_catalog_governance_admin_operations`
-12. `20260823153603` — `m3_trust_safety_operations`
-13. `20260823153652` — `m3_content_notification_operations`
-14. `20260824014924` — `m3_advisor_hardening`
+Postflight:
 
-The live management-generated versions intentionally differ from repository filename timestamps for some M1–M3 migrations. Applied migrations are immutable; this known release-engineering timestamp drift must be handled by the deployment/migration procedure rather than rewriting historical SQL.
+- public tables: 45;
+- RLS-enabled public tables: 45;
+- RLS-disabled public tables: 0;
+- all eleven reported M3 unindexed foreign keys fixed;
+- catalogue RLS uses the non-exposed `app_private.marketplace_capability_is_active` helper;
+- generic public capability helper is browser-denied and service-role available;
+- critical execute grants/search paths and capability/catalogue triggers verified;
+- production seeded data preserved.
 
-## Final production database postflight
+Repository filename timestamps and Supabase management-recorded timestamps can differ for applied migrations. Applied SQL remains immutable; release procedure must reconcile by migration identity/content rather than rewriting history.
 
-After migration 14:
+## Original M3 web rollout
 
-- public tables: **45**;
-- RLS-enabled public tables: **45**;
-- RLS-disabled public tables: **0**;
-- all 11 M3 advisor FK indexes: present;
-- all six critical capability/catalogue enforcement triggers: present;
-- legacy arbitrary checkout: anon denied, authenticated denied, service role allowed;
-- checkout v2: anon denied, authenticated allowed;
-- `public.marketplace_capability_is_active(uuid,text)`: anon denied, authenticated denied, service role allowed;
-- `app_private.marketplace_capability_is_active(uuid,text)`: present with pinned `search_path=pg_catalog, public` and available for RLS evaluation;
-- anonymous product catalogue policy: confirmed to call the non-exposed `app_private` helper.
+- Store main M3 merge: `6a3220ddbc97d81cd30ab805ae20d75bf3e42f98`.
+- Store production deployment: `dpl_38NY6erWQAwmn3zN6ckZWxN46zfZ`, READY.
+- Paired EntizNet issuer engineering was delivered through PR #29 and the canonical handoff contract.
 
-Production data remained preserved across the rollout:
+## Post-M3 Admin integration hardening
 
-- categories: 16;
-- brands: 6;
-- products: 0;
-- Sellers: 0;
-- Businesses: 0;
-- carts: 0;
-- orders: 0;
-- payment sessions: 0;
-- escrow transactions: 0;
-- payout requests: 0;
-- refund requests: 0;
-- disputes: 0;
-- marketplace reports: 0;
-- reviews: 0;
-- EntizNet identity links: 0;
-- EntizNet handoff events: 0.
+### Why it was required
 
-## Supabase advisor verification
+Legacy EntizNet Admin tooling still contained a direct EntizNetStore Supabase bridge. That would have required EntizNet to possess EntizNetStore's service-role credential, violating the intended product/security boundary.
 
-### Performance
+The bridge has been removed. EntizNet now calls narrow EntizNetStore application APIs using short-lived Ed25519-signed, scope-restricted Admin assertions.
 
-The pre-hardening advisor identified 11 unindexed M3 foreign keys. Migration 14 added covering indexes for every reported key. The post-hardening advisor contains **no `unindexed_foreign_keys` findings**.
+### Store receiver CI
 
-The remaining performance entries are `unused_index` INFO notices. Production commerce is currently empty, so new and existing release-critical indexes have not accumulated planner usage. They are not removed merely because the empty production database has not exercised them yet.
+Store PR #10 — `Harden EntizNet Admin integration boundary`:
 
-Supabase remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index
+- exact tested head: `848f23efb181be84a65fc19b079d7fd12ec24286`;
+- CI #339 / run `32710050313`: SUCCESS;
+- production foundation: success;
+- TypeScript: success;
+- production build: success;
+- production dependency audit: success;
+- fresh Supabase reset/replay: success;
+- Admin service boundary replay/privilege regression: success;
+- every existing M1/M2/M3/payment/payout/concurrency suite: success.
 
-### Security
+### Store receiver database rollout
 
-The anonymous SECURITY DEFINER warning for `public.marketplace_capability_is_active` is gone after migration 14 moved catalogue RLS evaluation to `app_private` and revoked browser execution from the public helper.
+Forward migration:
 
-Nine RLS-enabled tables intentionally have no browser policies and therefore remain deny-by-default/service-role-only operational ledgers:
+- repository file: `supabase/migrations/20260824171000_entiznet_admin_service_boundary.sql`;
+- Supabase management-recorded live migration: `20260824131414_entiznet_admin_service_boundary`.
 
-- `admin_audit_logs`;
-- `conversation_keys`;
-- `entiznet_handoff_events`;
-- `featured_products`;
-- `marketplace_capability_state_events`;
-- `payment_webhook_events`;
-- `payout_provider_events`;
-- `prohibited_product_rules`;
-- `refund_provider_events`.
+The migration adds no public table. `app_private.entiznet_admin_api_requests` stores replay/audit state for verified external EntizNet Admin requests.
 
-Supabase remediation reference for this informational class: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+Live verification after migration:
 
-The remaining authenticated SECURITY DEFINER warnings correspond to reviewed, intentional owner/state-checked application RPC boundaries such as Buyer cart/address/refund/review operations, Seller catalogue operations, checkout v2, conversation/notification read state and order transitions. These functions are used instead of reopening direct browser DML, and their execute grants/search paths are part of the regression suite.
+- public tables: 45;
+- public RLS tables: 45;
+- `app_private.entiznet_admin_api_requests`: present;
+- public ledger equivalent: absent;
+- anon/authenticated ledger SELECT: denied;
+- service-role ledger SELECT: allowed;
+- anon/authenticated execute on register/complete/account-search integration RPCs: denied;
+- service-role execute on all three: allowed;
+- initial request rows: zero.
 
-Supabase remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
+### Store receiver merge/deployment
 
-## Paired EntizNet evidence
+- PR #10 merge commit: `e216ba9918dd2a50659aab595477fc39cef494fb`;
+- Vercel production deployment: `dpl_8jAjnm8PNTQudvxQfSmmAFPM3ACa`;
+- deployment source: exact merge commit above;
+- deployment state: READY;
+- canonical `https://entiznetstore.vercel.app/`: HTTP 200;
+- unsigned `/api/integrations/entiznet/admin/health`: HTTP 401 `missing_admin_assertion`;
+- unsigned `/api/integrations/entiznet/admin/accounts`: HTTP 401 `missing_admin_assertion`;
+- runtime-error groups on these routes in verification window: zero.
 
-EntizNet repository `OKenechukwu/entiznet-bolt`, PR #29, exact head `5558bf1220d57cf38627023e777c977e3f15c431`, passed EntizNet CI #123 / run `32614073435` production build.
+### EntizNet sender CI
 
-That counterpart implements the issuer/entry side of the Store contract: confirmed real-session identity, canonical active Store capabilities, short-lived Ed25519 assertion, issuer/audience, one-time `jti`, safe signed return path, POST handoff, and canonical `/entizstore` entry.
+EntizNet PR #30 — `Replace direct Store database access with signed integration API`:
 
-## Remaining promotion gates
+- exact tested head: `98a1294dd3e99c01eea875f3a13610194e05cf62`;
+- EntizNet CI #125 / run `32710100051`: SUCCESS;
+- direct EntizNetStore database-credential rejection gate: success;
+- production Next.js build: success.
 
-Before M3 can be called fully production-web/integration verified:
+The PR removed `storeAdmin()` and the application dependency on the legacy Store Supabase URL/service-role environment variables. The CI guard now prevents those credential names from being reintroduced into EntizNet application code.
 
-1. merge the exact final Store branch after repository evidence commits pass CI;
-2. verify the resulting Store Vercel deployment/alias and runtime health;
-3. merge the paired EntizNet PR only after the Store receiver is landed;
-4. verify the EntizNet deployment and production handoff configuration/keys;
-5. perform a real deployed cross-product handoff/revocation/return-path verification when production secrets are provisioned.
+### EntizNet sender merge/deployment
 
-The broader public-launch blockers in `LAUNCH_BLOCKERS.md` remain authoritative.
+- PR #30 merge commit: `29c505cd0bb1be56a912e0a2228a96a1bf3d8743`;
+- Vercel production deployment: `dpl_GU5PWyAtgMQ72kubt8JbuA18Gkhc`;
+- deployment source: exact merge commit above;
+- deployment state: READY;
+- canonical root: expected 307 age-check redirect;
+- unauthenticated `/api/admin/store/ping`: HTTP 401 `Not authenticated`;
+- unauthenticated `/api/admin/store/list-users`: HTTP 401 `Not authenticated`;
+- runtime-error groups on these routes in verification window: zero.
+
+## Security contract after hardening
+
+EntizNet does not require and must not receive EntizNetStore's Supabase service-role key.
+
+User handoff and Admin API assertions use strict cryptographic domain separation even if one Ed25519 key family is used:
+
+- user handoff audience: `entiznetstore`;
+- Admin API audience: `entiznetstore-admin-api`;
+- Admin assertion mandatory purpose: `admin-api`;
+- Admin scopes currently: `store.health`, `store.accounts.read`;
+- one-time `jti` replay protection;
+- Admin sender TTL 60 seconds;
+- no Store Admin auth-user spoofing.
+
+The Admin API receiver records external EntizNet actor identity in its private integration ledger rather than inserting that UUID into Store `admin_audit_logs.admin_id`, which correctly references Store auth users.
+
+## Exact production signing-key contract
+
+EntizNet:
+
+- `ENTIZNETSTORE_HANDOFF_PRIVATE_KEY`
+- `ENTIZNETSTORE_HANDOFF_KEY_ID`
+- `ENTIZNETSTORE_HANDOFF_ISSUER`
+- `ENTIZNETSTORE_HANDOFF_AUDIENCE`
+- `ENTIZNETSTORE_ADMIN_API_AUDIENCE`
+- `ENTIZNETSTORE_ORIGIN`
+
+EntizNetStore:
+
+- `ENTIZNET_HANDOFF_PUBLIC_KEY`
+- `ENTIZNET_HANDOFF_KEY_ID`
+- `ENTIZNET_HANDOFF_ISSUER`
+- `ENTIZNET_HANDOFF_AUDIENCE`
+- `ENTIZNET_ADMIN_API_AUDIENCE`
+
+## Remaining P0-08 verification
+
+Production code, database and deployments are verified. The integration is not called fully E2E verified until server-side production signing configuration is provisioned and tests prove:
+
+- real confirmed EntizNet user handoff;
+- same-account linking/no duplicate identity;
+- Buyer/Seller/Business consistency;
+- local suspension precedence;
+- replay rejection;
+- safe return path;
+- logout, revocation and re-entry;
+- real signed EntizNet Admin health/account calls;
+- operational visibility with no assertion/token leakage.
+
+The broader public-launch blockers remain authoritative in `LAUNCH_BLOCKERS.md`.
