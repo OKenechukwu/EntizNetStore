@@ -1,11 +1,14 @@
 -- EntizNetStore — scoped EntizNet Admin service boundary.
 -- EntizNet must never hold this Store project's Supabase service-role key.
 -- Cross-product Admin requests are authenticated at the Store HTTP boundary
--- with short-lived Ed25519 assertions and recorded here for replay/audit.
+-- with short-lived Ed25519 assertions. Replay/audit state remains in the
+-- non-exposed app_private schema rather than expanding the public API surface.
 
 begin;
 
-create table if not exists public.entiznet_admin_api_requests (
+create schema if not exists app_private;
+
+create table if not exists app_private.entiznet_admin_api_requests (
   id uuid primary key default gen_random_uuid(),
   jti_hash text not null unique,
   entiznet_admin_id uuid not null,
@@ -28,16 +31,16 @@ create table if not exists public.entiznet_admin_api_requests (
     check (expires_at > issued_at and expires_at <= issued_at + interval '2 minutes')
 );
 
-alter table public.entiznet_admin_api_requests enable row level security;
-revoke all on public.entiznet_admin_api_requests from public, anon, authenticated;
-grant select, insert, update, delete on public.entiznet_admin_api_requests to service_role;
+alter table app_private.entiznet_admin_api_requests enable row level security;
+revoke all on app_private.entiznet_admin_api_requests from public, anon, authenticated;
+grant select, insert, update, delete on app_private.entiznet_admin_api_requests to service_role;
 
 create index if not exists idx_entiznet_admin_api_requests_actor_created
-  on public.entiznet_admin_api_requests(entiznet_admin_id, created_at desc);
+  on app_private.entiznet_admin_api_requests(entiznet_admin_id, created_at desc);
 create index if not exists idx_entiznet_admin_api_requests_status_created
-  on public.entiznet_admin_api_requests(status, created_at desc);
+  on app_private.entiznet_admin_api_requests(status, created_at desc);
 create index if not exists idx_entiznet_admin_api_requests_expires
-  on public.entiznet_admin_api_requests(expires_at);
+  on app_private.entiznet_admin_api_requests(expires_at);
 
 create or replace function public.register_entiznet_admin_api_request(
   p_jti_hash text,
@@ -84,7 +87,7 @@ begin
     raise exception 'invalid_or_expired_integration_request' using errcode = '22023';
   end if;
 
-  insert into public.entiznet_admin_api_requests(
+  insert into app_private.entiznet_admin_api_requests(
     jti_hash, entiznet_admin_id, issuer, audience, scopes, route, method,
     issued_at, expires_at, metadata
   ) values (
@@ -119,7 +122,7 @@ begin
     raise exception 'invalid_integration_request_status' using errcode = '22023';
   end if;
 
-  update public.entiznet_admin_api_requests
+  update app_private.entiznet_admin_api_requests
   set status = v_status,
       failure_code = case when v_status = 'rejected' then nullif(left(coalesce(p_failure_code, ''), 160), '') else null end,
       metadata = metadata || coalesce(p_metadata, '{}'::jsonb),
