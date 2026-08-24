@@ -215,7 +215,7 @@ begin
   foreach v_idx in array array[
     'idx_addresses_user_id','addresses_one_default_per_user_type','idx_addresses_user_created',
     'carts_one_active_per_buyer','idx_carts_buyer_updated','cart_items_cart_variant_key',
-    'idx_cart_items_cart','idx_cart_items_variant','idx_cart_quotes_cart_created',
+    'idx_cart_items_cart','idx_cart_items_variant','idx_cart_items_product_id','idx_cart_quotes_cart_created',
     'idx_cart_quotes_buyer_created','idx_cart_quotes_expiry',
     'idx_categories_parent_id','idx_categories_active_parent_sort','idx_brands_active_name',
     'idx_content_pages_brand_active_key','idx_notifications_user_unread_created',
@@ -231,19 +231,22 @@ begin
     'idx_payout_items_request','idx_payout_items_escrow','idx_payout_items_active_escrow',
     'idx_payout_provider_events_request','idx_profiles_business_verification_status',
     'idx_kyc_documents_seller_status','idx_kyc_requests_seller_status','idx_message_attachments_message_id',
-    'idx_marketplace_capability_states_status','idx_marketplace_capability_state_events_user_created',
-    'idx_marketplace_capability_state_events_capability_created',
+    'idx_marketplace_capability_states_status','idx_marketplace_capability_states_suspended_by','idx_marketplace_capability_states_restored_by',
+    'idx_marketplace_capability_state_events_user_created','idx_marketplace_capability_state_events_capability_created',
+    'idx_marketplace_capability_state_events_actor_id',
     'idx_entiznet_identity_links_status','idx_entiznet_handoff_events_entiznet_created',
     'idx_entiznet_handoff_events_store_created','idx_entiznet_handoff_events_status_expiry',
     'order_disputes_one_nonclosed_per_order','idx_order_disputes_status_created',
-    'idx_order_disputes_order_created','idx_order_disputes_raised_by_created',
-    'idx_order_dispute_events_dispute_created','refund_requests_one_active_per_order',
+    'idx_order_disputes_order_created','idx_order_disputes_raised_by_created','idx_order_disputes_assigned_admin_id',
+    'idx_order_dispute_events_dispute_created','idx_order_dispute_events_actor_id','refund_requests_one_active_per_order',
     'idx_refund_requests_provider_reference','idx_refund_requests_status_created',
-    'idx_refund_requests_order_created','idx_refund_requests_buyer_created',
+    'idx_refund_requests_order_created','idx_refund_requests_buyer_created','idx_refund_requests_dispute_id',
+    'idx_refund_requests_requested_by','idx_refund_requests_reviewed_by',
     'idx_refund_provider_events_request','idx_escrow_transactions_dispute_id',
     'marketplace_reports_one_active_per_reporter_subject','idx_marketplace_reports_status_priority_created',
     'idx_marketplace_reports_subject_created','idx_marketplace_reports_reporter_created',
-    'idx_marketplace_reports_assigned_admin','idx_prohibited_product_rules_active_severity'
+    'idx_marketplace_reports_assigned_admin','idx_prohibited_product_rules_active_severity',
+    'idx_prohibited_product_rules_created_by','idx_prohibited_product_rules_updated_by'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -345,9 +348,18 @@ begin
     end if;
   end loop;
 
-  if not has_function_privilege('anon','public.marketplace_capability_is_active(uuid,text)','EXECUTE')
-     or not has_function_privilege('authenticated','public.marketplace_capability_is_active(uuid,text)','EXECUTE') then
-    raise exception 'Capability-state predicate must remain browser-safe executable';
+  if has_function_privilege('anon','public.marketplace_capability_is_active(uuid,text)','EXECUTE')
+     or has_function_privilege('authenticated','public.marketplace_capability_is_active(uuid,text)','EXECUTE')
+     or not has_function_privilege('service_role','public.marketplace_capability_is_active(uuid,text)','EXECUTE') then
+    raise exception 'Public capability helper browser execution boundary is incorrect';
+  end if;
+
+  if to_regprocedure('app_private.marketplace_capability_is_active(uuid,text)') is null
+     or not has_schema_privilege('anon','app_private','USAGE')
+     or not has_schema_privilege('authenticated','app_private','USAGE')
+     or not has_function_privilege('anon','app_private.marketplace_capability_is_active(uuid,text)','EXECUTE')
+     or not has_function_privilege('authenticated','app_private.marketplace_capability_is_active(uuid,text)','EXECUTE') then
+    raise exception 'Private capability RLS helper boundary is incorrect';
   end if;
 
   if has_function_privilege('authenticated','public.seller_save_product(uuid,text,text,numeric,numeric,text,uuid[],text[],integer)','EXECUTE')
@@ -406,6 +418,15 @@ begin
     and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then
     raise exception '% privileged marketplace/integration functions lack hardened pg_catalog,public search_path', v_bad;
+  end if;
+
+  select count(*) into v_bad
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'app_private'
+    and p.proname = 'marketplace_capability_is_active'
+    and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
+  if v_bad <> 0 then
+    raise exception 'Private capability helper lacks hardened pg_catalog,public search_path';
   end if;
 
   select count(*) into v_bad
