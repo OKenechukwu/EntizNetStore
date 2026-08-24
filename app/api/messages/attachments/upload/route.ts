@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
 import { safeOriginalFileName, validateUploadedFile } from '@/lib/storage/validatedUpload';
 
 const BUCKET = 'message-attachments';
@@ -49,7 +50,8 @@ export async function POST(request: NextRequest) {
   // arbitrary binary formats. Signature validation reduces spoofing; it is not
   // represented as antivirus scanning and can later sit behind a malware scanner.
   const filePath = `${user.id}/${message.id}/${randomUUID()}${validated.extension}`;
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(filePath, validated.bytes, {
+  const storage = admin.storage.from(BUCKET);
+  const { error: uploadError } = await storage.upload(filePath, validated.bytes, {
     contentType: validated.mimeType,
     upsert: false,
     cacheControl: '3600',
@@ -72,7 +74,16 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertError) {
-    await admin.storage.from(BUCKET).remove([filePath]);
+    await removeStorageObjectBestEffort(
+      storage,
+      filePath,
+      {
+        bucket: BUCKET,
+        operation: 'rollback-attachment-registration',
+        ownerId: user.id,
+        recordId: message.id,
+      },
+    );
     console.error('Message attachment registration failed:', insertError);
     return NextResponse.json({ error: 'Unable to register attachment' }, { status: 500 });
   }
