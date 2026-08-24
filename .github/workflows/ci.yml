@@ -21,6 +21,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SHIPPING_QUOTE_PROVIDER: unconfigured
+      TAX_QUOTE_PROVIDER: unconfigured
       PAYMENT_PROVIDER: unconfigured
       NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
       PAYOUT_PROVIDER: unconfigured
@@ -70,6 +72,9 @@ jobs:
       - name: Verify M2 structural database invariants
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-m2-database-invariants.sql
 
+      - name: Verify M3 structural database invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-m3-database-invariants.sql
+
       - name: Run M1 identity, KYC and storage regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-identity-kyc-storage.sql
 
@@ -88,11 +93,53 @@ jobs:
       - name: Run M2 Seller policy completeness regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-product-policy-completeness.sql
 
+      - name: Run M3 cart and order core regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-cart-order-core.sql
+
+      - name: Run M3 identity and operations regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-identity-operations.sql
+
+      - name: Run M3 EntizNet linked capability authority regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-entiznet-linked-authority.sql
+
+      - name: Run M3 catalogue governance regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-catalog-governance.sql
+
+      - name: Run M3 trust and safety regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-trust-safety-operations.sql
+
+      - name: Run M3 content and notification regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-content-notification-operations.sql
+
+      - name: Run M3 refund and dispute regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-refund-dispute-operations.sql
+
+      - name: Run M3 financial operations regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-financial-operations.sql
+
       - name: Run P0 commerce and authorization regression suite
-        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          cleanup() {
+            psql "$DB" -v ON_ERROR_STOP=1 -c "revoke execute on function public.create_checkout_session(jsonb,jsonb,uuid) from authenticated" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/prepare-legacy-commerce-security-test.sql
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-commerce-security.sql
 
       - name: Run provider-neutral payment regression suite
-        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          cleanup() {
+            psql "$DB" -v ON_ERROR_STOP=1 -c "revoke execute on function public.create_checkout_session(jsonb,jsonb,uuid) from authenticated" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/prepare-legacy-commerce-security-test.sql
+          psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
 
       - name: Run terminal payment-state regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-terminal-state.sql
