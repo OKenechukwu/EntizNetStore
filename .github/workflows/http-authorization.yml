@@ -108,6 +108,13 @@ jobs:
             exit "$status"
           }
 
+          APP_ORIGIN=http://127.0.0.1:3000 node scripts/test-checkout-http-boundary.mjs || {
+            status=$?
+            echo "Checkout HTTP boundary regression failed; server log follows"
+            cat /tmp/entiznetstore-http.log
+            exit "$status"
+          }
+
           PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
             APP_ORIGIN=http://127.0.0.1:3000 \
             node scripts/test-web-responsive-browser.mjs || {
