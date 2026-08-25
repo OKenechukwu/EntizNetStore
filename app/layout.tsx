@@ -95,7 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Header />
 
               <LayoutContent>
-                <main id="main" className="w-full">
+                <main id="main" tabIndex={-1} className="w-full">
                   {children}
                 </main>
               </LayoutContent>
