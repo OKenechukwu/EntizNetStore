@@ -1,0 +1,46 @@
+name: Update Commerce Payment Regression
+
+on:
+  push:
+    branches:
+      - codex/p0-security-definer-surface
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: codex/p0-security-definer-surface
+          fetch-depth: 0
+
+      - name: Use provider-neutral payment attachment in commerce regression
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/test-commerce-security.sql')
+          source = path.read_text()
+          old = """select public.attach_checkout_payment_intent(\n  (\n    select id from public.payment_sessions\n    where buyer_id = auth.uid()\n      and idempotency_key = '70000000-0000-0000-0000-000000000007'\n  ),\n  'pi_p0_checkout_one'\n);"""
+          new = """select public.attach_checkout_payment_reference(\n  (\n    select id from public.payment_sessions\n    where buyer_id = auth.uid()\n      and idempotency_key = '70000000-0000-0000-0000-000000000007'\n  ),\n  'stripe',\n  'pi_p0_checkout_one'\n);"""
+          if source.count(old) != 1:
+              raise SystemExit('expected legacy payment attachment block exactly once')
+          path.write_text(source.replace(old, new, 1))
+          PY
+
+      - name: Commit commerce regression update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/test-commerce-security.sql
+          git diff --cached --check
+          git commit -m "Use provider-neutral payment reference in commerce regression"
+          git push origin HEAD:codex/p0-security-definer-surface
