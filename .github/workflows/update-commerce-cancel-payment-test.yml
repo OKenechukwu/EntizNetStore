@@ -1,0 +1,49 @@
+name: Update Commerce Cancel Payment Regression
+
+on:
+  push:
+    branches:
+      - codex/p0-security-definer-surface
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: codex/p0-security-definer-surface
+          fetch-depth: 0
+
+      - name: Use provider-neutral payment attachment in cancellation regression
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/test-commerce-security.sql')
+          source = path.read_text()
+          old = """select public.attach_checkout_payment_intent(\n  (select id from public.payment_sessions where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008'),\n  'pi_p0_checkout_cancelled'\n);"""
+          new = """select public.attach_checkout_payment_reference(\n  (select id from public.payment_sessions where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008'),\n  'stripe',\n  'pi_p0_checkout_cancelled'\n);"""
+          if source.count(old) != 1:
+              raise SystemExit('expected cancelled-checkout legacy payment attachment exactly once')
+          updated = source.replace(old, new, 1)
+          if 'select public.attach_checkout_payment_intent(' in updated:
+              raise SystemExit('another normal commerce regression call still uses the legacy payment wrapper')
+          path.write_text(updated)
+          PY
+
+      - name: Commit regression modernization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/test-commerce-security.sql
+          git diff --cached --check
+          git commit -m "Use provider-neutral payment reference for cancellation regression"
+          git push origin HEAD:codex/p0-security-definer-surface
