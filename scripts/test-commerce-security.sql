@@ -481,8 +481,9 @@ select * from public.create_checkout_session(
   '80000000-0000-0000-0000-000000000008'
 );
 
-select public.attach_checkout_payment_intent(
+select public.attach_checkout_payment_reference(
   (select id from public.payment_sessions where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008'),
+  'stripe',
   'pi_p0_checkout_cancelled'
 );
 select public.cancel_checkout_session(
