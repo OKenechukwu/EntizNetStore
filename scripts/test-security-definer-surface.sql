@@ -64,6 +64,32 @@ begin
 end;
 $$;
 
+-- Every retained authenticated SECURITY DEFINER boundary must explicitly bind
+-- behavior to the authenticated actor. This prevents an allow-listed function
+-- from silently losing its auth.uid() scoping in a later migration.
+do $$
+declare
+  unscoped text[];
+begin
+  select coalesce(array_agg(signature order by signature), '{}'::text[])
+  into unscoped
+  from (
+    select p.oid::regprocedure::text as signature
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where p.prokind = 'f'
+      and p.prosecdef
+      and n.nspname = 'public'
+      and has_function_privilege('authenticated', p.oid, 'EXECUTE')
+      and pg_get_functiondef(p.oid) not ilike '%auth.uid()%'
+  ) unsafe;
+
+  if cardinality(unscoped) > 0 then
+    raise exception 'authenticated SECURITY DEFINER RPC(s) lost auth.uid() scoping: %', unscoped;
+  end if;
+end;
+$$;
+
 -- Anonymous callers must never receive direct EXECUTE on public SECURITY
 -- DEFINER functions. Public catalogue RLS uses a deliberately non-exposed
 -- app_private helper instead of a public RPC.
@@ -106,7 +132,7 @@ begin
 end;
 $$;
 
--- The canonical provider-neutral browser RPC stays self-scoped and available
+-- The canonical provider-neutral browser RPC stays self-scoped and available.
 do $$
 declare
   fn regprocedure := 'public.attach_checkout_payment_reference(uuid,text,text)'::regprocedure;
