@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { logOperationalError } from '../lib/observability/operationalEvent.ts'
+import { logOperationalError, type OperationalEventRecord } from '../lib/observability/operationalEvent.ts'
 
 test('logs only allow-listed provider error fields and returns the same safe record', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   const jwt = 'eyJabcdefghijk.abcdefghijklmnop.abcdefghijklmnop'
   const secretKey = 'sb_secret_abcdefghijklmnopqrstuvwxyz'
 
@@ -51,7 +51,7 @@ test('logs only allow-listed provider error fields and returns the same safe rec
 })
 
 test('contains thrown errors without logging stack traces', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   const error = new Error('network unavailable?access_token=private-value')
   error.stack = 'stack with private-value that must never be serialized'
 
@@ -73,7 +73,7 @@ test('contains thrown errors without logging stack traces', () => {
 })
 
 test('truncates large error strings', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   logOperationalError(
     'storage.generic.failed',
     'x'.repeat(2000),
