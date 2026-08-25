@@ -49,7 +49,7 @@ jobs:
           set -euo pipefail
           PLAYWRIGHT_PREFIX=/tmp/entiznetstore-playwright
           rm -rf "$PLAYWRIGHT_PREFIX"
-          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1 axe-core@4.13.0
           "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
 
       - name: Start fresh local Supabase stack
@@ -124,11 +124,20 @@ jobs:
               exit "$status"
             }
 
-      - name: Upload responsive browser screenshots
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-web-accessibility-browser.mjs || {
+              status=$?
+              echo "Accessibility browser regression failed; server log follows"
+              cat /tmp/entiznetstore-http.log
+              exit "$status"
+            }
+
+      - name: Upload browser verification artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: web-responsive-${{ github.sha }}
+          name: web-browser-verification-${{ github.sha }}
           path: artifacts/web-responsive
           if-no-files-found: ignore
           retention-days: 14
