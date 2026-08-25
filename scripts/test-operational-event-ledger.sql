@@ -61,17 +61,17 @@ declare
     'error_message', 'metadata', 'payload', 'provider_payload', 'file_path',
     'signed_url', 'token', 'actor_id', 'record_id', 'user_id'
   ];
-  column_name text;
+  forbidden_column_name text;
 begin
-  foreach column_name in array forbidden_columns loop
+  foreach forbidden_column_name in array forbidden_columns loop
     if exists (
       select 1
-      from information_schema.columns
-      where table_schema = 'app_private'
-        and table_name = 'operational_events'
-        and columns.column_name = column_name
+      from information_schema.columns c
+      where c.table_schema = 'app_private'
+        and c.table_name = 'operational_events'
+        and c.column_name = forbidden_column_name
     ) then
-      raise exception 'forbidden sensitive ledger column exists: %', column_name;
+      raise exception 'forbidden sensitive ledger column exists: %', forbidden_column_name;
     end if;
   end loop;
 end;
