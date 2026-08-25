@@ -240,12 +240,13 @@ begin
 end
 $$;
 
-select public.attach_checkout_payment_intent(
+select public.attach_checkout_payment_reference(
   (
     select id from public.payment_sessions
     where buyer_id = auth.uid()
       and idempotency_key = '70000000-0000-0000-0000-000000000007'
   ),
+  'stripe',
   'pi_p0_checkout_one'
 );
 
