@@ -188,6 +188,7 @@ try {
   const tabletToggle = tablet.getByRole("button", { name: "Toggle menu" });
   assert.equal(await tabletToggle.isVisible(), true, "tablet: compact navigation toggle is not visible");
   await tabletToggle.click();
+  await tablet.screenshot({ path: path.join(outputDir, "apps-tablet-menu-before-assert.png"), fullPage: true });
   const tabletDownload = tablet.getByRole("link", { name: "Download App" });
   await tabletDownload.waitFor();
   await assertNoHorizontalOverflow(tablet, "tablet menu");
@@ -206,6 +207,7 @@ try {
   const toggleBox = await phoneToggle.boundingBox();
   assert.ok(toggleBox && toggleBox.width >= 44 && toggleBox.height >= 44, "phone: menu toggle touch target is smaller than 44px");
   await phoneToggle.click();
+  await phone.screenshot({ path: path.join(outputDir, "home-phone-menu-before-assert.png"), fullPage: true });
 
   const phoneDownload = phone.getByRole("link", { name: "Download App" });
   await phoneDownload.waitFor();
