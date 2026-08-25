@@ -30,19 +30,21 @@ There is deliberately no column for raw error messages, provider payloads, URLs,
 
 ## Application flow
 
-Sensitive Storage/KYC routes call `reportOperationalError()` only on genuine infrastructure, persistence or lifecycle failures. The helper:
+Sensitive Storage/KYC routes call `reportOperationalError()` only on infrastructure, persistence or lifecycle failures. The helper:
 
 1. creates the same redacted structured record already emitted to runtime logs;
 2. fingerprints actor/record identifiers before persistence;
-3. writes only the safe subset through `public.record_operational_event(...)`;
-4. treats ledger persistence as best-effort and never masks the original API error;
-5. emits a redacted warning if the observability write itself fails, without recursively attempting another ledger write.
+3. rejects ordinary 4xx client-caused failures from ledger persistence so a user cannot manufacture a sitewide incident by repeating an invalid or incomplete request;
+4. allows an explicitly `critical` event to override that filter when an application invariant requires escalation;
+5. writes only the safe subset through `public.record_operational_event(...)`;
+6. treats ledger persistence as best-effort and never masks the original API error;
+7. emits a redacted warning if the observability write itself fails, without recursively attempting another ledger write.
 
-Client validation errors, authorization failures and normal 4xx business outcomes are not operational incidents and are not written to this ledger.
+Client validation errors, authorization failures and normal 4xx business outcomes therefore remain redacted runtime diagnostics but are not operational-health events.
 
 ## Alert threshold
 
-`public.operational_event_health(15, 5)` groups `error` and `critical` events by event name and component for the previous 15 minutes.
+`public.operational_event_health(15, 5)` groups persisted `error` and `critical` events by event name and component for the previous 15 minutes.
 
 - fewer than five matching failures: `ok`;
 - five or more matching failures: `degraded`.
