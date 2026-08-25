@@ -10,12 +10,13 @@
     "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "verify:foundation": "node scripts/verify-production-foundation.mjs",
+    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-lint-foundation.mjs",
     "test:storage-recovery": "node --experimental-strip-types --test tests/storage-compensation.test.mts",
     "test:operational-logging": "node --experimental-strip-types --test tests/operational-event.test.mts",
     "test:production-http-smoke": "node scripts/test-production-http-smoke.mjs",
     "start": "PORT=${PORT:-3000} next start -H 0.0.0.0 -p ${PORT:-3000}",
-    "lint": "next lint"
+    "lint": "node scripts/lint-with-baseline.mjs",
+    "lint:strict": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^4.0.2",
@@ -38,7 +39,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "autoprefixer": "^10.0.1",
-    "eslint": "^10.8.1",
+    "eslint": "9.39.5",
     "eslint-config-next": "^16.3.1",
     "postcss": "^8.0.0",
     "tailwindcss": "^3.3.0",

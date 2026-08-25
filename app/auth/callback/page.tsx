@@ -102,7 +102,6 @@ export default function AuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams]);
 
   return (

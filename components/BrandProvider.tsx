@@ -171,7 +171,6 @@ export function useBrand(): BrandContextType {
     const mode: ThemeMode = "light";
     const resolved = "light" as const;
     if (typeof window !== "undefined") {
-      // eslint-disable-next-line no-console
       console.warn(
         "[useBrand] No BrandProvider found above this component. Using fallback theme. " +
           "Find and wrap this subtree with <BrandProvider>.",
