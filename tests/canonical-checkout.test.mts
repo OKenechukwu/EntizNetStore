@@ -48,16 +48,19 @@ test("checkout accepts only shipping-capable addresses", async () => {
   assert.match(checkout, /body: JSON\.stringify\(\{ addressId: selectedAddressId \}\)/);
 });
 
-test("payment is bound to one canonical checkout session", async () => {
+test("payment is bound to one quote-scoped canonical checkout session", async () => {
   const payment = await source("components/payments/CartPayment.tsx");
 
+  assert.match(payment, /const scope = `\$\{cartId\}:\$\{quoteId\}`;/);
+  assert.match(payment, /const activeAttempt = attempt\?\.scope === scope \? attempt : null;/);
+  assert.match(payment, /let workingAttempt = activeAttempt \|\| createAttempt\(scope\);/);
+  assert.match(payment, /let sessionId = workingAttempt\.checkoutSessionId;/);
   assert.match(payment, /fetch\("\/api\/checkout\/session"/);
   assert.match(
     payment,
-    /body: JSON\.stringify\(\{ cartId, quoteId, idempotencyKey \}\)/,
+    /body: JSON\.stringify\(\{\s*cartId,\s*quoteId,\s*idempotencyKey: workingAttempt\.idempotencyKey,\s*\}\)/s,
   );
-  assert.match(payment, /let sessionId = checkoutSessionId;/);
-  assert.match(payment, /setCheckoutSessionId\(sessionId\);/);
+  assert.match(payment, /workingAttempt = \{ \.\.\.workingAttempt, checkoutSessionId: sessionId \};/);
   assert.match(payment, /fetch\("\/api\/payments\/create-intent"/);
   assert.match(
     payment,
@@ -68,7 +71,7 @@ test("payment is bound to one canonical checkout session", async () => {
     /JSON\.stringify\(\{\s*(items|amount|price|shippingAddress|address)/,
     "payment initiation must never trust browser-supplied commerce values",
   );
-  assert.match(payment, /Never rotate the idempotency key or silently create a second session/);
+  assert.match(payment, /Retries keep the\s*same UUID and checkout session/);
 });
 
 test("checkout authentication return target is same-site only", async () => {
