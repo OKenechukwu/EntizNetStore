@@ -150,7 +150,7 @@ export default function Header() {
                 { href: "/on-sale", key: "nav.onSale", fb: "On Sale" },
                 { href: "/learn", key: "nav.learn", fb: "Learn" },
               ].map((link) => (
-                <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary" onClick={() => setMobileOpen(false)}>
+                <Link key={link.href} href={link.href} className="flex min-h-12 items-center rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary" onClick={() => setMobileOpen(false)}>
                   <T k={link.key} fallback={link.fb} />
                 </Link>
               ))}
@@ -159,8 +159,8 @@ export default function Header() {
             <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:gap-2">
               <span suppressHydrationWarning className="min-w-0"><LanguageCurrencySwitcher className="w-full sm:ml-2 sm:w-auto" /></span>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setMobileOpen(false); goProfile(); }} className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"><T k="nav.profile" fallback="Profile" /></button>
-                <Link href="/auth?mode=signin" className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-white/5 px-4 py-2.5 text-center text-sm font-semibold text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary" onClick={() => setMobileOpen(false)}><T k="nav.signIn" fallback="Sign in" /></Link>
+                <button type="button" onClick={() => { setMobileOpen(false); goProfile(); }} className="flex min-h-12 flex-1 items-center justify-center rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"><T k="nav.profile" fallback="Profile" /></button>
+                <Link href="/auth?mode=signin" className="flex min-h-12 flex-1 items-center justify-center rounded-lg bg-white/5 px-4 py-2.5 text-center text-sm font-semibold text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary" onClick={() => setMobileOpen(false)}><T k="nav.signIn" fallback="Sign in" /></Link>
               </div>
             </div>
           </div>
