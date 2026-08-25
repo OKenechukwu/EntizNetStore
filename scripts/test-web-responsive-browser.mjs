@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { chromium } from "playwright";
+
+const playwrightNodeModules = process.env.PLAYWRIGHT_NODE_MODULES;
+assert.ok(playwrightNodeModules, "PLAYWRIGHT_NODE_MODULES must point to the isolated browser-test dependency directory");
+const require = createRequire(import.meta.url);
+const { chromium } = require(path.join(playwrightNodeModules, "playwright"));
 
 const origin = (process.env.APP_ORIGIN || "http://127.0.0.1:3000").replace(/\/$/, "");
 const outputDir = path.resolve("artifacts/web-responsive");
