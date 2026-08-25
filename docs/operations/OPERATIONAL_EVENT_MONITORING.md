@@ -4,7 +4,7 @@ Last reviewed: 2026-08-25
 
 ## Purpose
 
-EntizNetStore records a minimal private signal for repeated production infrastructure failures so the production monitor can distinguish an isolated customer error from a recurring operational incident.
+EntizNetStore records a minimal private signal for production infrastructure and reconciliation failures so the production monitor can distinguish an isolated customer error from a recurring operational incident while still escalating money/identity/trust inconsistencies immediately.
 
 The ledger is **not** an application audit log and must never become a copy of provider error payloads, KYC metadata, Storage paths, signed URLs, payment payloads, request bodies, access tokens or user identifiers.
 
@@ -30,7 +30,7 @@ There is deliberately no column for raw error messages, provider payloads, URLs,
 
 ## Application flow
 
-Sensitive Storage/KYC routes call `reportOperationalError()` only on infrastructure, persistence or lifecycle failures. The helper:
+Sensitive Storage/KYC/payment/payout routes call `reportOperationalError()` only on infrastructure, persistence, lifecycle or reconciliation failures. The helper:
 
 1. creates the same redacted structured record already emitted to runtime logs;
 2. fingerprints actor/record identifiers before persistence;
@@ -42,12 +42,28 @@ Sensitive Storage/KYC routes call `reportOperationalError()` only on infrastruct
 
 Client validation errors, authorization failures and normal 4xx business outcomes therefore remain redacted runtime diagnostics but are not operational-health events.
 
+### Payment and payout boundary
+
+Financial provider operations use a stricter classification because an external processor can accept money before the application knows whether local persistence completed:
+
+- failure to load internal checkout/payout state is an ordinary operational `error` and uses the repeated-failure threshold;
+- payment or payout provider unavailability is an ordinary operational `error` unless the operation has already entered an ambiguous money-movement state;
+- failure to persist a provider reference after initialization is `critical`;
+- ambiguous payment or payout initialization after the external call has started is `critical`;
+- failure to finalize an already verified payment/payout webhook is `critical`;
+- an invalid or forged webhook signature/payload is **not** persisted to the health ledger. The route emits only a constant sanitized runtime warning so attacker traffic cannot manufacture an incident.
+
+Financial operational records never persist raw webhook bodies, signatures, provider payment/payout IDs, payout methods, customer addresses or raw database/provider errors.
+
 ## Alert threshold
 
-`public.operational_event_health(15, 5)` groups persisted `error` and `critical` events by event name and component for the previous 15 minutes.
+`public.operational_event_health(15, 5)` evaluates the previous 15 minutes with two levels of urgency:
 
-- fewer than five matching failures: `ok`;
-- five or more matching failures: `degraded`.
+- one `critical` event: `degraded` immediately;
+- fewer than five matching ordinary `error` events: `ok`;
+- five or more matching ordinary `error` events: `degraded`.
+
+Critical events represent reconciliation/invariant conditions where money, identity or trust may already be inconsistent. They intentionally bypass the ordinary repetition threshold.
 
 The public readiness response exposes only `checks.operations = ok | degraded | unavailable`. It does not disclose the event name, count, actor fingerprint or record fingerprint.
 
@@ -64,18 +80,20 @@ If production event volume grows materially, replace opportunistic cleanup with 
 When the operational check is degraded:
 
 1. use the GitHub monitor run and Vercel/Supabase aggregate logs to identify the affected component;
-2. do not paste KYC documents, signed URLs, credentials, assertions, payment payloads or raw provider responses into GitHub issues;
-3. inspect only the minimum provider/service telemetry needed to isolate the fault;
-4. apply containment from `docs/operations/INCIDENT_RESPONSE.md`;
-5. verify `/api/health` returns HTTP 200 with `database=ok`, `storage=ok`, and `operations=ok` before declaring recovery.
+2. do not paste KYC documents, signed URLs, credentials, assertions, payment payloads, payout methods, provider identifiers or raw provider responses into GitHub issues;
+3. if a payment/payout event is critical, freeze automatic retries that could duplicate money movement until the internal ledger is reconciled with the external provider;
+4. inspect only the minimum provider/service telemetry needed to isolate the fault;
+5. apply containment from `docs/operations/INCIDENT_RESPONSE.md`;
+6. verify `/api/health` returns HTTP 200 with `database=ok`, `storage=ok`, and `operations=ok` before declaring recovery.
 
 ## Known limits
 
-This mechanism detects repeated application-observed failures. It is not a replacement for:
+This mechanism detects application-observed failures. It is not a replacement for:
 
 - malware/content scanning;
-- payment-provider reconciliation and webhook alerts;
-- payout-provider reconciliation alerts;
+- external payment-provider reconciliation once the launch provider is selected;
+- external payout-provider reconciliation once the launch provider is selected;
+- provider-native webhook delivery/failure dashboards;
 - EntizNet signed-handoff monitoring after production signing configuration is enabled;
 - an external log drain/SIEM when the public-launch operating model requires one;
 - durable database/Storage backups.
