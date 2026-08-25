@@ -122,7 +122,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   // Hydrate locale and currency from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     const savedLocale = localStorage.getItem("locale") || "en";
     const savedCurrency = localStorage.getItem("currency") || "USD";
     setLocaleState(savedLocale);
@@ -132,7 +132,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       const c = localStorage.getItem("currency") || "USD";
       setCurrencyState(c);
     };
-    
+
     window.addEventListener("currencyChange", handleCurrencyChange);
     return () => window.removeEventListener("currencyChange", handleCurrencyChange);
   }, []);
@@ -155,9 +155,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BrandContext.Provider value={{ brand, config, theme, mode, locale, currency, setBrand, setMode, setLocale, setCurrency }}>
-      {children}
-    </BrandContext.Provider>
+    <BrandContext.Provider value={value}>{children}</BrandContext.Provider>
   );
 }
 
