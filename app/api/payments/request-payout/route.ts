@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { reportOperationalError } from "@/lib/observability/operationalEventSink";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -44,7 +45,14 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    throw error;
+
+    await reportOperationalError("payouts.provider_resolution_failed", error, {
+      component: "payouts",
+      operation: "resolve-payout-provider",
+      route: "/api/payments/request-payout",
+      actorId: user.id,
+    });
+    return NextResponse.json({ error: "Seller payouts are temporarily unavailable" }, { status: 503 });
   }
 
   if (!provider.configured) {
@@ -92,11 +100,16 @@ export async function POST(request: NextRequest) {
   ]);
 
   if (sellerError || privateError) {
-    console.error("Payout seller lookup failed", {
-      sellerId: user.id,
-      sellerError: sellerError?.code,
-      privateError: privateError?.code,
-    });
+    await reportOperationalError(
+      "payouts.seller_account_lookup_failed",
+      sellerError ?? privateError ?? "seller payout account lookup failed",
+      {
+        component: "payouts",
+        operation: "load-seller-payout-account",
+        route: "/api/payments/request-payout",
+        actorId: user.id,
+      },
+    );
     return NextResponse.json({ error: "Unable to verify payout account" }, { status: 503 });
   }
 
@@ -128,6 +141,20 @@ export async function POST(request: NextRequest) {
   const payout = payoutRows?.[0];
   if (payoutError || !payout) {
     const noBalance = payoutError?.code === "P0001";
+
+    if (!noBalance) {
+      await reportOperationalError(
+        "payouts.request_creation_failed",
+        payoutError ?? "payout request RPC returned no row",
+        {
+          component: "payouts",
+          operation: "reserve-eligible-escrow",
+          route: "/api/payments/request-payout",
+          actorId: user.id,
+        },
+      );
+    }
+
     return NextResponse.json(
       {
         error: noBalance
@@ -188,10 +215,13 @@ export async function POST(request: NextRequest) {
     if (attachError) {
       // Do NOT release the escrow reservation here. The external processor may
       // already have accepted money even though local persistence failed.
-      console.error("Payout provider reference reconciliation required", {
-        payoutRequestId,
-        provider: initialized.provider,
-        databaseCode: attachError.code,
+      await reportOperationalError("payouts.provider_reference_reconciliation_required", attachError, {
+        component: "payouts",
+        operation: "attach-provider-reference",
+        severity: "critical",
+        route: "/api/payments/request-payout",
+        actorId: user.id,
+        recordId: payoutRequestId,
       });
       return NextResponse.json(
         {
@@ -212,12 +242,16 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     // Network/provider initialization failures are intentionally fail-closed.
-    // We do not assume that a timeout means no transfer was accepted, so the
-    // escrow claim remains reserved for an idempotent retry/operator review.
-    console.error("Payout initialization failed; escrow remains reserved", {
-      payoutRequestId,
-      provider: provider.name,
-      errorName: error instanceof Error ? error.name : "UnknownError",
+    // A timeout is ambiguous: the provider may already have accepted the
+    // transfer. Escrow therefore remains reserved for reconciliation and the
+    // incident pages immediately without logging payout/provider identifiers.
+    await reportOperationalError("payouts.initialization_uncertain", error, {
+      component: "payouts",
+      operation: "initialize-payout",
+      severity: "critical",
+      route: "/api/payments/request-payout",
+      actorId: user.id,
+      recordId: payoutRequestId,
     });
 
     return NextResponse.json(
