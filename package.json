@@ -10,7 +10,7 @@
     "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-lint-foundation.mjs",
+    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs",
     "test:storage-recovery": "node --experimental-strip-types --test tests/storage-compensation.test.mts",
     "test:operational-logging": "node --experimental-strip-types --test tests/operational-event.test.mts",
     "test:production-http-smoke": "node scripts/test-production-http-smoke.mjs",
