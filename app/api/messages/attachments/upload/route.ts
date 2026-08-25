@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { logOperationalError } from '@/lib/observability/operationalEvent';
+import { reportOperationalError } from '@/lib/observability/operationalEventSink';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     cacheControl: '3600',
   });
   if (uploadError) {
-    logOperationalError('storage.message_attachment.upload_failed', uploadError, {
+    await reportOperationalError('storage.message_attachment.upload_failed', uploadError, {
       component: 'storage',
       operation: 'upload-message-attachment',
       bucket: BUCKET,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         recordId: message.id,
       },
     );
-    logOperationalError('storage.message_attachment.registration_failed', insertError, {
+    await reportOperationalError('storage.message_attachment.registration_failed', insertError, {
       component: 'storage',
       operation: 'register-message-attachment',
       bucket: BUCKET,
