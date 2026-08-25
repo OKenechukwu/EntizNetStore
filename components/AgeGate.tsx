@@ -1,73 +1,87 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function AgeGate({ children }: { children: React.ReactNode }) {
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Check if user has already verified their age
     const verified = localStorage.getItem("entiznet-age-verified") === "true";
     setIsVerified(verified);
     setMounted(true);
-  }, []); // Empty dependency array is correct here
+  }, []);
+
+  useEffect(() => {
+    if (mounted && isVerified === false) {
+      confirmButtonRef.current?.focus();
+    }
+  }, [mounted, isVerified]);
 
   const handleVerifyAge = (isAdult: boolean) => {
     if (isAdult) {
       localStorage.setItem("entiznet-age-verified", "true");
       setIsVerified(true);
     } else {
-      // Redirect away from the site
       window.location.href = "https://www.google.com";
     }
   };
 
-  // Don't render anything until mounted to prevent hydration mismatch
   if (!mounted) {
     return null;
   }
 
-  // Show age gate if not verified
   if (!isVerified) {
     return (
-      <div className="age-gate-overlay">
-        <div className="glass-card p-8 max-w-md w-full mx-4 text-center animate-fade-in">
+      <div className="age-gate-overlay p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="age-gate-title"
+          aria-describedby="age-gate-description"
+          className="glass-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5 text-center animate-fade-in sm:p-8"
+        >
           <div className="mb-6">
-            <h1 className="font-serif font-bold text-3xl text-accent-gold mb-2">
+            <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
               EntizNet Store
             </h1>
-            <div className="w-16 h-0.5 bg-accent-gold mx-auto mb-6"></div>
+            <div className="mx-auto mb-6 h-0.5 w-16 bg-accent-gold" aria-hidden="true" />
           </div>
 
-          <h2 className="font-serif text-2xl mb-4">Age Verification Required</h2>
-          
-          <p className="text-sm opacity-80 mb-6 leading-relaxed">
-            This website contains adult content and is intended for adults only. 
+          <h2 id="age-gate-title" className="mb-4 font-serif text-2xl">
+            Age Verification Required
+          </h2>
+
+          <p id="age-gate-description" className="mb-6 text-sm leading-relaxed opacity-80">
+            This website contains adult content and is intended for adults only.
             You must be 18 years or older to access this site.
           </p>
 
-          <p className="text-sm font-medium mb-8">
+          <p className="mb-8 text-sm font-medium">
             Are you 18 years of age or older?
           </p>
 
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
             <button
+              ref={confirmButtonRef}
+              type="button"
               onClick={() => handleVerifyAge(true)}
-              className="luxury-button px-8 py-3"
+              className="luxury-button min-h-11 w-full px-6 py-3 sm:w-auto"
             >
               Yes, I am 18+
             </button>
             <button
+              type="button"
               onClick={() => handleVerifyAge(false)}
-              className="luxury-button-outline px-8 py-3"
+              className="luxury-button-outline min-h-11 w-full px-6 py-3 sm:w-auto"
             >
               No, I am under 18
             </button>
           </div>
 
-          <p className="text-xs opacity-60 mt-6">
-            By clicking &quot;Yes&quot;, you certify that you are 18+ years of age and agree 
+          <p className="mt-6 text-xs opacity-60">
+            By clicking &quot;Yes&quot;, you certify that you are 18+ years of age and agree
             to our Terms of Service and Privacy Policy.
           </p>
         </div>
