@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Bell, Menu, X } from "lucide-react";
+import { ShoppingCart, Bell, Download, Menu, X } from "lucide-react";
 import { T, useI18n } from "@/components/i18n/I18nProvider";
 import LanguageCurrencySwitcher from "@/components/i18n/LanguageCurrencySwitcher";
 import ProfileIconClient from "./ProfileIconClient";
@@ -133,6 +133,15 @@ export default function Header() {
             </span>
 
             <Link
+              href="/apps"
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-secondary/30 bg-brand-secondary/10 px-3 py-2 text-sm font-semibold text-brand-secondary transition hover:bg-brand-secondary/15"
+              aria-label="Download EntizNetStore app"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden xl:inline">Download App</span>
+            </Link>
+
+            <Link
               href="/auth?mode=signin"
               className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
             >
@@ -196,6 +205,7 @@ export default function Header() {
             <div className="flex flex-col gap-2">
               {[
                 { href: "/", key: "nav.home", fb: "Home" },
+                { href: "/apps", key: "nav.downloadApp", fb: "Download App" },
                 { href: "/premium", key: "nav.premium", fb: "Premium" },
                 { href: "/luxury", key: "nav.luxury", fb: "Luxury" },
                 {
