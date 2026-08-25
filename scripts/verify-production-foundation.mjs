@@ -224,10 +224,40 @@ if (exists(".github/workflows/http-authorization.yml")) {
   for (const requiredFragment of [
     "scripts/test-http-authorization.mjs",
     "scripts/test-storage-boundary.mjs",
+    "ENTIZNETSTORE_BASE_URL=http://127.0.0.1:3000 node scripts/test-production-http-smoke.mjs",
     "supabase db reset --local",
   ]) {
     if (!httpAuthorization.includes(requiredFragment)) {
       fail(`HTTP authorization workflow is missing required control: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists("app/api/health/route.ts")) {
+  const healthRoute = read("app/api/health/route.ts");
+  for (const requiredFragment of [
+    "admin.storage.listBuckets()",
+    "kyc-documents",
+    "message-attachments",
+    "product-media",
+    "seller-branding",
+    "checks = { database, storage }",
+  ]) {
+    if (!healthRoute.includes(requiredFragment)) {
+      fail(`Production readiness route lost required Storage health control: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists("scripts/test-production-http-smoke.mjs")) {
+  const productionSmoke = read("scripts/test-production-http-smoke.mjs");
+  for (const requiredFragment of [
+    "body?.checks?.database !== 'ok'",
+    "body?.checks?.storage !== 'ok'",
+    "database=ok and storage=ok",
+  ]) {
+    if (!productionSmoke.includes(requiredFragment)) {
+      fail(`Production smoke lost required readiness assertion: ${requiredFragment}`);
     }
   }
 }
