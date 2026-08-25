@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logOperationalError } from '@/lib/observability/operationalEvent';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { sanitizeInput } from '@/lib/security';
@@ -158,7 +159,17 @@ export async function POST(request: NextRequest) {
       .download(filePath);
 
     if (downloadError || !blob) {
-      console.error('Unable to verify KYC storage object:', downloadError);
+      logOperationalError(
+        'storage.kyc.object_verification_failed',
+        downloadError ?? 'uploaded KYC object was not returned',
+        {
+          component: 'storage',
+          operation: 'download-kyc-object-for-verification',
+          bucket: KYC_BUCKET,
+          route: '/api/kyc/documents',
+          actorId: user.id,
+        },
+      );
       return NextResponse.json(
         { error: 'Uploaded KYC object was not found; upload must complete before registration' },
         { status: 409 },
@@ -196,7 +207,13 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       await deleteRejectedUpload(filePath, user.id, 'rollback-kyc-registration');
-      console.error('Error creating KYC document record:', insertError);
+      logOperationalError('storage.kyc.registration_failed', insertError, {
+        component: 'storage',
+        operation: 'register-kyc-document',
+        bucket: KYC_BUCKET,
+        route: '/api/kyc/documents',
+        actorId: user.id,
+      });
       return NextResponse.json({ error: 'Failed to save document record' }, { status: 500 });
     }
 
@@ -221,7 +238,13 @@ export async function POST(request: NextRequest) {
         .eq('id', verificationRequest.id);
 
       if (updateError) {
-        console.error('Error updating KYC verification request:', updateError);
+        logOperationalError('kyc.verification_request_update_failed', updateError, {
+          component: 'kyc',
+          operation: 'update-verification-request',
+          route: '/api/kyc/documents',
+          actorId: user.id,
+          recordId: verificationRequest.id,
+        });
       } else {
         if (!['verified', 'suspended'].includes(sellerProfile.verification_status)) {
           // Resubmission after rejection becomes actionable again. A verified or
@@ -234,7 +257,12 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', user.id);
           if (sellerStatusError) {
-            console.error('Error updating seller verification lifecycle:', sellerStatusError);
+            logOperationalError('kyc.seller_lifecycle_update_failed', sellerStatusError, {
+              component: 'kyc',
+              operation: 'update-seller-verification-lifecycle',
+              route: '/api/kyc/documents',
+              actorId: user.id,
+            });
           }
         }
 
@@ -258,7 +286,12 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', user.id);
           if (businessStatusError) {
-            console.error('Error updating Business/BSM verification lifecycle:', businessStatusError);
+            logOperationalError('kyc.business_lifecycle_update_failed', businessStatusError, {
+              component: 'kyc',
+              operation: 'update-business-verification-lifecycle',
+              route: '/api/kyc/documents',
+              actorId: user.id,
+            });
           }
         }
       }
@@ -266,7 +299,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, document }, { status: 201 });
   } catch (error) {
-    console.error('Error saving KYC document:', error);
+    logOperationalError('kyc.document_registration_route_failed', error, {
+      component: 'kyc',
+      operation: 'register-kyc-document',
+      route: '/api/kyc/documents',
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
