@@ -16,12 +16,26 @@ import { cookies } from "next/headers";
 import { DEFAULT_CURRENCY, type CurrencyCode } from "@/lib/currency";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 
+const siteIndexingEnabled = process.env.SITE_INDEXING_ENABLED === "true";
+
 export const metadata: Metadata = {
   title: "EntizNet Store - Luxury Adult Marketplace",
   description:
     "Premium adult products and experiences. Discreet, luxury, authentic.",
   keywords: "adult marketplace, luxury products, discreet shopping",
-  robots: "noindex, nofollow",
+  robots: siteIndexingEnabled
+    ? {
+        index: true,
+        follow: true,
+      }
+    : {
+        index: false,
+        follow: false,
+        googleBot: {
+          index: false,
+          follow: false,
+        },
+      },
 };
 
 // Read & normalize supported locales from env

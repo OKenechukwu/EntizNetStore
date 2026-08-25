@@ -16,9 +16,10 @@ concurrency:
 jobs:
   http-authorization:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      SITE_INDEXING_ENABLED: "false"
       SHIPPING_QUOTE_PROVIDER: unconfigured
       TAX_QUOTE_PROVIDER: unconfigured
       PAYMENT_PROVIDER: unconfigured
@@ -42,13 +43,22 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install isolated Chromium browser tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX=/tmp/entiznetstore-playwright
+          rm -rf "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
+
       - name: Start fresh local Supabase stack
         run: supabase start
 
       - name: Reset from repository migrations and seed
         run: supabase db reset --local
 
-      - name: Build, boot and exercise real HTTP authorization boundaries
+      - name: Build, boot and exercise real HTTP and browser boundaries
         shell: bash
         run: |
           set -euo pipefail
@@ -97,6 +107,24 @@ jobs:
             cat /tmp/entiznetstore-http.log
             exit "$status"
           }
+
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-web-responsive-browser.mjs || {
+              status=$?
+              echo "Responsive browser regression failed; server log follows"
+              cat /tmp/entiznetstore-http.log
+              exit "$status"
+            }
+
+      - name: Upload responsive browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-responsive-${{ github.sha }}
+          path: artifacts/web-responsive
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Stop local Supabase stack
         if: always()
