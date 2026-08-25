@@ -2,7 +2,7 @@
 
 ## Scope
 
-This verification closes a code-addressable portion of P0-06: accidental development/maintenance UI exposure and non-deterministic Next.js 16 build configuration.
+This verification closes a code-addressable portion of P0-06: accidental development/maintenance UI exposure, legacy browser-side upload bypasses and non-deterministic Next.js 16 build configuration.
 
 ## Removed production surfaces
 
@@ -27,6 +27,12 @@ The utility bypassed the canonical Seller media flow by:
 - relying on database/Storage policy behavior rather than the validated Seller upload route.
 
 The entire `app/internal` surface is removed. Product media must flow through `/api/seller/product-media/upload` and the canonical Seller product workflow.
+
+### Legacy `app/components/ProductImageUploader.tsx`
+
+The route/runtime guard then exposed a second, unused browser-side uploader outside `app/internal`. It also uploaded directly to the obsolete `store-products` bucket and only enforced a client-side size check.
+
+Repository code search found no consumer of this component. It is removed rather than migrated because the canonical Seller product-media server route already owns upload authorization, validation and path ownership.
 
 ## Next.js 16 request hook
 
@@ -61,13 +67,16 @@ The obsolete `.eslintrc.json` left behind from the pre-flat-config setup is remo
 - `.eslintrc.json`;
 - `middleware.ts`;
 - `app/admin/i18n/seed`;
+- `app/components/ProductImageUploader.tsx`;
 - `app/internal`;
 - `INTERNAL_OPEN` in runtime source;
 - `ADMIN_SEED_TOKEN` in runtime source;
 - legacy `store-products` bucket usage in runtime source;
 - `/api/i18n/seed-all` references in runtime source.
 
-It also verifies the canonical `proxy.ts` cookie/matcher contract and the committed Next 16 TypeScript settings.
+The guard also inventories every `app/**/page.*` route and rejects route segments named `debug`, `dev`, `fixture(s)`, `internal`, `maintenance`, `migrate/migration(s)`, `mock(s)`, `seed(s)` or `test(s)` anywhere in the production page tree.
+
+It additionally verifies the canonical `proxy.ts` cookie/matcher contract and the committed Next 16 TypeScript settings.
 
 ## Verification gate
 
@@ -80,7 +89,8 @@ Before merge:
 5. fresh-Supabase M1/M2/M3/commerce/payment/payout/concurrency regressions must pass;
 6. the real HTTP authorization regression must pass;
 7. exact-head Vercel preview and `/api/health` must be healthy;
-8. build route inventory must no longer contain `/admin/i18n/seed` or `/internal/upload-product-image`.
+8. build route inventory must no longer contain `/admin/i18n/seed` or `/internal/upload-product-image`;
+9. the global page-route guard must pass with no forbidden utility/development route segments.
 
 ## Remaining route/runtime work
 
