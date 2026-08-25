@@ -155,7 +155,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BrandContext.Provider value={value}>{children}</BrandContext.Provider>
+    <BrandContext.Provider value={{ brand, config, theme, mode, locale, currency, setBrand, setMode, setLocale, setCurrency }}>
+      {children}
+    </BrandContext.Provider>
   );
 }
 
@@ -166,10 +168,13 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 export function useBrand(): BrandContextType {
   const ctx = useContext(BrandContext);
   if (ctx === undefined) {
-    // Safe default to prevent runtime crash
+    // The root application shell is dark by default. If a legacy consumer is
+    // mounted outside this provider, its defensive theme must match that shell;
+    // returning the old light fallback created light page surfaces with inherited
+    // dark-shell foreground text and failed WCAG contrast on authenticated routes.
     const fallbackBrand = "entiznetstore" as Brand;
-    const mode: ThemeMode = "light";
-    const resolved = "light" as const;
+    const mode: ThemeMode = "dark";
+    const resolved = "dark" as const;
     if (typeof window !== "undefined") {
       console.warn(
         "[useBrand] No BrandProvider found above this component. Using fallback theme. " +
