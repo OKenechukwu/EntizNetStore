@@ -37,11 +37,20 @@
    Optional Light Theme (toggle with data-theme="light")
    ========================================= */
 [data-theme="light"] {
-  --background-primary: #F7F6F3;  /* contrast-ivory */
-  --background-secondary: #FFFFFF;
-  --text-primary: #0B0B0D;        /* primary-black */
-  --text-secondary: #1A1A1D;      /* charcoal */
-  --border-subtle: rgba(11, 11, 13, 0.1);
+  /* Keep the canonical Tailwind tokens and the legacy design-system aliases in
+     the same mode. Several routes use bg-background/text-foreground directly,
+     while older surfaces consume the mapped aliases below. */
+  --background: #F7F6F3;
+  --foreground: #0B0B0D;
+  --muted: #EEECE7;
+  --card: #FFFFFF;
+  --border: rgba(11, 11, 13, 0.1);
+
+  --background-primary: var(--background);
+  --background-secondary: var(--card);
+  --text-primary: var(--foreground);
+  --text-secondary: #1A1A1D;
+  --border-subtle: var(--border);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --shadow-soft: 0 4px 32px rgba(11, 11, 13, 0.1);
 }
@@ -51,6 +60,12 @@
    Note: same as default Royal Desire root for consistency
    ========================================= */
 [data-theme="dark"] {
+  --background: #0B0A0D;
+  --foreground: #F4F3F6;
+  --muted: #1A1720;
+  --card: #121017;
+  --border: rgba(255,255,255,0.12);
+
   --background-primary: var(--background);
   --background-secondary: var(--card);
   --text-primary: var(--foreground);
@@ -177,11 +192,11 @@ html, body {
   to { opacity: 1; }
 }
 @keyframes slideUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(20px);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0);
   }
@@ -240,8 +255,8 @@ html, body {
 /* Keep the age-verification dialog opaque so text and CTA contrast remain
    deterministic under Chromium/axe rather than blending with the page behind it. */
 .age-gate-overlay .glass-card {
-  background: var(--card);
-  color: var(--foreground);
+  background: #121017;
+  color: #F4F3F6;
   backdrop-filter: none;
 }
 
@@ -251,8 +266,23 @@ html, body {
 /* The bright brand gold is intentionally retained on dark surfaces. On light
    surfaces, use a deeper gold that preserves the same brand hue while meeting
    WCAG AA contrast requirements. */
-[data-theme="light"] header .text-brand-secondary {
-  color: #756100;
+[data-theme="light"] header .text-brand-secondary,
+[data-theme="light"] .text-accent-gold {
+  color: #705c00;
+}
+
+[data-theme="light"] .border-accent-gold {
+  border-color: #705c00;
+}
+
+[data-theme="light"] .luxury-button-outline {
+  color: #705c00;
+  border-color: #705c00;
+}
+
+[data-theme="light"] .luxury-button-outline:hover {
+  background: #705c00;
+  color: #ffffff;
 }
 
 .auth-page-card .text-accent-gold,
