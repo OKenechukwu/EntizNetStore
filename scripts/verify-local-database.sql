@@ -274,8 +274,13 @@ begin
     raise exception 'M3 create_checkout_session_v2 execution boundary is incorrect';
   end if;
 
+  if has_function_privilege('anon','public.attach_checkout_payment_intent(uuid,text)','EXECUTE')
+     or has_function_privilege('authenticated','public.attach_checkout_payment_intent(uuid,text)','EXECUTE')
+     or not has_function_privilege('service_role','public.attach_checkout_payment_intent(uuid,text)','EXECUTE') then
+    raise exception 'Legacy payment-intent wrapper must be trusted-worker-only';
+  end if;
+
   foreach v_fn in array array[
-    'public.attach_checkout_payment_intent(uuid,text)',
     'public.cancel_checkout_session(uuid)',
     'public.mark_conversation_read(uuid)',
     'public.transition_seller_order(uuid,text,text,text)',
