@@ -1,13 +1,13 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-25**
+Last reviewed: **2026-08-26**
 
-This is the canonical launch-readiness record. UI completeness does not clear a blocker. A blocker moves to `VERIFIED` only after production-safe authorization, failure handling and reproducible evidence are recorded.
+This is the canonical launch-readiness record for EntizNetStore. UI completeness alone does not clear a blocker. A blocker moves to `VERIFIED` only after production-safe authorization, failure handling and reproducible evidence are recorded.
 
 ## Status language
 
 - **P0** — blocks real customer/payment data or public commerce launch.
-- **P1** — blocks polished public V1/mobile parity.
+- **P1** — blocks polished product parity or the next planned release stage.
 - **P2** — post-launch improvement/scale work.
 - Statuses: `OPEN`, `IN PROGRESS`, `VERIFIED`, `DEFERRED`.
 
@@ -19,51 +19,65 @@ This is the canonical launch-readiness record. UI completeness does not clear a 
 
 **Status: VERIFIED**
 
-Verified foundation includes canonical Supabase architecture, reproducible fresh-environment migrations/seed, RLS/security-definer review, removal of runtime Neon/Helium/Replit dependencies, production-oriented documentation, dependency/build verification and a recovery runbook.
+Verified foundation includes canonical Supabase architecture, reproducible fresh-environment migrations/seed, RLS and targeted `SECURITY DEFINER` review, removal of runtime Neon/Helium/Replit dependencies, production-oriented documentation, dependency/build verification and a recovery runbook.
 
-Supabase management-applied migration versions can differ from repository filename timestamps. Applied migrations remain immutable. `docs/operations/PRODUCTION_RELEASE.md` now defines migration identity/content reconciliation and forward-only corrective migration procedure; P0-06 retains the broader production release/environment/deployment conditions.
+Applied migrations remain immutable. `docs/operations/PRODUCTION_RELEASE.md` defines migration identity/content reconciliation and forward-only corrective migration procedure.
 
 ## M1 — Identity, Seller, KYC & Storage
 
 **Status: VERIFIED**
 
-A new standalone account can establish Buyer/Seller or Buyer/Seller/Business capabilities on one UUID, complete canonical Supabase-backed verification/storage flows and use trusted messaging without Replit infrastructure. KYC/private media boundaries, Seller/Business lifecycle, BSM synchronization, server-side validation and Admin audit workflows are covered by CI and live-database evidence.
+A new standalone account can establish Buyer/Seller or Buyer/Seller/Business capabilities on one UUID, complete canonical Supabase-backed verification/storage flows and use trusted messaging without Replit infrastructure. KYC/private media boundaries, Seller/Business lifecycle, BSM synchronization, server-side upload validation and Admin audit workflows are covered by CI and live-database evidence.
 
 ## M2 — Catalogue & Seller Operations
 
-**Status: VERIFIED — ENGINEERING/LIVE DATABASE/MAIN MERGE**
+**Status: VERIFIED — ENGINEERING/LIVE DATABASE/MAIN**
 
 Verified catalogue lifecycle includes stable storefront slugs, trusted storefront settings, rich products/variants/inventory, RPC-only catalogue mutation, independent moderation, approval invalidation on edit, publication/policy/inventory invariants and canonical public storefront/product reads.
 
-Historical M2 Vercel Hobby build-rate limiting remains recorded as an incident, but the project now runs on Vercel Pro and current production deployments supersede the old Hobby-capacity evidence.
-
 ## M3 — Marketplace Operations, Admin & EntizNet Integration
 
-**Status: VERIFIED WITH PRE-LAUNCH INTEGRATION CONDITION**
+**Status: VERIFIED WITH PRE-LAUNCH EXTERNAL-INTEGRATION CONDITIONS**
 
-Verified:
+Verified engineering includes:
 
 - persistent Buyer cart/address/quote/checkout core;
+- canonical server-side price, availability, Seller split and inventory authority;
 - legacy arbitrary checkout lockout;
-- Buyer/Seller/Business suspension and linked EntizNet authority;
+- Buyer/Seller/Business multi-capability and suspension enforcement;
 - Admin account/order/KYC/catalogue/refund/dispute/financial/trust/content operations;
-- 45 public tables / 45 RLS / zero RLS-disabled production baseline;
-- fourteen original M3 forward migrations and advisor hardening;
-- exact M3 release CI and production deployment;
-- post-M3 EntizNet Admin boundary hardening;
-- direct EntizNet access to EntizNetStore Supabase privileged credentials removed and CI-prohibited;
-- Store PR #10 exact head `848f23efb181be84a65fc19b079d7fd12ec24286` passed CI #339 / run `32710050313`;
-- Store Admin-boundary migration live as `20260824131414_entiznet_admin_service_boundary` while repository filename is `20260824171000_entiznet_admin_service_boundary.sql`;
-- private `app_private.entiznet_admin_api_requests` replay/audit ledger, no new public table;
-- Store merge `e216ba9918dd2a50659aab595477fc39cef494fb` deployed READY as `dpl_8jAjnm8PNTQudvxQfSmmAFPM3ACa`;
-- Store canonical root HTTP 200; unsigned Admin integration routes fail closed with HTTP 401; no runtime-error group during verification;
-- EntizNet PR #30 exact head `98a1294dd3e99c01eea875f3a13610194e05cf62` passed CI #125 / run `32710100051`, including the direct-Store-database-credential rejection gate;
-- EntizNet merge `29c505cd0bb1be56a912e0a2228a96a1bf3d8743` deployed READY as `dpl_GU5PWyAtgMQ72kubt8JbuA18Gkhc`;
-- unauthenticated EntizNet Store Admin routes fail closed with HTTP 401 and no runtime-error group during verification.
+- linked EntizNet capability authority with standalone Store accounts preserved;
+- direct EntizNet access to EntizNetStore privileged Supabase credentials removed and CI-prohibited;
+- short-lived signed EntizNet handoff/Admin contracts with replay/audit foundations;
+- provider-neutral payment/payout state machines and concurrency protections;
+- canonical production health, monitoring and operational event foundations.
 
-Remaining integration condition is tracked under **P0-08**: production Ed25519 signing configuration plus real authenticated cross-product user/Admin E2E.
+### Latest web-commerce release evidence
 
-Architecture/evidence: `docs/architecture/M3-MARKETPLACE-OPERATIONS-ENTIZNET-INTEGRATION.md`, `docs/operations/M3_RELEASE_VERIFICATION.md`.
+PR #26 — web-first launch:
+
+- exact head `b3313a0ffebf427ce4257c595a2df073dd8961fa`;
+- CI run `32885369776` passed;
+- HTTP Authorization Regression run `32885369783` passed, including real production-build Chromium phone/tablet/desktop verification;
+- merged as `b4b6ecdd2a1659a99c710d7b6a4d50c58e9b2c65`;
+- production deployment `dpl_GWFfNRz6Vm6nBwgn5tABSeuLQm5T` reached READY;
+- canonical `/api/health` returned HTTP 200 with database/storage/operations all `ok` and exact version `b4b6ecdd2a16`;
+- no error/fatal Vercel runtime logs were present in the release verification window.
+
+PR #27 — canonical visible cart/checkout convergence:
+
+- exact head `187693dbbbba8484347b8771edd571683cee4ba0` based on the merged PR #26 `main`;
+- CI run `32886155564` passed the application, fresh-database, M1/M2/M3, commerce, payment, payout and concurrency suites;
+- HTTP Authorization Regression run `32886155665` passed the real authenticated authorization and Chromium suite;
+- exact-head Vercel preview `dpl_GcvW5QcVbEf4aJ7pYppNPxQBc8EJ` reached READY;
+- merged as `919b163c11b4b3c2e6a8cc27b10c1e4604d563f8`;
+- production deployment `dpl_CxYGsvVCcQxWrz76tghBhUsYVieg` reached READY;
+- canonical `/api/health` returned HTTP 200 with database/storage/operations all `ok` and exact version `919b163c11b4`;
+- no error/fatal Vercel runtime logs were present in the release verification window.
+
+PR #27 additionally verifies that authenticated Buyers use the canonical server cart, guest carts import one-way after sign-in, checkout consumes trusted server quotes, payment initiation consumes one canonical checkout session, retries preserve quote-scoped idempotency, and billing-only/cross-Buyer addresses are rejected at the server quote boundary.
+
+Remaining external/integration conditions are tracked under P0-02, P0-03, P0-06, P0-07, P0-08 and P0-09.
 
 ---
 
@@ -73,14 +87,17 @@ Architecture/evidence: `docs/architecture/M3-MARKETPLACE-OPERATIONS-ENTIZNET-INT
 
 **Status: OPEN**
 
-Current recovery documentation and pre-change checkpoints are not equivalent to durable managed/off-platform production backup.
+Current recovery documentation, migration reproducibility and pre-change checkpoints are not equivalent to durable managed/off-platform production backup.
 
-Before real customer/KYC/order/payment/Seller data:
+Before real customer/KYC/order/payment/Seller data is accepted at public scale:
 
-- automated encrypted off-platform logical backup and/or suitable managed Supabase backup/PITR;
-- defined retention/access ownership;
-- recorded restore rehearsal;
-- documented RPO/RTO expectations.
+- establish automated encrypted off-platform logical database backup and/or suitable managed Supabase backup/PITR;
+- separately protect required Supabase Storage objects because database backups do not constitute object backup;
+- define retention, encryption and access ownership;
+- record a restore rehearsal;
+- document RPO/RTO expectations and recovery ownership.
+
+This blocker must not be marked complete merely because migrations can recreate schema.
 
 ## P0-02 — Production secret provisioning and rotation ownership
 
@@ -90,90 +107,112 @@ Server-only Supabase configuration and provider-neutral secret contracts exist. 
 
 Still required:
 
-- provision EntizNet↔Store Ed25519 production integration configuration;
-- finalize owner/rotation procedure for every remaining production secret;
-- verify environment separation and no privileged value in Git/browser/mobile bundles.
+- provision EntizNet↔Store production Ed25519 signing configuration;
+- provision payment/payout/provider secrets only after provider selection;
+- finalize owner/rotation procedure for every production secret;
+- verify production/preview/development target separation;
+- verify no privileged value appears in Git, browser bundles or future mobile bundles.
 
 ## P0-03 — Production payment processor E2E
 
-**Status: IN PROGRESS — EXTERNAL PROCESSOR ONBOARDING DEFERRED UNTIL PRE-LAUNCH**
+**Status: IN PROGRESS — INTERNAL COMMERCE AUTHORITY VERIFIED; EXTERNAL PROCESSOR PENDING**
 
-Internal provider-neutral payment state machines, inventory reservation, checkout idempotency, webhook event deduplication/terminal-state rules and fail-closed `unconfigured` behavior are verified.
+Verified:
+
+- provider-neutral payment state machines;
+- inventory reservation and checkout idempotency;
+- webhook event deduplication and terminal-state rules;
+- fail-closed `unconfigured` provider behavior;
+- PR #27 visible checkout now uses the canonical server cart → trusted quote → canonical checkout-session → payment boundary chain;
+- browser code does not provide authoritative prices, totals, Seller splits, shipping snapshots or payment amounts;
+- retries for the same trusted quote reuse the same checkout session/idempotency attempt rather than manufacturing duplicate payment initialization.
 
 Still required before real checkout:
 
 - select approved processor/legal entity;
-- implement provider adapter without rewriting marketplace commerce state;
+- implement the production provider adapter without replacing the canonical commerce state machine;
 - deployed sandbox payment initialization;
-- signed callback/webhook retries, duplicates and out-of-order verification;
+- signed callback/webhook retry, duplicate and out-of-order verification;
 - refund/partial-refund verification where launch scope requires it;
-- provider reconciliation procedure and production money-movement incident integration.
+- provider reconciliation procedure;
+- production money-movement alerting and incident integration.
 
 ## P0-04 — Authorization/RLS HTTP regression coverage
 
-**Status: IN PROGRESS — BROAD REAL HTTP MATRIX + SECURITY-DEFINER SURFACE VERIFIED**
+**Status: IN PROGRESS — BROAD REAL HTTP + FRESH-DB MATRIX VERIFIED**
 
 Verified:
 
-- database-level cross-account, role/capability, Admin and trusted-worker isolation remains extensive across M1–M3 and commerce/payment/payout suites;
-- PR #13 established production-built real HTTP authorization tests against a freshly replayed Supabase stack with anonymous, Buyer, Seller/cross-account, Admin and unsigned EntizNet roles;
-- PR #15 extended high-risk storage/media ownership coverage to Seller storefront/branding, KYC path ownership and cross-account product-media deletion boundaries;
-- PR #25 exact head `fe3b4a9c19bc194eb787e54668e562debd0f036f` passed CI run `32867931444` and HTTP Authorization Regression run `32867931437`;
-- PR #25 freezes the authenticated public `SECURITY DEFINER` surface to an exact reviewed 21-function allow-list, requires every retained client privileged RPC to preserve `auth.uid()` scoping and requires the anonymous public privileged RPC surface to remain empty;
-- live Supabase verification after PR #25 confirmed the retired Stripe compatibility wrapper is anonymous/authenticated denied and service-role only, while the canonical provider-neutral payment-reference RPC remains authenticated/self-scoped;
-- PR #25 merged as `5db7250c05a8d08779f3af0d9524f24ebeddbc5b`; canonical production health returned HTTP 200 with database/storage/operations all `ok` and exact version `5db7250c05a8`.
+- database-level cross-account, role/capability, Admin and trusted-worker isolation across M1–M3 and commerce/payment/payout suites;
+- PR #13 established production-built real HTTP authorization tests against freshly replayed Supabase with anonymous, Buyer, Seller/cross-account, Admin and unsigned EntizNet roles;
+- PR #15 extended high-risk storage/media ownership coverage to Seller storefront/branding, KYC path ownership and cross-account product-media deletion;
+- PR #25 froze the authenticated public `SECURITY DEFINER` surface behind a reviewed allow-list and CI guard;
+- PR #26 runs the real HTTP matrix plus Chromium responsive/browser checks against a production build;
+- PR #27 adds authenticated checkout HTTP coverage for anonymous quote denial, billing-only address rejection, cross-Buyer address rejection and owned shipping-address acceptance;
+- PR #27 exact-head CI and HTTP runs passed after retargeting to the real post-PR #26 `main` base.
 
 Still required before clearing P0-04:
 
-- controlled authenticated verification against a deployed production-like environment rather than only local-Supabase HTTP execution;
-- repeat the representative matrix after any material auth/session/RLS architecture change;
-- keep any future browser-callable privileged RPC addition behind the explicit CI review allow-list.
+- controlled authenticated verification of representative protected flows against a deployed production-like environment using disposable test identities, not only local-Supabase HTTP execution;
+- repeat the matrix after any material auth/session/RLS architecture change;
+- keep any future browser-callable privileged RPC addition behind the explicit review/CI allow-list.
 
 ## P0-05 — Seller/Admin/KYC/storage security completion
 
 **Status: IN PROGRESS — STORAGE/MEDIA OWNERSHIP VERIFIED; MALWARE/CONTENT SCANNING PENDING**
 
-Verified controls include private KYC/message storage, size and magic-byte validation, Seller media ownership verification, RPC-only catalogue mutation, KYC/product moderation, trusted conversation-key access, reports/reviews/prohibited-product enforcement and narrow upload allow-lists.
+Verified controls include:
 
-Additional verified hardening:
-
-- PR #11 verified storage compensation/recovery for KYC, messaging and Seller branding partial failures;
-- PR #13 verified representative real HTTP KYC/product-media/message-attachment authorization and ownership behavior;
-- PR #15 merged as `8bc9271c16aaa1ab6342521afe97f8692943270a` and added Seller storefront/branding, KYC path ownership, product-media cross-account delete denial and direct bucket-boundary regressions;
-- KYC and message buckets remain private; product-media and Seller-branding buckets retain their intentional public/private boundaries with server-controlled upload/delete routes;
-- PR #17 made Storage bucket/public-private readiness part of canonical `/api/health`;
-- PR #18 redacts sensitive operational storage-route failures before logging/persistence.
+- private KYC/message storage;
+- size and magic-byte validation;
+- Seller media and branding ownership verification;
+- KYC path ownership;
+- cross-account product-media delete denial;
+- RPC-only catalogue mutation;
+- KYC/product moderation and Admin audit flows;
+- trusted conversation-key access;
+- reports/reviews/prohibited-product enforcement;
+- narrow upload allow-lists;
+- compensation/recovery for important storage partial failures;
+- required Storage bucket/public-private boundaries in canonical `/api/health`;
+- bounded redacted operational logging for sensitive storage routes.
 
 Still required:
 
 - malware/content scanning or an explicitly approved equivalent upload-safety architecture appropriate to public-launch risk;
-- final production content/moderation policy for accepted upload classes and escalation;
+- final public content/moderation policy for accepted upload classes and escalation;
 - re-verify public/private media boundaries after any storage-provider or upload architecture change.
 
-## P0-06 — Production deployment and migration hardening
+## P0-06 — Production deployment, capacity, domain and migration hardening
 
-**Status: IN PROGRESS — RELEASE/HEALTH/RUNTIME GUARDS + VERCEL PRO CAPACITY VERIFIED**
+**Status: IN PROGRESS — RELEASE/HEALTH/RUNTIME GUARDS VERIFIED; FINAL LAUNCH HOSTING CONDITIONS PENDING**
 
 Verified:
 
 - dedicated Vercel project `entiznetstore` linked to `OKenechukwu/EntizNetStore`;
-- project is now on Vercel Pro; exact-head previews and production deployments no longer depend on the former Hobby build-rate window;
-- canonical HTTPS production runtime has deployed M3 and subsequent P0 hardening successfully;
+- canonical HTTPS production runtime has repeatedly deployed M3 and subsequent P0/web-commerce hardening successfully;
 - exact source commit/deployment/runtime checks are part of release verification;
-- production build uses the canonical npm lockfile, effective Node 22 engine contract and CI runtime guards;
-- PR #12 established DB-backed `GET /api/health`, production security headers, reproducible production smoke verification and the release/rollback runbook;
+- production build uses the canonical npm lockfile and effective Node 22 application engine contract;
+- PR #12 established DB-backed `GET /api/health`, security headers, reproducible production smoke verification and release/rollback runbook;
 - PR #16 added dynamic public-API route inventory guards, effective-runtime verification and verbose operational logging rejection;
 - PR #18 added bounded structured error redaction for high-risk operational routes;
-- PR #25 production deployment `dpl_94WD4YipkZuTxAAmJRQ8H5CqSHa2` reached READY on exact merge `5db7250c05a8d08779f3af0d9524f24ebeddbc5b` with no error/fatal runtime logs in the verification window;
-- this web-first launch slice introduces `SITE_INDEXING_ENABLED`, defaulting to false so search indexing is an explicit production-launch action rather than an accidental development setting.
+- PR #26 added `SITE_INDEXING_ENABLED`, defaulting false, and made CSP permit the exact configured Supabase HTTPS/WSS origin instead of broadening arbitrary HTTP access;
+- PR #26 and PR #27 exact production releases both reached READY with healthy DB/Storage/operations and no error/fatal runtime logs during verification.
+
+Capacity note:
+
+- historical Vercel Hobby build-rate limiting was a real operational constraint;
+- do **not** treat an unverified plan-tier assumption as closure of this blocker;
+- confirm that the launch hosting tier/capacity, concurrency and deployment limits are appropriate before public traffic.
 
 Still required:
 
 - canonical owned production domain + DNS/HTTPS validation;
-- final production/preview/staging secret-target isolation review;
-- final CSP review for the actually selected payment/payout/identity browser integrations;
+- launch-capacity/hosting-tier verification;
+- final production/preview/development secret-target isolation review;
+- final CSP review for the selected payment/payout/identity browser integrations;
 - set and verify `SITE_INDEXING_ENABLED=true` only when public production is intentionally ready to be indexed;
-- final release rehearsal on the owned launch domain after remaining P0 external-provider/configuration blockers are cleared.
+- final release/rollback rehearsal on the owned launch domain after remaining P0 provider/configuration blockers are cleared.
 
 ## P0-07 — Observability and commerce incident response
 
@@ -183,43 +222,46 @@ Verified/implemented foundations:
 
 - canonical `/api/health` fails closed when database, required Storage boundaries or operational-event health are not `ok`;
 - PR #17 added Storage bucket/public-private readiness to health and production smoke verification;
-- PR #18 added bounded structured operational-event redaction that fingerprints actor/record identifiers and rejects raw stacks, tokens, signed URLs and arbitrary provider payloads;
-- the private `app_private.operational_events` ledger persists only a safe allow-listed event subset, retains events for 30 days and exposes service-role-only aggregate health;
-- repeated error/critical events use a 5-events/15-minute degradation threshold and the production monitor runs every 15 minutes;
-- repository incident automation creates/updates a GitHub production incident on failed canonical smoke and records/closes recovery after health returns;
+- PR #18 added bounded structured operational-event redaction that fingerprints identifiers and rejects raw stacks, tokens, signed URLs and arbitrary provider payloads;
+- private `app_private.operational_events` persists only a safe allow-listed event subset;
+- operational-event retention is 30 days;
+- repeated error/critical events use a 5-events/15-minute degradation threshold;
+- Production Monitor runs every 15 minutes and drives the canonical smoke signal;
+- repository incident automation can create/update a GitHub production incident and record recovery;
 - `docs/operations/INCIDENT_RESPONSE.md` defines severity, containment, recovery and evidence-handling rules;
-- PR #25 production verification again showed database/storage/operations healthy and no error/fatal Vercel runtime logs in the reviewed window.
+- PR #26 and PR #27 release checks showed healthy DB/Storage/operations and no error/fatal Vercel runtime logs in their verification windows.
 
 Still required before P0-07 is `VERIFIED`:
 
 - external alert/log-drain/SIEM destination and retention/escalation ownership appropriate to public operations;
 - processor-specific payment/refund inconsistency and callback reconciliation alerts once a real payment provider is selected;
 - payout/escrow reconciliation alerts once the launch payout provider is selected;
-- EntizNet handoff/Admin-service failure alerts after production signing configuration is enabled;
+- EntizNet handoff/Admin-service failure alerts after production signing is enabled;
 - recorded production monitor incident/recovery execution evidence on the final launch configuration.
 
 ## P0-08 — EntizNet identity/capability integration contract
 
-**Status: IN PROGRESS — CODE/DATABASE/PRODUCTION DEPLOYMENTS VERIFIED; SIGNING KEYS + REAL AUTHENTICATED E2E PENDING**
+**Status: IN PROGRESS — CODE/DATABASE/DEPLOYMENTS VERIFIED; PRODUCTION SIGNING + REAL AUTHENTICATED E2E PENDING**
 
 Verified:
 
 - one-to-one Store↔EntizNet identity mapping and auditable revocation;
-- only canonical Store capabilities (`entiznetstore_buyer`, `entiznetstore_seller`, `entiznetstore_business`);
-- linked EntizNet capability snapshot is upstream grant authority while Store-local suspension remains an additional deny;
+- canonical Store capabilities `entiznetstore_buyer`, `entiznetstore_seller`, `entiznetstore_business`;
+- linked EntizNet capability snapshot as upstream grant authority while Store-local suspension remains an additional deny;
 - standalone Store accounts remain supported;
-- short-lived Ed25519 user handoff, issuer/audience/time checks, POST transport, safe relative return path and replay-resistant `jti` ledger;
+- short-lived Ed25519 user handoff with issuer/audience/time checks, POST transport, safe relative return path and replay-resistant `jti` ledger;
 - Store handoff/identity-control RPCs are trusted-server/service-role boundaries;
 - legacy EntizNet Admin direct Store Supabase bridge removed;
-- EntizNet no longer requires EntizNetStore's service-role credential or privileged Store DB client;
-- CI rejects reintroduction of legacy Store database credential names in EntizNet application code;
-- domain-separated Admin assertions require `purpose=admin-api`, dedicated audience and allow-listed scopes (`store.health`, `store.accounts.read`);
-- Admin replay/audit state is private in `app_private.entiznet_admin_api_requests` with the real EntizNet actor UUID;
-- Store receiver and EntizNet sender are merged and READY in production with fail-closed unauthenticated/unsigned smoke checks and no route runtime-error groups.
+- EntizNet no longer requires EntizNetStore service-role credentials;
+- CI rejects reintroduction of legacy Store database credentials into EntizNet application code;
+- domain-separated Admin assertions require dedicated purpose/audience/scopes;
+- Admin replay/audit state is private in `app_private.entiznet_admin_api_requests`;
+- unsigned/unauthenticated integration paths fail closed.
 
-Exact production configuration contract:
+Production configuration contract:
 
 EntizNet:
+
 - `ENTIZNETSTORE_HANDOFF_PRIVATE_KEY`
 - `ENTIZNETSTORE_HANDOFF_KEY_ID`
 - `ENTIZNETSTORE_HANDOFF_ISSUER`
@@ -228,6 +270,7 @@ EntizNet:
 - `ENTIZNETSTORE_ORIGIN`
 
 EntizNetStore:
+
 - `ENTIZNET_HANDOFF_PUBLIC_KEY`
 - `ENTIZNET_HANDOFF_KEY_ID`
 - `ENTIZNET_HANDOFF_ISSUER`
@@ -236,20 +279,29 @@ EntizNetStore:
 
 Still required before EntizNet-linked public launch:
 
-- provision/own/rotate the production Ed25519 key pair in server-side secret stores;
+- provision, own and rotate the production Ed25519 key pair in server-side secret stores;
 - real confirmed EntizNet user → Store handoff;
 - same-account link/no duplicate identity;
 - Buyer/Seller/Business consistency and Store-local suspension precedence;
-- replay rejection and safe return path;
+- replay rejection and safe return path under real signing configuration;
 - logout, revocation and re-entry;
 - real signed EntizNet Admin health/account calls;
-- verify failures are observable without assertion/token leakage.
+- verify integration failures are observable without assertion/token leakage.
 
 ## P0-09 — Seller payout/disbursement E2E
 
-**Status: IN PROGRESS — EXTERNAL PAYOUT PROVIDER ONBOARDING DEFERRED UNTIL PRE-LAUNCH**
+**Status: IN PROGRESS — INTERNAL LEDGER/CONCURRENCY VERIFIED; EXTERNAL PAYOUT PROVIDER PENDING**
 
-Internal payout ledger, escrow claiming, idempotency, failure/cancellation release rules, terminal success semantics, event replay protection and real PostgreSQL concurrency regression are verified. The incident-response runbook now defines fail-closed payout/escrow containment and reconciliation principles.
+Verified:
+
+- internal payout ledger;
+- escrow claiming;
+- idempotency;
+- failure/cancellation release rules;
+- terminal success semantics;
+- event replay protection;
+- real PostgreSQL concurrency regression;
+- fail-closed payout/escrow containment principles in incident documentation.
 
 Still required before real disbursement:
 
@@ -263,32 +315,46 @@ Still required before real disbursement:
 
 ## P0-10 — Responsive web and accessibility public-launch pass
 
-**Status: OPEN — WEB PUBLIC-LAUNCH BLOCKER**
+**Status: IN PROGRESS — CORE RESPONSIVE BROWSER REGRESSION VERIFIED**
 
-EntizNetStore public V1 launches on the web before the native apps. The web therefore must be a first-class phone/tablet/desktop product, not merely a desktop precursor to mobile.
+EntizNetStore public V1 launches on the web before native apps. The web must therefore be a first-class phone/tablet/desktop product.
 
-Required before public web launch:
+Verified by PR #26:
 
-- verify core Buyer, Seller, Business and Admin launch-scope flows across target phone, tablet and desktop viewports;
-- verify keyboard navigation, focus management, labels/semantics, contrast and screen-reader behavior for critical paths;
-- verify touch ergonomics, sticky/fixed controls and mobile keyboard behavior on forms and checkout;
-- verify loading, empty, validation, error, retry and recovery states on constrained/mobile connections;
-- verify the shared `Download App` navigation entry and `/apps` availability page across responsive breakpoints;
-- complete a production-like accessibility/responsive regression pass on the launch domain.
+- production-built Chromium verification across phone, tablet and desktop viewport classes;
+- horizontal-overflow regression checks;
+- age-gate behavior;
+- browser console/page-error rejection;
+- shared `/apps` and Download App navigation behavior;
+- compact-header/mobile navigation fixes;
+- explicit 48px compact navigation/touch targets where failures were found;
+- exact-head HTTP/Chromium run `32885369783` passed before merge;
+- merged production release `b4b6ecdd2a1659a99c710d7b6a4d50c58e9b2c65` was healthy.
+
+PR #27 additionally passed the same production-build HTTP/Chromium workflow after the canonical cart/checkout rewrite.
+
+Still required before public web launch:
+
+- broader Buyer, Seller, Business and Admin launch-scope responsive walkthroughs where current automated routes do not cover the complete workflow;
+- keyboard navigation and focus-management pass across critical forms/dialogs;
+- labels/semantics, contrast and screen-reader verification for critical paths;
+- mobile-keyboard behavior on forms and checkout;
+- loading, empty, validation, error, retry and recovery state review under constrained/mobile conditions;
+- production-like accessibility/responsive regression on the final owned launch domain.
 
 Architecture/sequence: `docs/architecture/WEB_FIRST_LAUNCH_AND_NATIVE_MOBILE.md`.
 
 ---
 
-# P1 — polished V1/product parity
+# P1 — post-web V1 / native product parity
 
 ## P1-01 — Native iOS/Android marketplace client
 
 **Status: DEFERRED UNTIL AFTER PUBLIC WEB V1 — NOT A WEB-LAUNCH BLOCKER**
 
-React Native + TypeScript mobile remains a first-class product, not a web wrapper. Public responsive web launches first. The web includes a stable `Download App` entry and `/apps` page; until legitimate store listings exist, iOS/Android states remain clearly marked coming soon.
+React Native + TypeScript mobile remains a first-class product, not a web wrapper. Public responsive web launches first. The web includes a stable Download App entry and `/apps` page; until legitimate store listings exist, iOS/Android states remain clearly marked coming soon.
 
-After the web launch gates are cleared, native work proceeds through shared domain/API contracts, secure device session storage, Buyer/Seller mobile flows, push notifications, deep links/EntizNet entry points and production mobile observability. Expo is preferred unless repository/platform inspection gives a strong reason otherwise.
+After web launch gates are cleared, native work proceeds through shared domain/API contracts, secure device session storage, Buyer/Seller mobile flows, push notifications, deep links/EntizNet entry points and production mobile observability. Expo is preferred unless repository/platform inspection gives a strong reason otherwise.
 
 Architecture/sequence: `docs/architecture/WEB_FIRST_LAUNCH_AND_NATIVE_MOBILE.md`.
 
@@ -296,7 +362,7 @@ Architecture/sequence: `docs/architecture/WEB_FIRST_LAUNCH_AND_NATIVE_MOBILE.md`
 
 **Status: OPEN — AFTER NATIVE FOUNDATION**
 
-Before either native client is submitted, re-audit the then-current Apple App Store and Google Play rules against the actual EntizNetStore catalogue/content, age gating, payments, privacy/account controls and Seller functionality. Acceptance is a release gate, not an assumption.
+Before either native client is submitted, re-audit then-current Apple App Store and Google Play rules against the actual EntizNetStore catalogue/content, age gating, payments, privacy/account controls and Seller functionality. Acceptance is a release gate, not an assumption.
 
 Required work includes separate iOS/Android signing and release configuration, privacy declarations, app permissions, universal/app links, notifications, screenshots/metadata, accessibility, production store-build verification and response to review findings. Official `/apps` store links are enabled only after legitimate listings exist.
 
@@ -305,6 +371,23 @@ Required work includes separate iOS/Android signing and release configuration, p
 **Status: OPEN**
 
 Finalize launch terms/privacy, returns/refunds, Seller policies, prohibited/restricted products, age requirements, support/escalation paths and jurisdiction-specific commerce disclosures.
+
+---
+
+# Current public-web launch focus
+
+The highest-impact unresolved launch blockers are now:
+
+1. **P0-01** — durable database + Storage backup and tested restore.
+2. **P0-03** — real payment processor selection/integration/E2E.
+3. **P0-05** — malware/content scanning or approved equivalent upload-safety architecture.
+4. **P0-06** — owned launch domain, hosting capacity/tier confirmation, environment isolation and final release rehearsal.
+5. **P0-07** — external alert/log destination and provider-specific reconciliation alerts.
+6. **P0-08** — production EntizNet Ed25519 signing and real authenticated cross-product E2E.
+7. **P0-09** — real payout provider E2E.
+8. **P0-10** — broader accessibility and final launch-domain responsive verification.
+
+P0-02 remains coupled to the external provider/signing selections above. P0-04 remains a continuing authorization verification gate rather than a known code defect.
 
 ---
 
