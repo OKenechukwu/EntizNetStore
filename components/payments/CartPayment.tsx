@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import type { CartItem } from "@/lib/cart";
+import { useEffect, useState } from "react";
 
 const publicProvider = (
   process.env.NEXT_PUBLIC_PAYMENT_PROVIDER || "unconfigured"
@@ -12,59 +11,83 @@ function ProviderPending() {
     <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
       <p className="font-semibold">Secure payment activation is pending.</p>
       <p className="mt-1">
-        EntizNetStore checkout, inventory reservation, order splitting and escrow
-        are built and tested. Card/payment processing will open after the final
-        marketplace payment provider is approved and connected before launch.
+        EntizNetStore&apos;s canonical cart, quote, order, inventory reservation and escrow
+        flow is built and tested. Payment collection will open only after the final
+        marketplace processor is approved and connected before launch.
       </p>
     </div>
   );
 }
 
+type PaymentResult = {
+  error?: string;
+  code?: string;
+  checkoutSessionId?: string;
+  nextAction?: { type?: string; url?: string | null };
+};
+
 export default function CartPayment({
-  cart,
-  onSuccess,
+  cartId,
+  quoteId,
+  onNeedsRequote,
 }: {
-  cart: CartItem[];
-  onSuccess: () => void;
+  cartId: string;
+  quoteId: string;
+  onNeedsRequote: () => void;
 }) {
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
-  const [address, setAddress] = useState({
-    name: "",
-    line1: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "US",
-  });
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    setIdempotencyKey(crypto.randomUUID());
+    setCheckoutSessionId(null);
+    setError("");
+    setStatus("");
+  }, [cartId, quoteId]);
 
   if (publicProvider === "unconfigured") {
     return <ProviderPending />;
   }
 
-  async function beginPayment(event: React.FormEvent) {
-    event.preventDefault();
+  async function beginPayment() {
     setProcessing(true);
     setError("");
+    setStatus("");
 
     try {
+      let sessionId = checkoutSessionId;
+      if (!sessionId) {
+        const sessionResponse = await fetch("/api/checkout/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cartId, quoteId, idempotencyKey }),
+        });
+        const session = (await sessionResponse.json().catch(() => ({}))) as PaymentResult;
+        if (!sessionResponse.ok || !session.checkoutSessionId) {
+          if ([400, 403, 404, 409].includes(sessionResponse.status)) onNeedsRequote();
+          throw new Error(session.error || "Unable to create secure checkout session");
+        }
+        sessionId = session.checkoutSessionId;
+        setCheckoutSessionId(sessionId);
+      }
+
       const response = await fetch("/api/payments/create-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idempotencyKey,
-          items: cart.map((item) => ({
-            productId: item.id,
-            variantId: item.variantId,
-            quantity: item.qty,
-          })),
-          shippingAddress: address,
-        }),
+        body: JSON.stringify({ checkoutSessionId: sessionId }),
       });
+      const result = (await response.json().catch(() => ({}))) as PaymentResult;
 
-      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (result.code === "PAYMENT_ALREADY_INITIALIZED") {
+          throw new Error(
+            "Payment was already initialized for this checkout. EntizNetStore will not create a duplicate payment. If you did not reach the processor, refresh the checkout status or contact support.",
+          );
+        }
+        if (response.status === 409) onNeedsRequote();
         throw new Error(result.error || "Unable to initialize payment");
       }
 
@@ -74,7 +97,9 @@ export default function CartPayment({
       }
 
       if (result.nextAction?.type === "none") {
-        onSuccess();
+        setStatus(
+          "Payment initialization was accepted. The order remains pending until the payment provider confirms the transaction.",
+        );
         return;
       }
 
@@ -83,77 +108,37 @@ export default function CartPayment({
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Payment failed");
-      setIdempotencyKey(crypto.randomUUID());
+      // Never rotate the idempotency key or silently create a second session on
+      // retry. Replays remain bound to this cart/quote until the parent explicitly
+      // requires a fresh trusted quote.
     } finally {
       setProcessing(false);
     }
   }
 
-  const field = "w-full rounded-lg border px-3 py-2";
-
   return (
-    <form onSubmit={beginPayment} className="space-y-4">
-      <h2 className="text-lg font-semibold">Shipping and payment</h2>
+    <div className="space-y-4">
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
       )}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          required
-          placeholder="Full name"
-          value={address.name}
-          onChange={(event) => setAddress({ ...address, name: event.target.value })}
-          className={field}
-        />
-        <input
-          required
-          placeholder="Address"
-          value={address.line1}
-          onChange={(event) => setAddress({ ...address, line1: event.target.value })}
-          className={field}
-        />
-        <input
-          required
-          placeholder="City"
-          value={address.city}
-          onChange={(event) => setAddress({ ...address, city: event.target.value })}
-          className={field}
-        />
-        <input
-          placeholder="State / province"
-          value={address.state}
-          onChange={(event) => setAddress({ ...address, state: event.target.value })}
-          className={field}
-        />
-        <input
-          required
-          placeholder="Postal code"
-          value={address.postalCode}
-          onChange={(event) => setAddress({ ...address, postalCode: event.target.value })}
-          className={field}
-        />
-        <input
-          required
-          minLength={2}
-          maxLength={2}
-          placeholder="Country code"
-          value={address.country}
-          onChange={(event) => setAddress({ ...address, country: event.target.value.toUpperCase() })}
-          className={field}
-        />
-      </div>
+      {status && (
+        <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+          {status}
+        </div>
+      )}
       <button
-        type="submit"
-        disabled={processing || cart.length === 0}
-        className="w-full rounded-lg bg-black py-3 font-medium text-white disabled:opacity-50"
+        type="button"
+        onClick={() => void beginPayment()}
+        disabled={processing}
+        className="min-h-11 w-full rounded-lg bg-black px-4 py-3 font-medium text-white disabled:opacity-50"
       >
-        {processing ? "Opening secure payment…" : "Continue to secure payment"}
+        {processing ? "Opening secure payment…" : checkoutSessionId ? "Retry secure payment" : "Continue to secure payment"}
       </button>
       <p className="text-center text-xs text-gray-500">
-        The final USD amount is recalculated securely from the live catalog before any provider is asked to collect payment.
+        The amount, Seller split, shipping address and inventory reservation come only from the consumed server quote. Browser-supplied item prices are never accepted here.
       </p>
-    </form>
+    </div>
   );
 }
