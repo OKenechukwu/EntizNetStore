@@ -45,6 +45,9 @@ jobs:
       - name: Run storage failure recovery regression
         run: npm run test:storage-recovery
 
+      - name: Run operational logging redaction regression
+        run: npm run test:operational-logging
+
       - name: Type-check application
         run: npm run typecheck
 
