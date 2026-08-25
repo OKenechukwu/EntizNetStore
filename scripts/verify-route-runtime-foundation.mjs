@@ -16,6 +16,17 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
+function walk(relativePath) {
+  const absolute = path.join(root, relativePath);
+  if (!fs.existsSync(absolute)) return [];
+  const stat = fs.statSync(absolute);
+  if (stat.isFile()) return [relativePath];
+  return fs.readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
+    const next = path.join(relativePath, entry.name);
+    return entry.isDirectory() ? walk(next) : [next];
+  });
+}
+
 for (const forbiddenPath of [
   ".eslintrc.json",
   "middleware.ts",
@@ -60,17 +71,6 @@ for (const requiredInclude of [".next/types/**/*.ts", ".next/dev/types/**/*.ts"]
 }
 
 const sourceRoots = ["app", "components", "lib", "proxy.ts"];
-function walk(relativePath) {
-  const absolute = path.join(root, relativePath);
-  if (!fs.existsSync(absolute)) return [];
-  const stat = fs.statSync(absolute);
-  if (stat.isFile()) return [relativePath];
-  return fs.readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
-    const next = path.join(relativePath, entry.name);
-    return entry.isDirectory() ? walk(next) : [next];
-  });
-}
-
 const runtimeFiles = sourceRoots.flatMap((entry) => walk(entry));
 const forbiddenLegacyTokens = [
   { label: "legacy internal-open feature flag", value: "INTERNAL_OPEN" },
@@ -89,10 +89,42 @@ for (const relativePath of runtimeFiles) {
   }
 }
 
+const forbiddenPageRouteSegments = new Set([
+  "debug",
+  "dev",
+  "fixture",
+  "fixtures",
+  "internal",
+  "maintenance",
+  "migrate",
+  "migration",
+  "migrations",
+  "mock",
+  "mocks",
+  "seed",
+  "seeds",
+  "test",
+  "tests",
+]);
+const pageRouteFiles = walk("app").filter((relativePath) => /(?:^|[\\/])page\.[cm]?[jt]sx?$/.test(relativePath));
+
+for (const relativePath of pageRouteFiles) {
+  const normalizedPath = relativePath.split(path.sep).join("/");
+  const routeSegments = normalizedPath.split("/").slice(1, -1);
+  for (const segment of routeSegments) {
+    const normalizedSegment = segment.replace(/^\((.*)\)$/, "$1").toLowerCase();
+    if (forbiddenPageRouteSegments.has(normalizedSegment)) {
+      fail(`Forbidden production page route segment '${segment}' found in ${normalizedPath}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error("Route/runtime foundation verification FAILED:\n");
   for (const message of failures) console.error(`- ${message}`);
   process.exit(1);
 }
 
-console.log(`Route/runtime foundation verification passed (${runtimeFiles.length} runtime files scanned).`);
+console.log(
+  `Route/runtime foundation verification passed (${runtimeFiles.length} runtime files, ${pageRouteFiles.length} page routes scanned).`,
+);
