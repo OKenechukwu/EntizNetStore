@@ -138,13 +138,17 @@ for (const packageName of forbiddenPackages) {
 // ---------------------------------------------------------------------------
 for (const requiredPath of [
   ".env.example",
+  ".github/workflows/http-authorization.yml",
+  ".github/workflows/production-monitor.yml",
   "LAUNCH_BLOCKERS.md",
   "app/api/health/route.ts",
   "docs/architecture/ADR-0001-account-capabilities.md",
   "docs/operations/BACKUP_RECOVERY.md",
   "docs/operations/ENVIRONMENT_SECRETS.md",
+  "docs/operations/INCIDENT_RESPONSE.md",
   "docs/operations/PRODUCTION_BASELINE_2026-08-21.md",
   "docs/operations/PRODUCTION_RELEASE.md",
+  "scripts/test-http-authorization.mjs",
   "scripts/test-production-http-smoke.mjs",
   "supabase/seed.sql",
 ]) {
@@ -153,6 +157,31 @@ for (const requiredPath of [
 
 if (!pkg.scripts?.["test:production-http-smoke"]) {
   fail("package.json must expose test:production-http-smoke");
+}
+
+if (exists(".github/workflows/production-monitor.yml")) {
+  const monitor = read(".github/workflows/production-monitor.yml");
+  for (const requiredFragment of [
+    "cron: '17 * * * *'",
+    "issues: write",
+    "scripts/test-production-http-smoke.mjs",
+    "docs/operations/INCIDENT_RESPONSE.md",
+    "[monitor] EntizNetStore production smoke failure",
+  ]) {
+    if (!monitor.includes(requiredFragment)) {
+      fail(`Production monitor is missing required control: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists(".github/workflows/http-authorization.yml")) {
+  const httpAuthorization = read(".github/workflows/http-authorization.yml");
+  if (!httpAuthorization.includes("scripts/test-http-authorization.mjs")) {
+    fail("HTTP authorization workflow must execute scripts/test-http-authorization.mjs");
+  }
+  if (!httpAuthorization.includes("supabase db reset --local")) {
+    fail("HTTP authorization workflow must replay a fresh local Supabase database");
+  }
 }
 
 if (exists("next.config.js")) {
