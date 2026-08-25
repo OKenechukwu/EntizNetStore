@@ -1,8 +1,7 @@
 // app/api/products/[slug]/recommendations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-export const runtime = "edge";
+import { logOperationalError } from "@/lib/observability/operationalEvent";
 
 /**
  * GET /api/products/[slug]/recommendations
@@ -10,7 +9,7 @@ export const runtime = "edge";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     const { slug } = await params;
@@ -36,7 +35,12 @@ export async function GET(
       .limit(8);
 
     if (error) {
-      console.error("Recommendations error:", error);
+      logOperationalError("product_recommendations_query_failed", error, {
+        component: "catalog",
+        operation: "product-recommendations",
+        route: "/api/products/[slug]/recommendations",
+        recordId: product.id,
+      });
       return NextResponse.json({ recommendations: [] });
     }
 
@@ -54,7 +58,11 @@ export async function GET(
 
     return NextResponse.json({ recommendations: formattedRecommendations });
   } catch (error) {
-    console.error("Recommendations error:", error);
+    logOperationalError("product_recommendations_failed", error, {
+      component: "catalog",
+      operation: "product-recommendations",
+      route: "/api/products/[slug]/recommendations",
+    });
     return NextResponse.json({ recommendations: [] });
   }
 }
