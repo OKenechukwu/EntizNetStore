@@ -61,3 +61,42 @@ test('contains thrown error output and returns false instead of masking the orig
   assert.equal(logs[0].details.errorName, 'Error')
   assert.equal(logs[0].details.errorMessage, 'network unavailable')
 })
+
+test('default compensation logging fingerprints ownership and redacts secrets', async () => {
+  const originalConsoleError = console.error
+  const captured: unknown[][] = []
+  console.error = (...args: unknown[]) => captured.push(args)
+
+  try {
+    const result = await removeStorageObjectBestEffort(
+      {
+        async remove() {
+          throw new Error('cleanup failed?access_token=private-value Bearer bearer-secret')
+        },
+      },
+      'seller-123/private/document.pdf',
+      {
+        bucket: 'kyc-documents',
+        operation: 'rollback-kyc-registration',
+        ownerId: 'seller-123',
+        recordId: 'document-456',
+      },
+    )
+
+    assert.equal(result, false)
+    assert.equal(captured.length, 1)
+    assert.equal(captured[0][0], 'EntizNetStore operational error')
+
+    const serialized = JSON.stringify(captured[0])
+    assert.equal(serialized.includes('seller-123'), false)
+    assert.equal(serialized.includes('document-456'), false)
+    assert.equal(serialized.includes('private/document.pdf'), false)
+    assert.equal(serialized.includes('private-value'), false)
+    assert.equal(serialized.includes('bearer-secret'), false)
+    assert.match(serialized, /actorFingerprint/)
+    assert.match(serialized, /recordFingerprint/)
+    assert.match(serialized, /\[REDACTED\]/)
+  } finally {
+    console.error = originalConsoleError
+  }
+})
