@@ -29,7 +29,7 @@ export type OperationalEventRecord = {
 
 type OperationalLogger = (
   message: string,
-  details: Record<string, string | number | boolean | null | undefined>,
+  details: OperationalEventRecord,
 ) => void
 
 const QUERY_SECRET = /([?&](?:token|access_token|refresh_token|apikey|api_key|key|signature|sig)=)[^&#\s]+/gi
