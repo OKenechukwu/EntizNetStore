@@ -59,6 +59,13 @@ async function loadLocaleDict(locale: string): Promise<Dict> {
   }
 }
 
+function resolveDictValue(dict: Dict, key: string): unknown {
+  return key.split('.').reduce<unknown>((value, segment) => {
+    if (!value || typeof value !== 'object') return undefined;
+    return (value as Dict)[segment];
+  }, dict);
+}
+
 /* -------------------- Provider -------------------- */
 export default function I18nProvider({
   children,
@@ -134,10 +141,13 @@ export default function I18nProvider({
   /** Humanized fallback so raw keys never show */
   const t = useMemo(() => {
     return (k: string) => {
-      const v = k.split('.').reduce<any>((o, p) => (o ? o[p] : undefined), dict);
+      const v = resolveDictValue(dict, k);
       if (typeof v === 'string') return v;
       const last = k.split('.').pop() || k;
-      return last.replace(/[_\.]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+      return last
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_\.]/g, ' ')
+        .replace(/\b\w/g, (m) => m.toUpperCase());
     };
   }, [dict]);
 
@@ -166,8 +176,9 @@ export function T({
   fallback?: string;
   vars?: Record<string, string | number>;
 }) {
-  const { t } = useI18n();
-  let txt = t(k) || fallback || '';
+  const { t, dict } = useI18n();
+  const translated = resolveDictValue(dict, k);
+  let txt = typeof translated === 'string' ? translated : fallback || t(k) || '';
   if (vars) {
     for (const [key, val] of Object.entries(vars)) {
       txt = txt.split(`{${key}}`).join(String(val));
