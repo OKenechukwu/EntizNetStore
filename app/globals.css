@@ -237,6 +237,14 @@ html, body {
   justify-content: center;
 }
 
+/* Keep the age-verification dialog opaque so text and CTA contrast remain
+   deterministic under Chromium/axe rather than blending with the page behind it. */
+.age-gate-overlay .glass-card {
+  background: var(--card);
+  color: var(--foreground);
+  backdrop-filter: none;
+}
+
 /* =========================================
    Accessibility
    ========================================= */
