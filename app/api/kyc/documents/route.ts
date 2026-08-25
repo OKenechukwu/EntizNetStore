@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logOperationalError } from '@/lib/observability/operationalEvent';
+import { reportOperationalError } from '@/lib/observability/operationalEventSink';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { sanitizeInput } from '@/lib/security';
@@ -152,14 +152,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // The browser's filename, Content-Type and claimed size are not trusted.
-    // Download the private object and identify supported formats by magic bytes.
     const { data: blob, error: downloadError } = await admin.storage
       .from(KYC_BUCKET)
       .download(filePath);
 
     if (downloadError || !blob) {
-      logOperationalError(
+      await reportOperationalError(
         'storage.kyc.object_verification_failed',
         downloadError ?? 'uploaded KYC object was not returned',
         {
@@ -207,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       await deleteRejectedUpload(filePath, user.id, 'rollback-kyc-registration');
-      logOperationalError('storage.kyc.registration_failed', insertError, {
+      await reportOperationalError('storage.kyc.registration_failed', insertError, {
         component: 'storage',
         operation: 'register-kyc-document',
         bucket: KYC_BUCKET,
@@ -238,7 +236,7 @@ export async function POST(request: NextRequest) {
         .eq('id', verificationRequest.id);
 
       if (updateError) {
-        logOperationalError('kyc.verification_request_update_failed', updateError, {
+        await reportOperationalError('kyc.verification_request_update_failed', updateError, {
           component: 'kyc',
           operation: 'update-verification-request',
           route: '/api/kyc/documents',
@@ -247,8 +245,6 @@ export async function POST(request: NextRequest) {
         });
       } else {
         if (!['verified', 'suspended'].includes(sellerProfile.verification_status)) {
-          // Resubmission after rejection becomes actionable again. A verified or
-          // suspended seller is never silently downgraded by an extra upload.
           const { error: sellerStatusError } = await admin
             .from('profiles_seller')
             .update({
@@ -257,7 +253,7 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', user.id);
           if (sellerStatusError) {
-            logOperationalError('kyc.seller_lifecycle_update_failed', sellerStatusError, {
+            await reportOperationalError('kyc.seller_lifecycle_update_failed', sellerStatusError, {
               component: 'kyc',
               operation: 'update-seller-verification-lifecycle',
               route: '/api/kyc/documents',
@@ -266,9 +262,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Business/BSM uses the same KYC evidence but keeps a distinct business
-        // projection. Keep its lifecycle synchronized so BSM never remains
-        // permanently "pending" after the shared seller verification advances.
         const { data: businessProfile } = await admin
           .from('profiles_business')
           .select('verification_status')
@@ -286,7 +279,7 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', user.id);
           if (businessStatusError) {
-            logOperationalError('kyc.business_lifecycle_update_failed', businessStatusError, {
+            await reportOperationalError('kyc.business_lifecycle_update_failed', businessStatusError, {
               component: 'kyc',
               operation: 'update-business-verification-lifecycle',
               route: '/api/kyc/documents',
@@ -299,7 +292,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, document }, { status: 201 });
   } catch (error) {
-    logOperationalError('kyc.document_registration_route_failed', error, {
+    await reportOperationalError('kyc.document_registration_route_failed', error, {
       component: 'kyc',
       operation: 'register-kyc-document',
       route: '/api/kyc/documents',
