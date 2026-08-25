@@ -14,7 +14,7 @@ test("signed-in cart converges on the canonical server cart", async () => {
 
   assert.match(cartPage, /loadCanonicalCartWithGuestImport\(\)/);
   assert.match(cartPage, /if \(user\?\.isBuyer\) return canonicalCart\?\.items \|\| \[\]/);
-  assert.match(cartPage, /setCanonicalCart\(await setCanonicalCartItem/);
+  assert.match(cartPage, /setCanonicalCart\(\s*await setCanonicalCartItem/s);
   assert.match(cartPage, /setCanonicalCart\(await removeCanonicalCartItem/);
   assert.match(cartPage, /setCanonicalCart\(await clearCanonicalCart\(\)\)/);
 
@@ -63,12 +63,14 @@ test("payment is bound to one quote-scoped canonical checkout session", async ()
   assert.match(payment, /const activeAttempt = attempt\?\.scope === scope \? attempt : null;/);
   assert.match(payment, /let workingAttempt = activeAttempt \|\| createAttempt\(scope\);/);
   assert.match(payment, /let sessionId = workingAttempt\.checkoutSessionId;/);
+  assert.match(payment, /if \(!sessionId\) \{/);
   assert.match(payment, /fetch\("\/api\/checkout\/session"/);
   assert.match(
     payment,
     /body: JSON\.stringify\(\{\s*cartId,\s*quoteId,\s*idempotencyKey: workingAttempt\.idempotencyKey,\s*\}\)/s,
   );
   assert.match(payment, /workingAttempt = \{ \.\.\.workingAttempt, checkoutSessionId: sessionId \};/);
+  assert.match(payment, /setAttempt\(workingAttempt\);/);
   assert.match(payment, /fetch\("\/api\/payments\/create-intent"/);
   assert.match(
     payment,
@@ -79,7 +81,6 @@ test("payment is bound to one quote-scoped canonical checkout session", async ()
     /JSON\.stringify\(\{\s*(items|amount|price|shippingAddress|address)/,
     "payment initiation must never trust browser-supplied commerce values",
   );
-  assert.match(payment, /Retries keep the\s*same UUID and checkout session/);
 });
 
 test("checkout authentication return target is same-site only", async () => {
