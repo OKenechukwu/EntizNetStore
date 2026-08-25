@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { logOperationalError } from '@/lib/observability/operationalEvent';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
@@ -57,7 +58,14 @@ export async function POST(request: NextRequest) {
     cacheControl: '3600',
   });
   if (uploadError) {
-    console.error('Message attachment upload failed:', uploadError);
+    logOperationalError('storage.message_attachment.upload_failed', uploadError, {
+      component: 'storage',
+      operation: 'upload-message-attachment',
+      bucket: BUCKET,
+      route: '/api/messages/attachments/upload',
+      actorId: user.id,
+      recordId: message.id,
+    });
     return NextResponse.json({ error: 'Unable to upload attachment' }, { status: 500 });
   }
 
@@ -84,7 +92,14 @@ export async function POST(request: NextRequest) {
         recordId: message.id,
       },
     );
-    console.error('Message attachment registration failed:', insertError);
+    logOperationalError('storage.message_attachment.registration_failed', insertError, {
+      component: 'storage',
+      operation: 'register-message-attachment',
+      bucket: BUCKET,
+      route: '/api/messages/attachments/upload',
+      actorId: user.id,
+      recordId: message.id,
+    });
     return NextResponse.json({ error: 'Unable to register attachment' }, { status: 500 });
   }
 
