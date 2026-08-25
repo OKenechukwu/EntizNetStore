@@ -1,3 +1,5 @@
+import { logOperationalError } from '@/lib/observability/operationalEvent'
+
 export type StorageRemovalResult = { error: unknown | null }
 
 export type StorageObjectRemover = {
@@ -32,7 +34,30 @@ function errorDetails(error: unknown) {
 }
 
 const defaultLogger: StorageCleanupLogger = (message, details) => {
-  console.error(message, details)
+  const event = message === 'Storage compensation threw'
+    ? 'storage.compensation.threw'
+    : 'storage.compensation.failed'
+
+  logOperationalError(
+    event,
+    {
+      name: typeof details.errorName === 'string' ? details.errorName : undefined,
+      message: typeof details.errorMessage === 'string'
+        ? details.errorMessage
+        : 'storage compensation failed',
+    },
+    {
+      component: 'storage',
+      operation: typeof details.operation === 'string' ? details.operation : 'compensate-object',
+      bucket: typeof details.bucket === 'string' ? details.bucket : undefined,
+      actorId: typeof details.ownerId === 'string' ? details.ownerId : undefined,
+      recordId: typeof details.recordId === 'string'
+        ? details.recordId
+        : typeof details.filePath === 'string'
+          ? details.filePath
+          : undefined,
+    },
+  )
 }
 
 export async function removeStorageObjectBestEffort(
