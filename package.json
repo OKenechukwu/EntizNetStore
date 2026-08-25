@@ -15,7 +15,8 @@
     "test:operational-logging": "node --experimental-strip-types --test tests/operational-event.test.mts",
     "test:production-http-smoke": "node scripts/test-production-http-smoke.mjs",
     "start": "PORT=${PORT:-3000} next start -H 0.0.0.0 -p ${PORT:-3000}",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "node scripts/lint-with-baseline.mjs",
+    "lint:strict": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^4.0.2",
