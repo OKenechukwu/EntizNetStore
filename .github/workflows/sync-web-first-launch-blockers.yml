@@ -1,16 +1,16 @@
-name: Sync Web-First Launch Blockers
+name: "Sync Web-First Launch Blockers"
 
 on:
   push:
     branches:
-      - codex/web-first-launch
+      - "codex/web-first-launch"
 
 permissions:
   contents: write
 
 jobs:
   update:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out feature branch
@@ -63,12 +63,7 @@ Still required before clearing P0-04:
 - repeat the representative matrix after any material auth/session/RLS architecture change;
 - keep any future browser-callable privileged RPC addition behind the explicit CI review allow-list.
 '''
-          source = replace_section(
-              source,
-              '## P0-04 — Authorization/RLS HTTP regression coverage',
-              '## P0-05 — Seller/Admin/KYC/storage security completion',
-              p004,
-          )
+          source = replace_section(source, '## P0-04 — Authorization/RLS HTTP regression coverage', '## P0-05 — Seller/Admin/KYC/storage security completion', p004)
 
           p005 = '''## P0-05 — Seller/Admin/KYC/storage security completion
 
@@ -91,12 +86,7 @@ Still required:
 - final production content/moderation policy for accepted upload classes and escalation;
 - re-verify public/private media boundaries after any storage-provider or upload architecture change.
 '''
-          source = replace_section(
-              source,
-              '## P0-05 — Seller/Admin/KYC/storage security completion',
-              '## P0-06 — Production deployment and migration hardening',
-              p005,
-          )
+          source = replace_section(source, '## P0-05 — Seller/Admin/KYC/storage security completion', '## P0-06 — Production deployment and migration hardening', p005)
 
           p006 = '''## P0-06 — Production deployment and migration hardening
 
@@ -123,12 +113,7 @@ Still required:
 - set and verify `SITE_INDEXING_ENABLED=true` only when public production is intentionally ready to be indexed;
 - final release rehearsal on the owned launch domain after remaining P0 external-provider/configuration blockers are cleared.
 '''
-          source = replace_section(
-              source,
-              '## P0-06 — Production deployment and migration hardening',
-              '## P0-07 — Observability and commerce incident response',
-              p006,
-          )
+          source = replace_section(source, '## P0-06 — Production deployment and migration hardening', '## P0-07 — Observability and commerce incident response', p006)
 
           p007 = '''## P0-07 — Observability and commerce incident response
 
@@ -153,12 +138,7 @@ Still required before P0-07 is `VERIFIED`:
 - EntizNet handoff/Admin-service failure alerts after production signing configuration is enabled;
 - recorded production monitor incident/recovery execution evidence on the final launch configuration.
 '''
-          source = replace_section(
-              source,
-              '## P0-07 — Observability and commerce incident response',
-              '## P0-08 — EntizNet identity/capability integration contract',
-              p007,
-          )
+          source = replace_section(source, '## P0-07 — Observability and commerce incident response', '## P0-08 — EntizNet identity/capability integration contract', p007)
 
           p010 = '''## P0-10 — Responsive web and accessibility public-launch pass
 
@@ -200,12 +180,7 @@ Before either native client is submitted, re-audit the then-current Apple App St
 
 Required work includes separate iOS/Android signing and release configuration, privacy declarations, app permissions, universal/app links, notifications, screenshots/metadata, accessibility, production store-build verification and response to review findings. Official `/apps` store links are enabled only after legitimate listings exist.
 '''
-          source = replace_section(
-              source,
-              '## P1-01 — Native iOS/Android marketplace client',
-              '## P1-03 — Marketplace policy/operational content',
-              native,
-          )
+          source = replace_section(source, '## P1-01 — Native iOS/Android marketplace client', '## P1-03 — Marketplace policy/operational content', native)
 
           path.write_text(source)
           PY
