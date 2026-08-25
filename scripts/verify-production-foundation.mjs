@@ -33,11 +33,6 @@ function stripComments(content) {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
-// ---------------------------------------------------------------------------
-// Runtime/template residue that must never re-enter the production branch.
-// Historical provenance inside already-applied migrations and explanatory code
-// comments is intentionally excluded: this gate targets executable assumptions.
-// ---------------------------------------------------------------------------
 const forbiddenPaths = [
   ".replit",
   "yarn.lock",
@@ -83,11 +78,6 @@ for (const relativePath of runtimeFiles) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Dependency contract: npm + package-lock.json are canonical. package.json and
-// package-lock.json must agree exactly at the root and known legacy packages
-// must be absent from the locked graph.
-// ---------------------------------------------------------------------------
 const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const lockRoot = lock.packages?.[""] ?? {};
@@ -133,9 +123,6 @@ for (const packageName of forbiddenPackages) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Required production-foundation records and release safety controls.
-// ---------------------------------------------------------------------------
 for (const requiredPath of [
   ".env.example",
   ".github/workflows/http-authorization.yml",
@@ -148,8 +135,10 @@ for (const requiredPath of [
   "docs/operations/INCIDENT_RESPONSE.md",
   "docs/operations/PRODUCTION_BASELINE_2026-08-21.md",
   "docs/operations/PRODUCTION_RELEASE.md",
+  "docs/operations/STORAGE_SECURITY_VERIFICATION_2026-08-25.md",
   "scripts/test-http-authorization.mjs",
   "scripts/test-production-http-smoke.mjs",
+  "scripts/test-storage-boundary.mjs",
   "supabase/seed.sql",
 ]) {
   if (!exists(requiredPath)) fail(`Required production-foundation file missing: ${requiredPath}`);
@@ -164,6 +153,7 @@ if (exists(".github/workflows/production-monitor.yml")) {
   for (const requiredFragment of [
     "cron: '17 * * * *'",
     "issues: write",
+    "persist-credentials: false",
     "scripts/test-production-http-smoke.mjs",
     "docs/operations/INCIDENT_RESPONSE.md",
     "[monitor] EntizNetStore production smoke failure",
@@ -176,11 +166,30 @@ if (exists(".github/workflows/production-monitor.yml")) {
 
 if (exists(".github/workflows/http-authorization.yml")) {
   const httpAuthorization = read(".github/workflows/http-authorization.yml");
-  if (!httpAuthorization.includes("scripts/test-http-authorization.mjs")) {
-    fail("HTTP authorization workflow must execute scripts/test-http-authorization.mjs");
+  for (const requiredFragment of [
+    "scripts/test-http-authorization.mjs",
+    "scripts/test-storage-boundary.mjs",
+    "supabase db reset --local",
+  ]) {
+    if (!httpAuthorization.includes(requiredFragment)) {
+      fail(`HTTP authorization workflow is missing required control: ${requiredFragment}`);
+    }
   }
-  if (!httpAuthorization.includes("supabase db reset --local")) {
-    fail("HTTP authorization workflow must replay a fresh local Supabase database");
+}
+
+if (exists("scripts/test-http-authorization.mjs")) {
+  const httpRegression = read("scripts/test-http-authorization.mjs");
+  for (const requiredFragment of [
+    "/api/seller/storefront",
+    "/api/seller/branding",
+    "/api/kyc/documents",
+    "seller B cannot delete seller A product-media path",
+    "seller branding rejects spoofed image bytes",
+    "seller storefront update is authenticated-self scoped",
+  ]) {
+    if (!httpRegression.includes(requiredFragment)) {
+      fail(`HTTP authorization regression lost required P0 coverage: ${requiredFragment}`);
+    }
   }
 }
 
