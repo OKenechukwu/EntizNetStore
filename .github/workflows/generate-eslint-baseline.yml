@@ -1,0 +1,51 @@
+name: Generate ESLint baseline
+
+on:
+  push:
+    branches:
+      - codex/p0-lint-toolchain-hardening
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-eslint-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/p0-lint-toolchain-hardening
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate exact lint debt baseline
+        run: node scripts/lint-with-baseline.mjs --write-baseline
+
+      - name: Commit generated baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add eslint-baseline.json
+          if git diff --cached --quiet; then
+            echo "ESLint baseline already current"
+            exit 0
+          fi
+          git commit -m "Record current ESLint debt baseline"
+          git push origin HEAD:codex/p0-lint-toolchain-hardening
