@@ -112,11 +112,63 @@ test('sensitive production routes must persist safe events and cannot regress to
     'app/api/messages/attachments/upload/route.ts',
     'app/api/seller/branding/route.ts',
     'app/api/seller/product-media/upload/route.ts',
+    'app/api/payments/create-intent/route.ts',
+    'app/api/payments/webhook/route.ts',
+    'app/api/payments/request-payout/route.ts',
+    'app/api/payments/payout-webhook/route.ts',
   ]
 
   for (const relativePath of criticalRoutes) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8')
     assert.match(source, /reportOperationalError\s*\(/, `${relativePath} must persist safe operational failures`)
     assert.doesNotMatch(source, /\bconsole\.error\s*\(/, `${relativePath} must not log raw errors`)
+  }
+})
+
+test('invalid webhook traffic is runtime-only and cannot enter the health ledger', () => {
+  for (const relativePath of [
+    'app/api/payments/webhook/route.ts',
+    'app/api/payments/payout-webhook/route.ts',
+  ]) {
+    const source = fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8')
+    assert.match(source, /webhook_verification_rejected/)
+    assert.match(source, /logOperationalError\s*\(/)
+    assert.doesNotMatch(
+      source,
+      /reportOperationalError\s*\(\s*["'][^"']*webhook_verification_rejected/,
+      `${relativePath} must not persist invalid webhook traffic`,
+    )
+  }
+})
+
+test('money reconciliation ambiguity is explicitly critical', () => {
+  const createIntent = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/payments/create-intent/route.ts'),
+    'utf8',
+  )
+  const paymentWebhook = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/payments/webhook/route.ts'),
+    'utf8',
+  )
+  const requestPayout = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/payments/request-payout/route.ts'),
+    'utf8',
+  )
+  const payoutWebhook = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/payments/payout-webhook/route.ts'),
+    'utf8',
+  )
+
+  for (const [label, source, event] of [
+    ['payment initialization', createIntent, 'payments.initialization_uncertain'],
+    ['payment webhook finalization', paymentWebhook, 'payments.webhook_finalization_failed'],
+    ['payout provider reference', requestPayout, 'payouts.provider_reference_reconciliation_required'],
+    ['payout initialization', requestPayout, 'payouts.initialization_uncertain'],
+    ['payout webhook finalization', payoutWebhook, 'payouts.webhook_finalization_failed'],
+  ] as const) {
+    const eventIndex = source.indexOf(event)
+    assert.notEqual(eventIndex, -1, `${label} must emit its reconciliation event`)
+    const nearby = source.slice(eventIndex, eventIndex + 700)
+    assert.match(nearby, /severity:\s*["']critical["']/, `${label} must be critical`)
   }
 })
