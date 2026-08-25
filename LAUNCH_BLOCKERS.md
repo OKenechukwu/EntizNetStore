@@ -1,6 +1,6 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-24**
+Last reviewed: **2026-08-25**
 
 This is the canonical launch-readiness record. UI completeness does not clear a blocker. A blocker moves to `VERIFIED` only after production-safe authorization, failure handling and reproducible evidence are recorded.
 
@@ -21,7 +21,7 @@ This is the canonical launch-readiness record. UI completeness does not clear a 
 
 Verified foundation includes canonical Supabase architecture, reproducible fresh-environment migrations/seed, RLS/security-definer review, removal of runtime Neon/Helium/Replit dependencies, production-oriented documentation, dependency/build verification and a recovery runbook.
 
-Known release-engineering fact: Supabase management-applied migration versions can differ from repository filename timestamps. Applied migrations are immutable; the final release procedure must reconcile by name/content and never rewrite historical SQL. P0-06 owns the remaining migration-release procedure.
+Supabase management-applied migration versions can differ from repository filename timestamps. Applied migrations remain immutable. `docs/operations/PRODUCTION_RELEASE.md` now defines migration identity/content reconciliation and forward-only corrective migration procedure; P0-06 retains the broader production release/environment/deployment conditions.
 
 ## M1 — Identity, Seller, KYC & Storage
 
@@ -107,67 +107,98 @@ Still required before real checkout:
 - deployed sandbox payment initialization;
 - signed callback/webhook retries, duplicates and out-of-order verification;
 - refund/partial-refund verification where launch scope requires it;
-- reconciliation/incident procedure.
+- provider reconciliation procedure and production money-movement incident integration.
 
 ## P0-04 — Authorization/RLS HTTP regression coverage
 
-**Status: IN PROGRESS**
+**Status: IN PROGRESS — REPRESENTATIVE REAL HTTP MATRIX VERIFIED**
 
-Database-level cross-account, role/capability, Admin and trusted-worker isolation is extensive across M1–M3 and commerce/payment/payout suites.
+Verified:
 
-Still required: representative deployed HTTP-level anon/Buyer/Seller/cross-account/Admin/integration ownership tests across catalogue, messaging, media/branding, storefront, Admin and integration routes.
+- database-level cross-account, role/capability, Admin and trusted-worker isolation remains extensive across M1–M3 and commerce/payment/payout suites;
+- PR #12 added reproducible canonical-production anonymous HTTP smoke verification for readiness plus representative messaging/KYC/EntizNet Admin fail-closed boundaries;
+- PR #13 exact head `9f7a4e9f4f08373c8c10a84589abaf269584a3c5` passed standard CI #347 / run `32813384780` and HTTP Authorization Regression run `32813384832`;
+- PR #13 boots the production-built Next.js application against a freshly replayed local Supabase stack and uses real Supabase auth sessions/cookies rather than mocked identities;
+- verified HTTP roles include anonymous, Buyer, Seller A, Seller B/cross-account, trusted `app_metadata` Admin and unsigned EntizNet integration;
+- verified routes include Buyer self-profile, Seller product create/delete ownership, Seller KYC upload initialization, Seller product-media initialization, encrypted messaging attachment sender ownership/download participant isolation, Admin account search and EntizNet Admin fail-closed behavior;
+- PR #13 merged as `725c83bf2a90f3d12a98c81973d09050cf2139e8`.
+
+Still required before clearing P0-04:
+
+- controlled authenticated verification against a deployed production-like environment rather than only local-Supabase HTTP execution;
+- explicit HTTP ownership regressions for remaining high-risk surfaces such as Seller branding/storefront where not already exercised by the representative matrix;
+- repeat the representative matrix after any material auth/session/RLS architecture change.
 
 ## P0-05 — Seller/Admin/KYC/storage security completion
 
-**Status: IN PROGRESS**
+**Status: IN PROGRESS — PARTIAL-FAILURE RECOVERY + REPRESENTATIVE HTTP OWNERSHIP VERIFIED**
 
 Verified controls include private KYC/message storage, size/magic-byte checks, Seller media ownership verification, RPC-only catalogue mutation, KYC/product moderation, trusted conversation-key access, reports/reviews/prohibited-product enforcement and narrow upload allow-lists.
 
+Additional verified hardening:
+
+- PR #11 exact head `13da45cb77e55d000ddf444bd86c39022289e6dc` passed CI run `32740438640` including fresh database replay and storage-recovery regression;
+- failed KYC document registration now compensates the uploaded private object instead of leaving a known orphan path;
+- message attachment and Seller branding compensation failures are bounded/observable without serializing arbitrary provider error objects;
+- PR #11 merged as `3bf443cd9a5554d02fe9698a545d12b0858d8f99` and deployed READY as `dpl_BTY8RegbpVaJ6TP1sbysPHWWSyHb`;
+- PR #13 verifies real HTTP KYC/product-media/message-attachment authorization and ownership behavior in a production-built application against fresh Supabase.
+
 Still required:
 
-- remaining upload/ownership HTTP regressions;
-- storage/database partial-failure recovery tests;
+- remaining Seller branding/storefront upload/ownership HTTP regressions where not covered by the representative suite;
 - malware/content scanning/moderation policy and implementation appropriate to launch risk;
 - final public/private media boundary review under production deployment conditions.
 
 ## P0-06 — Production deployment and migration hardening
 
-**Status: IN PROGRESS**
+**Status: IN PROGRESS — RELEASE/HEALTH/ROLLBACK PROCEDURE VERIFIED**
 
 Verified:
 
 - dedicated Vercel project `entiznetstore` linked to `OKenechukwu/EntizNetStore`;
-- canonical HTTPS production runtime has deployed M3 and post-M3 Admin-boundary releases successfully;
-- exact source commit/deployment/runtime checks are now part of release verification;
+- canonical HTTPS production runtime has deployed M3 and subsequent P0 hardening successfully;
+- exact source commit/deployment/runtime checks are part of release verification;
 - production build uses canonical npm lockfile and foundation guards;
-- historical Vercel Hobby build-rate incident is documented rather than misclassified as a code failure.
+- historical Vercel Hobby build-rate incident is documented rather than misclassified as a code failure;
+- PR #12 exact head `02808f0baafe8e5cf751515d6982e98ba981d251` passed CI #344 / run `32741400371`;
+- PR #12 added DB-backed `GET /api/health`, production no-store/noindex/security headers, production CSP without `unsafe-eval`, a reproducible production HTTP smoke runner and `docs/operations/PRODUCTION_RELEASE.md`;
+- the release runbook records exact-SHA release identity, forward-only migration reconciliation, database-compatible application rollback, readiness verification and runtime-error review;
+- PR #12 merged as `51f99e3925e3625b7b91a04170eedef66bd21b0b` and deployed READY as `dpl_Aj9ptLiBs9VD8AwKK3eisK5JjsiG`;
+- canonical `/api/health` returned HTTP 200 on 2026-08-25 with `checks.database=ok` and exact version `51f99e3925e3`;
+- the same live verification window showed no grouped Vercel runtime errors;
+- PR #13 preview for exact head `9f7a4e9f4f08373c8c10a84589abaf269584a3c5` also reached READY and reported its exact version through `/api/health`.
 
 Still required:
 
-- reliable production deployment capacity/automation not dependent on a rate-limit window;
+- reliable production deployment capacity/automation not dependent on a Vercel Hobby rate-limit window;
 - canonical owned production domain + DNS/HTTPS validation;
-- final production/preview/staging isolation review;
-- final CSP/header review for selected payment/Supabase flows;
-- no accidental public debug/test/maintenance route;
-- structured error/logging review with secret redaction;
-- documented rollback/health procedure;
-- finalized migration deployment/reconciliation procedure for management timestamp drift.
+- final production/preview/staging secret-target isolation review;
+- final CSP review for the actually selected payment/payout/identity browser integrations;
+- final route inventory confirming no accidental public debug/test/maintenance route beyond the foundation deny-list;
+- broader structured error/logging redaction review across production routes.
 
 ## P0-07 — Observability and commerce incident response
 
-**Status: OPEN**
+**Status: IN PROGRESS**
 
-Need actionable production monitoring/alerts for:
+Verified/implemented foundations:
 
-- elevated server/runtime errors;
-- auth/Admin/integration failures;
-- checkout/payment/refund inconsistencies;
-- payout/escrow reconciliation failures;
-- storage/upload failures;
-- database health;
-- EntizNet handoff/Admin-service failures.
+- DB-backed production readiness endpoint with fail-closed HTTP 503 behavior;
+- canonical production HTTP smoke runner and release-time Vercel grouped runtime-error review;
+- production verification on 2026-08-25 showed database readiness healthy and no grouped runtime errors in the selected 24-hour window;
+- repository `Production Monitor` workflow runs the canonical smoke check hourly and creates/updates a GitHub production incident on failure, then records/closes recovery after a successful check;
+- `docs/operations/INCIDENT_RESPONSE.md` defines SEV-1/2/3 classification, first response, auth/Admin/EntizNet, payment/refund/inventory, payout/escrow, KYC/storage and database playbooks, recovery gates and post-incident review;
+- incident evidence rules prohibit credentials, tokens/assertions, signed URLs/upload tokens, payment/payout secrets and complete KYC/PII from issues/logs;
+- foundation CI requires the HTTP authorization workflow, production monitor and incident-response runbook so these controls cannot silently disappear.
 
-Define alert ownership, severity, retention and first-response runbooks.
+Still required before P0-07 is `VERIFIED`:
+
+- actionable event/metric alerts for commerce-specific payment/refund inconsistencies and provider callback failures once a real processor is selected;
+- payout/escrow reconciliation alerts once the launch payout provider is selected;
+- direct storage/upload failure alerting beyond the hourly end-to-end smoke signal;
+- EntizNet handoff/Admin-service failure alerts after production signing configuration is enabled;
+- final alert destination/retention/escalation ownership appropriate to the public-launch operating model;
+- recorded monitor execution/recovery evidence on `main` after this monitoring workflow is merged.
 
 ## P0-08 — EntizNet identity/capability integration contract
 
@@ -220,7 +251,7 @@ Still required before EntizNet-linked public launch:
 
 **Status: IN PROGRESS — EXTERNAL PAYOUT PROVIDER ONBOARDING DEFERRED UNTIL PRE-LAUNCH**
 
-Internal payout ledger, escrow claiming, idempotency, failure/cancellation release rules, terminal success semantics, event replay protection and real PostgreSQL concurrency regression are verified.
+Internal payout ledger, escrow claiming, idempotency, failure/cancellation release rules, terminal success semantics, event replay protection and real PostgreSQL concurrency regression are verified. The incident-response runbook now defines fail-closed payout/escrow containment and reconciliation principles.
 
 Still required before real disbursement:
 
@@ -230,7 +261,7 @@ Still required before real disbursement:
 - Seller payout-account onboarding/validation;
 - signed callback/duplicate/retry/out-of-order verification;
 - sandbox payout E2E;
-- reconciliation/support/money-movement incident procedure.
+- provider-specific reconciliation/support/money-movement incident procedure.
 
 ---
 
