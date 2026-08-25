@@ -20,6 +20,7 @@ for (const forbiddenPath of [
   ".eslintrc.json",
   "middleware.ts",
   "app/admin/i18n/seed",
+  "app/components/ProductImageUploader.tsx",
   "app/internal",
 ]) {
   if (exists(forbiddenPath)) {
