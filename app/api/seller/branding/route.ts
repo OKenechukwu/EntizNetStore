@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { logOperationalError } from '@/lib/observability/operationalEvent';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
@@ -70,7 +71,13 @@ export async function POST(request: NextRequest) {
   });
 
   if (uploadError) {
-    console.error('Seller branding upload failed:', uploadError);
+    logOperationalError('storage.seller_branding.upload_failed', uploadError, {
+      component: 'storage',
+      operation: 'upload-branding-image',
+      bucket: BUCKET,
+      route: '/api/seller/branding',
+      actorId: user.id,
+    });
     return NextResponse.json({ error: 'Unable to upload branding image' }, { status: 500 });
   }
 
@@ -88,7 +95,13 @@ export async function POST(request: NextRequest) {
       filePath,
       { bucket: BUCKET, operation: 'rollback-branding-update', ownerId: user.id },
     );
-    console.error('Seller branding profile update failed:', updateError);
+    logOperationalError('storage.seller_branding.profile_update_failed', updateError, {
+      component: 'storage',
+      operation: 'save-branding-reference',
+      bucket: BUCKET,
+      route: '/api/seller/branding',
+      actorId: user.id,
+    });
     return NextResponse.json({ error: 'Unable to save branding image' }, { status: 500 });
   }
 

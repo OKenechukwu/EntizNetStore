@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
+import { logOperationalError } from '@/lib/observability/operationalEvent'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
@@ -82,7 +83,17 @@ export async function POST(request: NextRequest) {
       .createSignedUploadUrl(filePath)
 
     if (error || !data?.signedUrl) {
-      console.error('Unable to initialize product media upload:', error)
+      logOperationalError(
+        'storage.product_media.signed_upload_init_failed',
+        error ?? 'signed upload URL was not returned',
+        {
+          component: 'storage',
+          operation: 'create-signed-upload-url',
+          bucket: PRODUCT_MEDIA_BUCKET,
+          route: '/api/seller/product-media/upload',
+          actorId: auth.user.id,
+        },
+      )
       return NextResponse.json({ error: 'Unable to initialize secure upload' }, { status: 500 })
     }
 
@@ -97,7 +108,12 @@ export async function POST(request: NextRequest) {
       method: 'PUT',
     })
   } catch (error) {
-    console.error('Product media upload initialization failed:', error)
+    logOperationalError('storage.product_media.upload_route_failed', error, {
+      component: 'storage',
+      operation: 'initialize-product-media-upload',
+      bucket: PRODUCT_MEDIA_BUCKET,
+      route: '/api/seller/product-media/upload',
+    })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -134,13 +150,24 @@ export async function DELETE(request: NextRequest) {
       .remove([filePath])
 
     if (error) {
-      console.error('Unable to remove product media:', error)
+      logOperationalError('storage.product_media.delete_failed', error, {
+        component: 'storage',
+        operation: 'delete-object',
+        bucket: PRODUCT_MEDIA_BUCKET,
+        route: '/api/seller/product-media/upload',
+        actorId: auth.user.id,
+      })
       return NextResponse.json({ error: 'Unable to remove product media' }, { status: 500 })
     }
 
     return NextResponse.json({ deleted: true })
   } catch (error) {
-    console.error('Product media deletion failed:', error)
+    logOperationalError('storage.product_media.delete_route_failed', error, {
+      component: 'storage',
+      operation: 'delete-product-media',
+      bucket: PRODUCT_MEDIA_BUCKET,
+      route: '/api/seller/product-media/upload',
+    })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
