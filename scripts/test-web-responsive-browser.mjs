@@ -116,6 +116,29 @@ async function assertHeaderGeometry(page, label) {
   assert.deepEqual(geometry.overlaps, [], `${label}: overlapping header controls`);
 }
 
+async function completeAgeGate(page, label) {
+  const confirm = page.getByRole("button", { name: "Yes, I am 18+" });
+  const gateVisible = await confirm
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!gateVisible) return;
+
+  await page.getByRole("dialog", { name: "Age Verification Required" }).waitFor();
+  assert.equal(await confirm.evaluate((element) => document.activeElement === element), true, `${label}: age confirmation should receive initial keyboard focus`);
+
+  const confirmBox = await confirm.boundingBox();
+  const rejectBox = await page.getByRole("button", { name: "No, I am under 18" }).boundingBox();
+  assert.ok(confirmBox && confirmBox.height >= 44, `${label}: age confirmation target is smaller than 44px`);
+  assert.ok(rejectBox && rejectBox.height >= 44, `${label}: age rejection target is smaller than 44px`);
+  await assertNoHorizontalOverflow(page, `${label} age gate`);
+
+  await confirm.click();
+  await page.getByRole("dialog", { name: "Age Verification Required" }).waitFor({ state: "detached", timeout: 5_000 });
+  assert.equal(await page.evaluate(() => localStorage.getItem("entiznet-age-verified")), "true", `${label}: age verification was not persisted`);
+}
+
 async function assertAppsPage(page, label) {
   await page.getByRole("heading", { level: 1, name: "Shop on the web now. Native apps are next." }).waitFor();
   await page.getByRole("link", { name: /Shop on the web/i }).waitFor();
@@ -136,7 +159,7 @@ async function assertAppsPage(page, label) {
   await assertHeaderGeometry(page, label);
 }
 
-async function openPage(page, pathname) {
+async function openPage(page, pathname, label) {
   const response = await page.goto(`${origin}${pathname}`, {
     waitUntil: "domcontentloaded",
     timeout: 30_000,
@@ -144,13 +167,14 @@ async function openPage(page, pathname) {
   assert.ok(response, `${pathname}: no HTTP response`);
   assert.ok(response.status() < 400, `${pathname}: HTTP ${response.status()}`);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+  await completeAgeGate(page, label);
 }
 
 const browser = await chromium.launch({ headless: true });
 try {
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   watchBrowserErrors(desktop, "desktop");
-  await openPage(desktop, "/apps");
+  await openPage(desktop, "/apps", "desktop");
   await assertAppsPage(desktop, "desktop /apps");
   const desktopDownload = desktop.getByRole("link", { name: "Download EntizNetStore app" });
   assert.equal(await desktopDownload.isVisible(), true, "desktop: Download App header entry is not visible");
@@ -159,7 +183,7 @@ try {
 
   const tablet = await browser.newPage({ viewport: { width: 820, height: 1180 } });
   watchBrowserErrors(tablet, "tablet");
-  await openPage(tablet, "/apps");
+  await openPage(tablet, "/apps", "tablet");
   await assertAppsPage(tablet, "tablet /apps");
   const tabletToggle = tablet.getByRole("button", { name: "Toggle menu" });
   assert.equal(await tabletToggle.isVisible(), true, "tablet: compact navigation toggle is not visible");
@@ -173,7 +197,7 @@ try {
 
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
   watchBrowserErrors(phone, "phone");
-  await openPage(phone, "/");
+  await openPage(phone, "/", "phone");
   await assertNoFrameworkFailure(phone, "phone home");
   await assertNoHorizontalOverflow(phone, "phone home");
   await assertHeaderGeometry(phone, "phone home");
