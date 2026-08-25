@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { logOperationalError } from '@/lib/observability/operationalEvent'
+import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       .createSignedUploadUrl(filePath)
 
     if (error || !data?.signedUrl) {
-      logOperationalError(
+      await reportOperationalError(
         'storage.kyc.signed_upload_init_failed',
         error ?? 'signed upload URL was not returned',
         {
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       method: 'PUT',
     })
   } catch (error) {
-    logOperationalError('storage.kyc.upload_route_failed', error, {
+    await reportOperationalError('storage.kyc.upload_route_failed', error, {
       component: 'storage',
       operation: 'initialize-kyc-upload',
       bucket: KYC_BUCKET,

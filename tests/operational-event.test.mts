@@ -2,14 +2,15 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { logOperationalError } from '../lib/observability/operationalEvent.ts'
+import { logOperationalError, type OperationalEventRecord } from '../lib/observability/operationalEvent.ts'
+import { shouldPersistOperationalEvent } from '../lib/observability/operationalEventPolicy.ts'
 
-test('logs only allow-listed provider error fields and redacts secrets', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+test('logs only allow-listed provider error fields and returns the same safe record', () => {
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   const jwt = 'eyJabcdefghijk.abcdefghijklmnop.abcdefghijklmnop'
   const secretKey = 'sb_secret_abcdefghijklmnopqrstuvwxyz'
 
-  logOperationalError(
+  const record = logOperationalError(
     'storage.kyc.init_failed',
     {
       message: `upload failed https://example.test/object?token=super-secret Bearer bearer-secret ${jwt} ${secretKey}`,
@@ -31,7 +32,9 @@ test('logs only allow-listed provider error fields and redacts secrets', () => {
 
   assert.equal(logs.length, 1)
   assert.equal(logs[0].message, 'EntizNetStore operational error')
-  assert.equal(logs[0].details.event, 'storage.kyc.init_failed')
+  assert.equal(record.event, 'storage.kyc.init_failed')
+  assert.equal(record.severity, 'error')
+  assert.deepEqual(record, logs[0].details)
   assert.equal(logs[0].details.errorCode, 'storage_error')
   assert.equal(logs[0].details.errorStatus, 503)
   assert.equal(typeof logs[0].details.actorFingerprint, 'string')
@@ -49,7 +52,7 @@ test('logs only allow-listed provider error fields and redacts secrets', () => {
 })
 
 test('contains thrown errors without logging stack traces', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   const error = new Error('network unavailable?access_token=private-value')
   error.stack = 'stack with private-value that must never be serialized'
 
@@ -71,7 +74,7 @@ test('contains thrown errors without logging stack traces', () => {
 })
 
 test('truncates large error strings', () => {
-  const logs: Array<{ message: string; details: Record<string, unknown> }> = []
+  const logs: Array<{ message: string; details: OperationalEventRecord }> = []
   logOperationalError(
     'storage.generic.failed',
     'x'.repeat(2000),
@@ -82,7 +85,26 @@ test('truncates large error strings', () => {
   assert.equal(String(logs[0].details.errorMessage).length, 500)
 })
 
-test('sensitive production routes cannot regress to raw console error logging', () => {
+test('client-caused 4xx failures cannot manufacture aggregate production incidents', () => {
+  const base: OperationalEventRecord = {
+    event: 'storage.kyc.object_verification_failed',
+    component: 'storage',
+    operation: 'download-kyc-object-for-verification',
+    severity: 'error',
+  }
+
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: 404 }), false)
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: '409' }), false)
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: 503 }), true)
+  assert.equal(shouldPersistOperationalEvent(base), true)
+  assert.equal(
+    shouldPersistOperationalEvent({ ...base, severity: 'critical', errorStatus: 400 }),
+    true,
+    'explicit critical events must always remain observable',
+  )
+})
+
+test('sensitive production routes must persist safe events and cannot regress to raw console logging', () => {
   const criticalRoutes = [
     'app/api/health/route.ts',
     'app/api/kyc/documents/route.ts',
@@ -94,7 +116,7 @@ test('sensitive production routes cannot regress to raw console error logging', 
 
   for (const relativePath of criticalRoutes) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8')
-    assert.match(source, /logOperationalError\s*\(/, `${relativePath} must use logOperationalError`)
+    assert.match(source, /reportOperationalError\s*\(/, `${relativePath} must persist safe operational failures`)
     assert.doesNotMatch(source, /\bconsole\.error\s*\(/, `${relativePath} must not log raw errors`)
   }
 })

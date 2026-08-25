@@ -66,9 +66,10 @@ await request('/api/health', 200, (body) => {
     body?.status !== 'ok' ||
     body?.service !== 'entiznetstore' ||
     body?.checks?.database !== 'ok' ||
-    body?.checks?.storage !== 'ok'
+    body?.checks?.storage !== 'ok' ||
+    body?.checks?.operations !== 'ok'
   ) {
-    throw new Error('readiness response did not report database=ok and storage=ok')
+    throw new Error('readiness response did not report database=ok, storage=ok and operations=ok')
   }
 })
 await request('/api/messages/conversations', 401, (body) => {
