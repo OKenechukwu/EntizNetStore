@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { logOperationalError } from '@/lib/observability/operationalEvent';
+import { reportOperationalError } from '@/lib/observability/operationalEventSink';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (uploadError) {
-    logOperationalError('storage.seller_branding.upload_failed', uploadError, {
+    await reportOperationalError('storage.seller_branding.upload_failed', uploadError, {
       component: 'storage',
       operation: 'upload-branding-image',
       bucket: BUCKET,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       filePath,
       { bucket: BUCKET, operation: 'rollback-branding-update', ownerId: user.id },
     );
-    logOperationalError('storage.seller_branding.profile_update_failed', updateError, {
+    await reportOperationalError('storage.seller_branding.profile_update_failed', updateError, {
       component: 'storage',
       operation: 'save-branding-reference',
       bucket: BUCKET,
