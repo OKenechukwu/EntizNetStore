@@ -6,8 +6,8 @@ const root = process.cwd();
 const baselinePath = path.join(root, "eslint-baseline.json");
 const writeBaseline = process.argv.includes("--write-baseline");
 
-// These rules are never grandfathered. They represent invalid Hook usage or a
-// configuration/parser failure where accepting historical debt would be unsafe.
+// These rules are never grandfathered. They represent invalid Hook usage.
+// Fatal parser/configuration failures are also always rejected separately.
 const zeroToleranceRules = new Set([
   "react-hooks/rules-of-hooks",
   "react-hooks/set-state-in-render",
@@ -17,10 +17,18 @@ function normalizePath(filePath) {
   return path.relative(root, filePath).split(path.sep).join("/");
 }
 
+function normalizedRuleId(message) {
+  return message.ruleId ?? "<eslint-core>";
+}
+
 function findingKey(filePath, message) {
-  const ruleId = message.ruleId ?? "<parser-or-config>";
+  const ruleId = normalizedRuleId(message);
   const messageId = message.messageId ?? "<message>";
   return `${normalizePath(filePath)}::${ruleId}::${messageId}`;
+}
+
+function isHardFailure(message) {
+  return message.fatal === true || zeroToleranceRules.has(message.ruleId ?? "");
 }
 
 function collect(results) {
@@ -54,9 +62,41 @@ function serializeBaseline(summary) {
   };
 }
 
-const eslint = new ESLint();
-const results = await eslint.lintFiles(["."]);
+let results;
+try {
+  const eslint = new ESLint();
+  results = await eslint.lintFiles(["."]);
+} catch (error) {
+  console.error("ESLint configuration/execution failed before results could be produced.");
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
 const current = collect(results);
+const hardFailures = [];
+for (const result of results) {
+  for (const message of result.messages) {
+    if (message.severity <= 0 || !isHardFailure(message)) continue;
+    hardFailures.push({
+      file: normalizePath(result.filePath),
+      line: message.line,
+      column: message.column,
+      ruleId: normalizedRuleId(message),
+      message: message.message,
+    });
+  }
+}
+
+if (hardFailures.length > 0) {
+  console.error("ESLint hard-failure gate FAILED:\n");
+  for (const item of hardFailures.slice(0, 100)) {
+    console.error(`- ${item.file}:${item.line}:${item.column} ${item.ruleId}: ${item.message}`);
+  }
+  if (writeBaseline) {
+    console.error("Refusing to generate a baseline containing fatal parser/configuration or zero-tolerance Hook failures.");
+  }
+  process.exit(1);
+}
 
 if (writeBaseline) {
   fs.writeFileSync(baselinePath, `${JSON.stringify(serializeBaseline(current), null, 2)}\n`);
@@ -82,16 +122,12 @@ for (const result of results) {
   for (const message of result.messages) {
     if (message.severity <= 0) continue;
 
-    const ruleId = message.ruleId ?? "<parser-or-config>";
+    const ruleId = normalizedRuleId(message);
     const key = findingKey(result.filePath, message);
     const allowed = Number(baseline.entries[key] ?? 0);
     const currentCount = current.entries.get(key) ?? 0;
 
-    if (
-      ruleId === "<parser-or-config>"
-      || zeroToleranceRules.has(ruleId)
-      || currentCount > allowed
-    ) {
+    if (currentCount > allowed) {
       regressions.push({
         file: normalizePath(result.filePath),
         line: message.line,
