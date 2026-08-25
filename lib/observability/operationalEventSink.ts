@@ -1,30 +1,11 @@
 import { logOperationalError, type OperationalErrorContext, type OperationalEventRecord } from '@/lib/observability/operationalEvent'
+import { operationalStatusCode, shouldPersistOperationalEvent } from '@/lib/observability/operationalEventPolicy'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 function bounded(value: string | number | undefined, maxLength: number) {
   if (typeof value === 'number') return String(value).slice(0, maxLength)
   if (typeof value === 'string') return value.slice(0, maxLength)
   return null
-}
-
-function boundedStatus(value: string | number | undefined) {
-  const numeric = typeof value === 'number' ? value : Number(value)
-  return Number.isInteger(numeric) && numeric >= 100 && numeric <= 599 ? numeric : null
-}
-
-/**
- * Only infrastructure/server failures should feed the aggregate availability
- * signal. Expected client-caused 4xx outcomes remain redacted logs but are not
- * persisted, otherwise a user could deliberately repeat a bad request and
- * manufacture a production incident. Explicit critical events are always kept.
- */
-export function shouldPersistOperationalEvent(record: OperationalEventRecord): boolean {
-  if (record.severity === 'critical') return true
-
-  const status = boundedStatus(record.errorStatus)
-  if (status !== null && status < 500) return false
-
-  return true
 }
 
 export async function persistOperationalEventBestEffort(record: OperationalEventRecord): Promise<boolean> {
@@ -41,7 +22,7 @@ export async function persistOperationalEventBestEffort(record: OperationalEvent
       p_actor_fingerprint: bounded(record.actorFingerprint, 16),
       p_record_fingerprint: bounded(record.recordFingerprint, 16),
       p_error_code: bounded(record.errorCode, 120),
-      p_error_status: boundedStatus(record.errorStatus),
+      p_error_status: operationalStatusCode(record.errorStatus),
     })
 
     if (error) {
