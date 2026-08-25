@@ -1,36 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-
-export type CanonicalCartItem = {
-  id: string;
-  productId: string;
-  variantId: string;
-  sellerId: string | null;
-  title: string;
-  variantTitle: string | null;
-  sku: string | null;
-  image: string | null;
-  quantity: number;
-  unitPriceCents: number;
-  lineTotalCents: number;
-  requiresShipping: boolean;
-  isTaxable: boolean;
-  available: boolean;
-  availabilityReason: string | null;
-  availableQuantity: number | null;
-};
-
-export type CanonicalCart = {
-  id: string;
-  version: number;
-  status: string;
-  currency: "usd";
-  itemCount: number;
-  subtotalCents: number;
-  hasUnavailableItems: boolean;
-  items: CanonicalCartItem[];
-};
+import type { CanonicalCart, CanonicalCartItem } from "@/lib/cart/contracts";
 
 export async function hydrateActiveCart(buyerId: string): Promise<CanonicalCart | null> {
   const admin = getSupabaseAdmin();
