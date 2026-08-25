@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
       .select("id, nickname, type, first_name, last_name, company, address_line1, address_line2, city, state_province, postal_code, country, phone")
       .eq("id", parsed.data.addressId)
       .eq("user_id", user.id)
+      .in("type", ["shipping", "both"])
       .maybeSingle();
 
     if (error) {
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unable to load shipping address" }, { status: 500 });
     }
     if (!data) {
-      return NextResponse.json({ error: "Address not found" }, { status: 404 });
+      return NextResponse.json({ error: "Shipping address not found" }, { status: 404 });
     }
     address = data as AddressRow;
   }
