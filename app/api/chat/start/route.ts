@@ -1,8 +1,7 @@
 // app/api/chat/start/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-export const runtime = "edge";
+import { logOperationalError } from "@/lib/observability/operationalEvent";
 
 /**
  * POST /api/chat/start
@@ -32,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (sellerId === user.id) {
       return NextResponse.json(
         { error: "You cannot start a conversation with yourself" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (!seller) {
       return NextResponse.json(
         { error: "Verified seller not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -75,19 +74,29 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Failed to create chat thread:", error);
+      logOperationalError("chat_thread_create_failed", error, {
+        component: "messaging",
+        operation: "chat-start-create",
+        route: "/api/chat/start",
+        actorId: user.id,
+        recordId: sellerId,
+      });
       return NextResponse.json(
         { error: "Failed to create chat thread" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({ threadId: newThread.id });
   } catch (error) {
-    console.error("Chat start error:", error);
+    logOperationalError("chat_start_failed", error, {
+      component: "messaging",
+      operation: "chat-start",
+      route: "/api/chat/start",
+    });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

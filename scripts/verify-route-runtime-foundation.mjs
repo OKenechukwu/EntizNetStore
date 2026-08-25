@@ -78,6 +78,7 @@ const forbiddenLegacyTokens = [
   { label: "legacy store-products bucket", value: '"store-products"' },
   { label: "legacy i18n seed API", value: "/api/i18n/seed-all" },
 ];
+const deprecatedEdgeRuntimePattern = /\bexport\s+const\s+runtime\s*=\s*["'`]edge["'`]/;
 
 for (const relativePath of runtimeFiles) {
   if (!/\.[cm]?[jt]sx?$/.test(relativePath)) continue;
@@ -86,6 +87,9 @@ for (const relativePath of runtimeFiles) {
     if (source.includes(value)) {
       fail(`${label} found in production runtime source: ${relativePath}`);
     }
+  }
+  if (deprecatedEdgeRuntimePattern.test(source)) {
+    fail(`Deprecated Next.js Edge Runtime opt-in found in production source: ${relativePath}`);
   }
 }
 
