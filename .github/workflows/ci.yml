@@ -93,6 +93,9 @@ jobs:
       - name: Run P0 operational event ledger regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-operational-event-ledger.sql
 
+      - name: Run P0 SECURITY DEFINER surface regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-security-definer-surface.sql
+
       - name: Run M2 catalogue and moderation regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m2-catalog-moderation.sql
 
