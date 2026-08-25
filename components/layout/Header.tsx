@@ -55,10 +55,10 @@ export default function Header() {
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2 font-extrabold text-foreground shrink-0"
+            className="flex shrink-0 items-center gap-2 font-extrabold text-foreground"
             aria-label="EntizNetStore Home"
           >
-            <span className="text-xl md:text-2xl font-extrabold">
+            <span className="text-xl font-extrabold md:text-2xl">
               EntizNet
               <span className="text-brand-secondary">
                 <T k="common.store" fallback="Store" />
@@ -66,118 +66,118 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* TopBar Links (desktop) */}
-          <nav className="hidden lg:flex items-center gap-1">
+          {/* TopBar Links (wide desktop) */}
+          <nav className="hidden items-center gap-1 xl:flex">
             <Link
               href="/stores"
-              className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
+              className="px-2 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary 2xl:px-3"
             >
               <T k="nav.stores" fallback="Stores" />
             </Link>
             <Link
               href="/brands"
-              className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
+              className="px-2 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary 2xl:px-3"
             >
               <T k="nav.brands" fallback="Brands" />
             </Link>
             <Link
               href="/live"
-              className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
+              className="px-2 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary 2xl:px-3"
             >
               <T k="nav.live" fallback="Live" />
             </Link>
             <Link
               href="/on-sale"
-              className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
+              className="px-2 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary 2xl:px-3"
             >
               <T k="nav.onSale" fallback="On Sale" />
             </Link>
             <Link
               href="/learn"
-              className="px-3 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary"
+              className="px-2 py-1.5 text-sm font-medium text-foreground/90 transition hover:text-brand-secondary 2xl:px-3"
             >
               <T k="nav.learn" fallback="Learn" />
             </Link>
           </nav>
 
-          {/* Search (desktop) */}
-          <div className="hidden md:flex flex-1 max-w-[520px] lg:max-w-[520px]">
+          {/* Search (wide desktop) */}
+          <div className="hidden min-w-0 flex-1 max-w-[420px] xl:flex 2xl:max-w-[520px]">
             <SearchSuggestions />
           </div>
 
-          {/* Small-screen Language/Currency switcher (visible even when menu is closed) */}
-          <div className="ml-auto md:hidden">
+          {/* Compact-screen Language/Currency switcher */}
+          <div className="ml-auto xl:hidden">
             <span suppressHydrationWarning>
               <LanguageCurrencySwitcher className="rounded-md bg-white/5 px-2 py-1" />
             </span>
           </div>
 
-          {/* Mobile Toggle */}
+          {/* Compact navigation toggle */}
           <button
-            className="rounded-lg p-2 text-foreground md:hidden"
+            type="button"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary xl:hidden"
             aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? (
-              <X className="h-6 w-6" />
+              <X className="h-6 w-6" aria-hidden="true" />
             ) : (
-              <Menu className="h-6 w-6" />
+              <Menu className="h-6 w-6" aria-hidden="true" />
             )}
           </button>
 
-          {/* Right Icons (desktop) */}
-          <div className="hidden md:flex items-center gap-2 ml-auto">
-            {/* Desktop Language/Currency switcher */}
+          {/* Right controls (wide desktop) */}
+          <div className="ml-auto hidden items-center gap-2 xl:flex">
             <span suppressHydrationWarning>
               <LanguageCurrencySwitcher className="ml-2" />
             </span>
 
             <Link
               href="/apps"
-              className="inline-flex items-center gap-2 rounded-lg border border-brand-secondary/30 bg-brand-secondary/10 px-3 py-2 text-sm font-semibold text-brand-secondary transition hover:bg-brand-secondary/15"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-brand-secondary/30 bg-brand-secondary/10 px-3 py-2 text-sm font-semibold text-brand-secondary transition hover:bg-brand-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
               aria-label="Download EntizNetStore app"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden xl:inline">Download App</span>
+              <span className="hidden 2xl:inline">Download App</span>
             </Link>
 
             <Link
               href="/auth?mode=signin"
-              className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10"
+              className="inline-flex min-h-11 items-center rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
             >
               <T k="nav.signIn" fallback="Sign in" />
             </Link>
 
-            {/* Profile icon (not nested in a button) */}
-            <div
+            <button
+              type="button"
               onClick={goProfile}
-              role="button"
               aria-label="Profile"
-              className="cursor-pointer rounded-lg p-2 text-foreground/90 transition hover:bg-white/10"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-foreground/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
             >
               <ProfileIconClient />
-            </div>
+            </button>
 
             <Link
               href="/cart"
-              className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
               aria-label="Cart"
             >
-              <ShoppingCart className="h-5 w-5" />
+              <ShoppingCart className="h-5 w-5" aria-hidden="true" />
             </Link>
             <Link
               href="/notifications"
-              className="rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-foreground/90 transition hover:text-brand-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
               aria-label="Notifications"
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-5 w-5" aria-hidden="true" />
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Nav Tabs (desktop) */}
-      <div className="hidden md:flex w-full items-center justify-center gap-6 border-t border-white/10 bg-background/70 px-4 py-2.5">
+      {/* Nav Tabs (wide desktop) */}
+      <div className="hidden w-full items-center justify-center gap-6 border-t border-white/10 bg-background/70 px-4 py-2.5 xl:flex">
         {[
           ["nav.home", "Home", "/"],
           ["nav.premium", "Premium", "/premium"],
@@ -189,17 +189,17 @@ export default function Header() {
           <Link
             key={href}
             href={href}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary"
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-white/10 hover:text-brand-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
           >
             <T k={key} fallback={fallback} />
           </Link>
         ))}
       </div>
 
-      {/* Mobile Menu */}
+      {/* Compact menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/10 bg-background/95">
-          <div className="px-4 py-4 space-y-4">
+        <div className="border-t border-white/10 bg-background/95 xl:hidden">
+          <div className="space-y-4 px-4 py-4">
             <GlobalSearch />
 
             <div className="flex flex-col gap-2">
@@ -228,7 +228,7 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10"
+                  className="flex min-h-11 items-center rounded-lg bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
                   onClick={() => setMobileOpen(false)}
                 >
                   <T k={link.key} fallback={link.fb} />
@@ -237,7 +237,6 @@ export default function Header() {
             </div>
 
             <div className="flex items-center gap-2 pt-2">
-              {/* Keep a second instance inside the drawer so users can change it there too */}
               <span suppressHydrationWarning>
                 <LanguageCurrencySwitcher className="ml-2" />
               </span>
@@ -248,14 +247,14 @@ export default function Header() {
                   setMobileOpen(false);
                   goProfile();
                 }}
-                className="flex-1 rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90"
+                className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand-secondary px-4 py-2.5 text-center text-sm font-semibold text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
               >
                 <T k="nav.profile" fallback="Profile" />
               </button>
 
               <Link
                 href="/auth?mode=signin"
-                className="flex-1 rounded-lg bg-white/5 px-4 py-2.5 text-center text-sm font-semibold text-foreground transition hover:bg-white/10"
+                className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-white/5 px-4 py-2.5 text-center text-sm font-semibold text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
                 onClick={() => setMobileOpen(false)}
               >
                 <T k="nav.signIn" fallback="Sign in" />
