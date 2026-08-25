@@ -98,14 +98,12 @@ export default function ProductForm({
     setLoading(true)
     
     try {
-      // Generate slug if not provided
-      if (!formData.slug) {
-        formData.slug = formData.title
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '')
-          .replace(/\s+/g, '-')
-          .trim()
-      }
+      // Derive the slug for this save without mutating React state in place.
+      const resolvedSlug = formData.slug || formData.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .trim()
 
       // Set status based on publish parameter. Pending sellers cannot publish
       // 'active' — RLS rejects it (final security boundary).
@@ -121,7 +119,7 @@ export default function ProductForm({
         brand_id: formData.brand_id || null,
         marketplace_brand: formData.marketplace_brand,
         title: formData.title,
-        slug: formData.slug,
+        slug: resolvedSlug,
         description: formData.description,
         short_description: formData.short_description,
         type: formData.type,
@@ -208,7 +206,7 @@ export default function ProductForm({
 
       // Redirect to product or dashboard
       if (publish) {
-        router.push(`/store/${formData.slug}`)
+        router.push(`/store/${resolvedSlug}`)
       } else {
         router.push('/dashboard/store')
       }
