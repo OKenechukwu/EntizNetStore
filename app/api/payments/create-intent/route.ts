@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { reportOperationalError } from "@/lib/observability/operationalEventSink";
 import {
   getPaymentProvider,
   PaymentProviderUnavailableError,
 } from "@/lib/payments/provider";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 const requestSchema = z.object({
   checkoutSessionId: z.string().uuid(),
@@ -66,13 +67,19 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (sessionError) {
-    console.error("Unable to load checkout session for payment", sessionError);
+    await reportOperationalError("payments.checkout_session_load_failed", sessionError, {
+      component: "payments",
+      operation: "load-checkout-session",
+      route: "/api/payments/create-intent",
+      actorId: user.id,
+      recordId: parsed.data.checkoutSessionId,
+    });
     return NextResponse.json({ error: "Unable to load checkout session" }, { status: 500 });
   }
   if (!session) {
     return NextResponse.json({ error: "Checkout session not found" }, { status: 404 });
   }
-  if (!['pending', 'requires_payment'].includes(session.status)) {
+  if (!["pending", "requires_payment"].includes(session.status)) {
     return NextResponse.json({ error: "Checkout session is not payable" }, { status: 409 });
   }
   if (session.payment_provider || session.provider_payment_id) {
@@ -92,7 +99,14 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    throw error;
+    await reportOperationalError("payments.provider_resolution_failed", error, {
+      component: "payments",
+      operation: "resolve-payment-provider",
+      route: "/api/payments/create-intent",
+      actorId: user.id,
+      recordId: session.id,
+    });
+    return NextResponse.json({ error: "Unable to initialize payment" }, { status: 503 });
   }
 
   if (!provider.configured) {
@@ -139,18 +153,51 @@ export async function POST(request: NextRequest) {
     // leave a locally payable session that can be initialized a second time.
     // Existing terminal-state handling rejects any later provider success as a
     // reconciliation incident instead of risking duplicate money movement.
-    await supabase.rpc("cancel_checkout_session", {
+    const { error: cancelError } = await supabase.rpc("cancel_checkout_session", {
       p_session_id: session.id,
     });
 
+    if (cancelError) {
+      await reportOperationalError(
+        "payments.checkout_cancel_failed_after_initialization_error",
+        cancelError,
+        {
+          component: "payments",
+          operation: "cancel-checkout-after-payment-failure",
+          severity: "critical",
+          route: "/api/payments/create-intent",
+          actorId: user.id,
+          recordId: session.id,
+        },
+      );
+    }
+
     if (error instanceof PaymentProviderUnavailableError) {
+      await reportOperationalError("payments.provider_unavailable", error, {
+        component: "payments",
+        operation: "initialize-payment",
+        route: "/api/payments/create-intent",
+        actorId: user.id,
+        recordId: session.id,
+      });
       return NextResponse.json(
         { error: error.message, code: "PAYMENT_PROVIDER_UNAVAILABLE" },
         { status: 503 },
       );
     }
 
-    console.error("Payment initialization failed:", error);
+    // The external provider may have accepted the payment while the network or
+    // local provider-reference persistence failed. Treat that ambiguity as a
+    // critical reconciliation condition without logging provider payloads/IDs.
+    await reportOperationalError("payments.initialization_uncertain", error, {
+      component: "payments",
+      operation: "initialize-or-attach-payment",
+      severity: "critical",
+      route: "/api/payments/create-intent",
+      actorId: user.id,
+      recordId: session.id,
+    });
+
     return NextResponse.json(
       { error: "Unable to initialize payment" },
       { status: 503 },
