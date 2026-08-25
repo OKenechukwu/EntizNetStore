@@ -180,9 +180,12 @@ for (const requiredPath of [
   "docs/operations/PRODUCTION_BASELINE_2026-08-21.md",
   "docs/operations/PRODUCTION_RELEASE.md",
   "docs/operations/STORAGE_SECURITY_VERIFICATION_2026-08-25.md",
+  "lib/observability/operationalEventSink.ts",
   "scripts/test-http-authorization.mjs",
+  "scripts/test-operational-event-ledger.sql",
   "scripts/test-production-http-smoke.mjs",
   "scripts/test-storage-boundary.mjs",
+  "supabase/migrations/20260825153000_operational_event_ledger.sql",
   "supabase/seed.sql",
 ]) {
   if (!exists(requiredPath)) fail(`Required production-foundation file missing: ${requiredPath}`);
@@ -190,6 +193,9 @@ for (const requiredPath of [
 
 if (!pkg.scripts?.["test:production-http-smoke"]) {
   fail("package.json must expose test:production-http-smoke");
+}
+if (!pkg.scripts?.["test:operational-logging"]) {
+  fail("package.json must expose test:operational-logging");
 }
 
 for (const workflowPath of [".github/workflows/ci.yml", ".github/workflows/http-authorization.yml"]) {
@@ -203,10 +209,17 @@ for (const workflowPath of [".github/workflows/ci.yml", ".github/workflows/http-
   }
 }
 
+if (exists(".github/workflows/ci.yml")) {
+  const ci = read(".github/workflows/ci.yml");
+  if (!ci.includes("scripts/test-operational-event-ledger.sql")) {
+    fail("CI must execute the operational event ledger regression");
+  }
+}
+
 if (exists(".github/workflows/production-monitor.yml")) {
   const monitor = read(".github/workflows/production-monitor.yml");
   for (const requiredFragment of [
-    "cron: '17 * * * *'",
+    "cron: '*/15 * * * *'",
     "issues: write",
     "persist-credentials: false",
     "scripts/test-production-http-smoke.mjs",
@@ -241,10 +254,13 @@ if (exists("app/api/health/route.ts")) {
     "message-attachments",
     "product-media",
     "seller-branding",
-    "checks = { database, storage }",
+    "operational_event_health",
+    "p_window_minutes: 15",
+    "p_threshold: 5",
+    "checks = { database, storage, operations }",
   ]) {
     if (!healthRoute.includes(requiredFragment)) {
-      fail(`Production readiness route lost required Storage health control: ${requiredFragment}`);
+      fail(`Production readiness route lost required health control: ${requiredFragment}`);
     }
   }
 }
@@ -254,10 +270,27 @@ if (exists("scripts/test-production-http-smoke.mjs")) {
   for (const requiredFragment of [
     "body?.checks?.database !== 'ok'",
     "body?.checks?.storage !== 'ok'",
-    "database=ok and storage=ok",
+    "body?.checks?.operations !== 'ok'",
+    "database=ok, storage=ok and operations=ok",
   ]) {
     if (!productionSmoke.includes(requiredFragment)) {
       fail(`Production smoke lost required readiness assertion: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists("supabase/migrations/20260825153000_operational_event_ledger.sql")) {
+  const ledgerMigration = read("supabase/migrations/20260825153000_operational_event_ledger.sql");
+  for (const requiredFragment of [
+    "app_private.operational_events",
+    "enable row level security",
+    "record_operational_event",
+    "operational_event_health",
+    "interval '30 days'",
+    "to service_role",
+  ]) {
+    if (!ledgerMigration.includes(requiredFragment)) {
+      fail(`Operational ledger migration lost required control: ${requiredFragment}`);
     }
   }
 }
