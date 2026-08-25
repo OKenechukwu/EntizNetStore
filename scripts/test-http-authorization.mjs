@@ -121,6 +121,13 @@ function productPayload() {
   }
 }
 
+function brandingForm(bytes, name = 'logo.png', type = 'image/png') {
+  const form = new FormData()
+  form.set('slot', 'logo')
+  form.set('file', new File([bytes], name, { type }))
+  return form
+}
+
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=',
   'base64',
@@ -176,6 +183,58 @@ try {
     401,
   )
 
+  const { data: sellerAInitial, error: sellerAInitialError } = await admin
+    .from('profiles_seller')
+    .select('store_slug, storefront_name, logo_url')
+    .eq('id', sellerA.id)
+    .single()
+  if (sellerAInitialError) throw sellerAInitialError
+
+  await expectStatus(
+    'anonymous storefront mutation denied',
+    await appFetch('/api/seller/storefront', {
+      method: 'PATCH',
+      json: { storefrontName: 'Anonymous Store' },
+    }),
+    401,
+  )
+  await expectStatus(
+    'buyer cannot mutate Seller storefront',
+    await appFetch('/api/seller/storefront', {
+      cookie: buyer.cookie,
+      method: 'PATCH',
+      json: { storefrontName: 'Buyer Store' },
+    }),
+    403,
+  )
+  const storefrontUpdate = await expectStatus(
+    'seller storefront update is authenticated-self scoped',
+    await appFetch('/api/seller/storefront', {
+      cookie: sellerA.cookie,
+      method: 'PATCH',
+      json: {
+        storefrontName: 'HTTP Seller A Updated',
+        bio: 'Seller A only',
+        shippingPolicy: 'Ships safely.',
+        returnPolicy: 'Returns safely.',
+        storeSlug: 'attempted-slug-overwrite',
+        id: sellerB.id,
+      },
+    }),
+    200,
+  )
+  assert.equal(storefrontUpdate.storefront.store_slug, sellerAInitial.store_slug)
+  const { data: sellerProfilesAfterStorefront, error: storefrontVerificationError } = await admin
+    .from('profiles_seller')
+    .select('id, storefront_name, store_slug')
+    .in('id', [sellerA.id, sellerB.id])
+  if (storefrontVerificationError) throw storefrontVerificationError
+  const sellerAAfterStorefront = sellerProfilesAfterStorefront.find((row) => row.id === sellerA.id)
+  const sellerBAfterStorefront = sellerProfilesAfterStorefront.find((row) => row.id === sellerB.id)
+  assert.equal(sellerAAfterStorefront.storefront_name, 'HTTP Seller A Updated')
+  assert.equal(sellerAAfterStorefront.store_slug, sellerAInitial.store_slug)
+  assert.equal(sellerBAfterStorefront.storefront_name, 'HTTP Seller B')
+
   await expectStatus(
     'buyer cannot create Seller product',
     await appFetch('/api/seller/products', {
@@ -221,7 +280,7 @@ try {
     }),
     403,
   )
-  await expectStatus(
+  const kycUpload = await expectStatus(
     'seller can initialize private KYC upload',
     await appFetch('/api/kyc/upload', {
       cookie: sellerA.cookie,
@@ -229,6 +288,17 @@ try {
       json: { documentType: 'identity', fileName: 'id.png' },
     }),
     200,
+  )
+  assert.equal(kycUpload.bucket, 'kyc-documents')
+  assert.equal(kycUpload.filePath.startsWith(`${sellerA.id}/identity/`), true)
+  await expectStatus(
+    'another seller cannot register seller A KYC path',
+    await appFetch('/api/kyc/documents', {
+      cookie: sellerB.cookie,
+      method: 'POST',
+      json: { documentType: 'identity', fileName: 'stolen.png', filePath: kycUpload.filePath },
+    }),
+    400,
   )
 
   await expectStatus(
@@ -240,7 +310,7 @@ try {
     }),
     403,
   )
-  await expectStatus(
+  const productMediaUpload = await expectStatus(
     'seller can initialize owned product-media upload',
     await appFetch('/api/seller/product-media/upload', {
       cookie: sellerA.cookie,
@@ -249,6 +319,64 @@ try {
     }),
     200,
   )
+  assert.equal(productMediaUpload.bucket, 'product-media')
+  assert.equal(productMediaUpload.filePath.startsWith(`${sellerA.id}/`), true)
+  await expectStatus(
+    'seller B cannot delete seller A product-media path',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerB.cookie,
+      method: 'DELETE',
+      json: { filePath: productMediaUpload.filePath },
+    }),
+    400,
+  )
+
+  await expectStatus(
+    'anonymous branding upload denied',
+    await appFetch('/api/seller/branding', {
+      method: 'POST',
+      body: brandingForm(onePixelPng),
+    }),
+    401,
+  )
+  await expectStatus(
+    'buyer cannot upload Seller branding',
+    await appFetch('/api/seller/branding', {
+      cookie: buyer.cookie,
+      method: 'POST',
+      body: brandingForm(onePixelPng),
+    }),
+    403,
+  )
+  await expectStatus(
+    'seller branding rejects spoofed image bytes',
+    await appFetch('/api/seller/branding', {
+      cookie: sellerA.cookie,
+      method: 'POST',
+      body: brandingForm(Buffer.from('not-a-real-image'), 'spoofed.png'),
+    }),
+    400,
+  )
+  const brandingUpload = await expectStatus(
+    'seller can upload validated owned branding',
+    await appFetch('/api/seller/branding', {
+      cookie: sellerA.cookie,
+      method: 'POST',
+      body: brandingForm(onePixelPng),
+    }),
+    200,
+  )
+  assert.equal(brandingUpload.slot, 'logo')
+  assert.equal(brandingUpload.url.includes(`/seller-branding/${sellerA.id}/logo/`), true)
+  const { data: sellerProfilesAfterBranding, error: brandingVerificationError } = await admin
+    .from('profiles_seller')
+    .select('id, logo_url')
+    .in('id', [sellerA.id, sellerB.id])
+  if (brandingVerificationError) throw brandingVerificationError
+  const sellerAAfterBranding = sellerProfilesAfterBranding.find((row) => row.id === sellerA.id)
+  const sellerBAfterBranding = sellerProfilesAfterBranding.find((row) => row.id === sellerB.id)
+  assert.equal(sellerAAfterBranding.logo_url, brandingUpload.url)
+  assert.equal(sellerBAfterBranding.logo_url, null)
 
   const sent = await expectStatus(
     'buyer can send encrypted message',

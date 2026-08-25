@@ -59,6 +59,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
 
+          node scripts/test-storage-boundary.mjs
           npm run build
 
           PORT=3000 npm start > /tmp/entiznetstore-http.log 2>&1 &
