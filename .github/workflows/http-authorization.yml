@@ -1,0 +1,95 @@
+name: HTTP Authorization Regression
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: http-authorization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  http-authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      SHIPPING_QUOTE_PROVIDER: unconfigured
+      TAX_QUOTE_PROVIDER: unconfigured
+      PAYMENT_PROVIDER: unconfigured
+      NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
+      PAYOUT_PROVIDER: unconfigured
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Start fresh local Supabase stack
+        run: supabase start
+
+      - name: Reset from repository migrations and seed
+        run: supabase db reset --local
+
+      - name: Build, boot and exercise real HTTP authorization boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+
+          npm run build
+
+          PORT=3000 npm start > /tmp/entiznetstore-http.log 2>&1 &
+          APP_PID=$!
+          cleanup() {
+            kill "$APP_PID" >/dev/null 2>&1 || true
+            command -v supabase >/dev/null 2>&1 && supabase stop --no-backup >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1:3000/; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js server did not become ready"
+            cat /tmp/entiznetstore-http.log
+            exit 1
+          fi
+
+          APP_ORIGIN=http://127.0.0.1:3000 node scripts/test-http-authorization.mjs || {
+            status=$?
+            echo "HTTP authorization regression failed; server log follows"
+            cat /tmp/entiznetstore-http.log
+            exit "$status"
+          }
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
