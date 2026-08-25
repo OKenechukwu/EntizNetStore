@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 import { logOperationalError } from '../lib/observability/operationalEvent.ts'
 
@@ -78,4 +80,21 @@ test('truncates large error strings', () => {
   )
 
   assert.equal(String(logs[0].details.errorMessage).length, 500)
+})
+
+test('sensitive production routes cannot regress to raw console error logging', () => {
+  const criticalRoutes = [
+    'app/api/health/route.ts',
+    'app/api/kyc/documents/route.ts',
+    'app/api/kyc/upload/route.ts',
+    'app/api/messages/attachments/upload/route.ts',
+    'app/api/seller/branding/route.ts',
+    'app/api/seller/product-media/upload/route.ts',
+  ]
+
+  for (const relativePath of criticalRoutes) {
+    const source = fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8')
+    assert.match(source, /logOperationalError\s*\(/, `${relativePath} must use logOperationalError`)
+    assert.doesNotMatch(source, /\bconsole\.error\s*\(/, `${relativePath} must not log raw errors`)
+  }
 })
