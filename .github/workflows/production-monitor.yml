@@ -44,7 +44,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'production-monitor',
               per_page: 100,
             });
             const existing = issues.find((issue) => issue.title === title && !issue.pull_request);
@@ -71,7 +70,6 @@ jobs:
                 repo: context.repo.repo,
                 title,
                 body,
-                labels: ['production-monitor'],
               });
             }
 
@@ -86,7 +84,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'production-monitor',
               per_page: 100,
             });
             for (const issue of issues.filter((item) => item.title === title && !item.pull_request)) {
