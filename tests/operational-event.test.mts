@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { logOperationalError, type OperationalEventRecord } from '../lib/observability/operationalEvent.ts'
-import { shouldPersistOperationalEvent } from '../lib/observability/operationalEventSink.ts'
+import { shouldPersistOperationalEvent } from '../lib/observability/operationalEventPolicy.ts'
 
 test('logs only allow-listed provider error fields and returns the same safe record', () => {
   const logs: Array<{ message: string; details: OperationalEventRecord }> = []
