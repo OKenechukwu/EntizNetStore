@@ -111,7 +111,7 @@ begin
 end;
 $$;
 
--- A single failure must not trip the repeated-failure threshold.
+-- A single ordinary error must not trip the repeated-failure threshold.
 do $$
 declare
   health_status text;
@@ -122,12 +122,53 @@ begin
   from public.operational_event_health(15, 5) h;
 
   if health_status <> 'ok' or count_value <> 0 then
-    raise exception 'single operational failure must not mark aggregate health degraded';
+    raise exception 'single ordinary operational error must not mark aggregate health degraded';
   end if;
 end;
 $$;
 
--- Five matching failures within the window must become an actionable signal.
+-- One critical money/reconciliation event must degrade readiness immediately.
+set local role service_role;
+select public.record_operational_event(
+  'payments.reference_reconciliation_required',
+  'payments',
+  'attach-provider-reference',
+  'critical',
+  null,
+  '/api/payments/create-intent',
+  null,
+  '0011223344556677',
+  'database_error',
+  500
+);
+reset role;
+
+do $$
+declare
+  health_status text;
+  event_name text;
+  component_name text;
+  count_value bigint;
+begin
+  select h.status, h.failing_event, h.failing_component, h.failure_count
+  into health_status, event_name, component_name, count_value
+  from public.operational_event_health(15, 5) h;
+
+  if health_status <> 'degraded'
+     or event_name <> 'payments.reference_reconciliation_required'
+     or component_name <> 'payments'
+     or count_value <> 1 then
+    raise exception 'single critical reconciliation event must mark aggregate health degraded';
+  end if;
+end;
+$$;
+
+-- Remove only the critical fixture so the repeated ordinary-error threshold can
+-- be tested independently in the same transaction.
+delete from app_private.operational_events
+where event = 'payments.reference_reconciliation_required';
+
+-- Five matching ordinary errors within the window must become actionable.
 set local role service_role;
 select public.record_operational_event('storage.product_media.upload_failed','storage','upload-object','error','product-media','/api/seller/product-media/upload',null,null,'storage_error',503);
 select public.record_operational_event('storage.product_media.upload_failed','storage','upload-object','error','product-media','/api/seller/product-media/upload',null,null,'storage_error',503);
@@ -151,7 +192,7 @@ begin
      or event_name <> 'storage.product_media.upload_failed'
      or component_name <> 'storage'
      or count_value < 5 then
-    raise exception 'repeated operational failures must mark aggregate health degraded';
+    raise exception 'repeated ordinary operational errors must mark aggregate health degraded';
   end if;
 end;
 $$;
