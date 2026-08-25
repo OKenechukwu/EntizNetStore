@@ -91,7 +91,7 @@ export default function Header() {
           {/* Compact navigation toggle */}
           <button
             type="button"
-            className="ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary sm:ml-0 xl:hidden"
+            className="ml-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-lg p-2 text-foreground transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary sm:ml-0 xl:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen(!mobileOpen)}
