@@ -62,8 +62,13 @@ async function request(path, expectedStatus, verifyBody) {
 
 await request('/', 200)
 await request('/api/health', 200, (body) => {
-  if (body?.status !== 'ok' || body?.service !== 'entiznetstore' || body?.checks?.database !== 'ok') {
-    throw new Error('readiness response did not report database=ok')
+  if (
+    body?.status !== 'ok' ||
+    body?.service !== 'entiznetstore' ||
+    body?.checks?.database !== 'ok' ||
+    body?.checks?.storage !== 'ok'
+  ) {
+    throw new Error('readiness response did not report database=ok and storage=ok')
   }
 })
 await request('/api/messages/conversations', 401, (body) => {
