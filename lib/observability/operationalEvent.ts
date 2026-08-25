@@ -1,12 +1,30 @@
 import { createHash } from 'node:crypto'
 
-type OperationalErrorContext = {
+export type OperationalSeverity = 'warning' | 'error' | 'critical'
+
+export type OperationalErrorContext = {
   component: string
   operation: string
+  severity?: OperationalSeverity
   bucket?: string
   route?: string
   actorId?: string
   recordId?: string
+}
+
+export type OperationalEventRecord = {
+  event: string
+  component: string
+  operation: string
+  severity: OperationalSeverity
+  bucket?: string
+  route?: string
+  actorFingerprint?: string
+  recordFingerprint?: string
+  errorName?: string | number
+  errorMessage?: string | number
+  errorCode?: string | number
+  errorStatus?: string | number
 }
 
 type OperationalLogger = (
@@ -73,15 +91,19 @@ export function logOperationalError(
   error: unknown,
   context: OperationalErrorContext,
   logger: OperationalLogger = defaultLogger,
-) {
-  logger('EntizNetStore operational error', {
+): OperationalEventRecord {
+  const record: OperationalEventRecord = {
     event,
     component: context.component,
     operation: context.operation,
+    severity: context.severity ?? 'error',
     bucket: context.bucket,
     route: context.route,
     actorFingerprint: fingerprint(context.actorId),
     recordFingerprint: fingerprint(context.recordId),
     ...errorDetails(error),
-  })
+  }
+
+  logger('EntizNetStore operational error', record)
+  return record
 }
