@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const failures = [];
+const canonicalNodeEngine = ">=22 <23";
 
 function fail(message) {
   failures.push(message);
@@ -78,12 +79,54 @@ for (const relativePath of runtimeFiles) {
   }
 }
 
+const forbiddenApiRouteSegments = new Set([
+  "debug",
+  "dev",
+  "fixture",
+  "fixtures",
+  "maintenance",
+  "migrate",
+  "migration",
+  "migrations",
+  "mock",
+  "mocks",
+  "seed",
+  "seeds",
+  "test",
+  "tests",
+]);
+const apiRouteFiles = walk("app/api").filter((relativePath) => /(?:^|[\\/])route\.[cm]?[jt]sx?$/.test(relativePath));
+
+for (const relativePath of apiRouteFiles) {
+  const normalizedPath = relativePath.split(path.sep).join("/");
+  const routeSegments = normalizedPath.split("/").slice(2, -1);
+  for (const segment of routeSegments) {
+    const normalizedSegment = segment.replace(/^\((.*)\)$/, "$1").toLowerCase();
+    if (forbiddenApiRouteSegments.has(normalizedSegment)) {
+      fail(`Forbidden public API route segment '${segment}' found in ${normalizedPath}`);
+    }
+  }
+
+  const executableContent = stripComments(read(relativePath));
+  if (/\bconsole\.(?:log|debug|info|trace)\s*\(/.test(executableContent)) {
+    fail(`Unstructured verbose console logging found in production API route: ${normalizedPath}`);
+  }
+}
+
 const pkg = JSON.parse(read("package.json"));
 const lock = JSON.parse(read("package-lock.json"));
 const lockRoot = lock.packages?.[""] ?? {};
 
 if (!/^npm@/.test(pkg.packageManager ?? "")) {
   fail(`Canonical packageManager must be npm, found: ${pkg.packageManager ?? "missing"}`);
+}
+
+if (pkg.engines?.node !== canonicalNodeEngine) {
+  fail(`Canonical Node.js runtime contract must be ${canonicalNodeEngine}, found: ${pkg.engines?.node ?? "missing"}`);
+}
+
+if (lockRoot.engines?.node !== canonicalNodeEngine) {
+  fail(`package-lock Node.js runtime contract must be ${canonicalNodeEngine}, found: ${lockRoot.engines?.node ?? "missing"}`);
 }
 
 if (lock.name !== pkg.name || lockRoot.name !== pkg.name) {
@@ -131,6 +174,7 @@ for (const requiredPath of [
   "app/api/health/route.ts",
   "docs/architecture/ADR-0001-account-capabilities.md",
   "docs/operations/BACKUP_RECOVERY.md",
+  "docs/operations/DEPLOYMENT_RUNTIME_SECURITY_VERIFICATION_2026-08-25.md",
   "docs/operations/ENVIRONMENT_SECRETS.md",
   "docs/operations/INCIDENT_RESPONSE.md",
   "docs/operations/PRODUCTION_BASELINE_2026-08-21.md",
@@ -146,6 +190,17 @@ for (const requiredPath of [
 
 if (!pkg.scripts?.["test:production-http-smoke"]) {
   fail("package.json must expose test:production-http-smoke");
+}
+
+for (const workflowPath of [".github/workflows/ci.yml", ".github/workflows/http-authorization.yml"]) {
+  if (!exists(workflowPath)) {
+    fail(`Required Node.js workflow missing: ${workflowPath}`);
+    continue;
+  }
+  const workflow = read(workflowPath);
+  if (!/node-version:\s*22\b/.test(workflow)) {
+    fail(`${workflowPath} must execute against canonical Node.js 22`);
+  }
 }
 
 if (exists(".github/workflows/production-monitor.yml")) {
@@ -209,4 +264,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Production-foundation verification passed (${runtimeFiles.length} runtime files scanned).`);
+console.log(
+  `Production-foundation verification passed (${runtimeFiles.length} runtime files, ${apiRouteFiles.length} API routes scanned).`,
+);
