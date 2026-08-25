@@ -1,8 +1,7 @@
 // app/api/search/suggest/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-export const runtime = "edge";
+import { logOperationalError } from "@/lib/observability/operationalEvent";
 
 /**
  * GET /api/search/suggest?q=...
@@ -27,7 +26,11 @@ export async function GET(request: NextRequest) {
       .limit(8);
 
     if (error) {
-      console.error("Search suggest error:", error);
+      logOperationalError("search_suggest_query_failed", error, {
+        component: "search",
+        operation: "suggestions-query",
+        route: "/api/search/suggest",
+      });
       return NextResponse.json({ suggestions: [] });
     }
 
@@ -40,7 +43,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ suggestions });
   } catch (error) {
-    console.error("Search suggest error:", error);
+    logOperationalError("search_suggest_failed", error, {
+      component: "search",
+      operation: "suggestions",
+      route: "/api/search/suggest",
+    });
     return NextResponse.json({ suggestions: [] });
   }
 }
