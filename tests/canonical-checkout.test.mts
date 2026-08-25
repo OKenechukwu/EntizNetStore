@@ -31,8 +31,11 @@ test("signed-in cart converges on the canonical server cart", async () => {
   );
 });
 
-test("checkout accepts only shipping-capable addresses", async () => {
-  const checkout = await source("app/checkout/CheckoutClient.tsx");
+test("checkout accepts only owned shipping-capable addresses", async () => {
+  const [checkout, quoteRoute] = await Promise.all([
+    source("app/checkout/CheckoutClient.tsx"),
+    source("app/api/cart/quote/route.ts"),
+  ]);
 
   assert.match(
     checkout,
@@ -46,6 +49,11 @@ test("checkout accepts only shipping-capable addresses", async () => {
   assert.doesNotMatch(checkout, /setAddresses\(rows\);/);
   assert.match(checkout, /fetch\("\/api\/cart\/quote"/);
   assert.match(checkout, /body: JSON\.stringify\(\{ addressId: selectedAddressId \}\)/);
+
+  assert.match(quoteRoute, /\.eq\("id", parsed\.data\.addressId\)/);
+  assert.match(quoteRoute, /\.eq\("user_id", user\.id\)/);
+  assert.match(quoteRoute, /\.in\("type", \["shipping", "both"\]\)/);
+  assert.match(quoteRoute, /error: "Shipping address not found"/);
 });
 
 test("payment is bound to one quote-scoped canonical checkout session", async () => {
