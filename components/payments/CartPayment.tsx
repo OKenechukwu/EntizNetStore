@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const publicProvider = (
   process.env.NEXT_PUBLIC_PAYMENT_PROVIDER || "unconfigured"
@@ -26,6 +26,24 @@ type PaymentResult = {
   nextAction?: { type?: string; url?: string | null };
 };
 
+type PaymentAttempt = {
+  scope: string;
+  idempotencyKey: string;
+  checkoutSessionId: string | null;
+  error: string;
+  status: string;
+};
+
+function createAttempt(scope: string): PaymentAttempt {
+  return {
+    scope,
+    idempotencyKey: crypto.randomUUID(),
+    checkoutSessionId: null,
+    error: "",
+    status: "",
+  };
+}
+
 export default function CartPayment({
   cartId,
   quoteId,
@@ -35,18 +53,10 @@ export default function CartPayment({
   quoteId: string;
   onNeedsRequote: () => void;
 }) {
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
-  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
+  const scope = `${cartId}:${quoteId}`;
+  const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    setIdempotencyKey(crypto.randomUUID());
-    setCheckoutSessionId(null);
-    setError("");
-    setStatus("");
-  }, [cartId, quoteId]);
+  const activeAttempt = attempt?.scope === scope ? attempt : null;
 
   if (publicProvider === "unconfigured") {
     return <ProviderPending />;
@@ -54,16 +64,21 @@ export default function CartPayment({
 
   async function beginPayment() {
     setProcessing(true);
-    setError("");
-    setStatus("");
+    let workingAttempt = activeAttempt || createAttempt(scope);
+    workingAttempt = { ...workingAttempt, error: "", status: "" };
+    setAttempt(workingAttempt);
 
     try {
-      let sessionId = checkoutSessionId;
+      let sessionId = workingAttempt.checkoutSessionId;
       if (!sessionId) {
         const sessionResponse = await fetch("/api/checkout/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cartId, quoteId, idempotencyKey }),
+          body: JSON.stringify({
+            cartId,
+            quoteId,
+            idempotencyKey: workingAttempt.idempotencyKey,
+          }),
         });
         const session = (await sessionResponse.json().catch(() => ({}))) as PaymentResult;
         if (!sessionResponse.ok || !session.checkoutSessionId) {
@@ -71,7 +86,8 @@ export default function CartPayment({
           throw new Error(session.error || "Unable to create secure checkout session");
         }
         sessionId = session.checkoutSessionId;
-        setCheckoutSessionId(sessionId);
+        workingAttempt = { ...workingAttempt, checkoutSessionId: sessionId };
+        setAttempt(workingAttempt);
       }
 
       const response = await fetch("/api/payments/create-intent", {
@@ -97,8 +113,14 @@ export default function CartPayment({
       }
 
       if (result.nextAction?.type === "none") {
-        setStatus(
-          "Payment initialization was accepted. The order remains pending until the payment provider confirms the transaction.",
+        setAttempt((current) =>
+          current?.scope === scope
+            ? {
+                ...current,
+                status:
+                  "Payment initialization was accepted. The order remains pending until the payment provider confirms the transaction.",
+              }
+            : current,
         );
         return;
       }
@@ -107,10 +129,13 @@ export default function CartPayment({
         "This payment provider requires a checkout UI adapter that has not been enabled yet.",
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Payment failed");
-      // Never rotate the idempotency key or silently create a second session on
-      // retry. Replays remain bound to this cart/quote until the parent explicitly
-      // requires a fresh trusted quote.
+      const message = caught instanceof Error ? caught.message : "Payment failed";
+      setAttempt((current) =>
+        current?.scope === scope ? { ...current, error: message } : current,
+      );
+      // The attempt is scoped to this exact cart/quote pair. Retries keep the
+      // same UUID and checkout session; a different trusted quote naturally
+      // receives a new attempt without an effect-driven state reset.
     } finally {
       setProcessing(false);
     }
@@ -118,14 +143,14 @@ export default function CartPayment({
 
   return (
     <div className="space-y-4">
-      {error && (
+      {activeAttempt?.error && (
         <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          {error}
+          {activeAttempt.error}
         </div>
       )}
-      {status && (
+      {activeAttempt?.status && (
         <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
-          {status}
+          {activeAttempt.status}
         </div>
       )}
       <button
@@ -134,7 +159,11 @@ export default function CartPayment({
         disabled={processing}
         className="min-h-11 w-full rounded-lg bg-black px-4 py-3 font-medium text-white disabled:opacity-50"
       >
-        {processing ? "Opening secure payment…" : checkoutSessionId ? "Retry secure payment" : "Continue to secure payment"}
+        {processing
+          ? "Opening secure payment…"
+          : activeAttempt?.checkoutSessionId
+            ? "Retry secure payment"
+            : "Continue to secure payment"}
       </button>
       <p className="text-center text-xs text-gray-500">
         The amount, Seller split, shipping address and inventory reservation come only from the consumed server quote. Browser-supplied item prices are never accepted here.
