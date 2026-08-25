@@ -58,9 +58,8 @@ export async function importGuestCartIfPresent(): Promise<GuestCartImportResult 
   // The import endpoint is deliberately non-destructive when a canonical cart
   // already exists. Once the server has answered successfully, the browser cart
   // must stop competing as a second source of truth even when some stale guest
-  // items were rejected.
+  // items were rejected. clearGuestCart already emits the single cartUpdate event.
   clearGuestCart();
-  dispatchCartUpdate();
   return result;
 }
 
