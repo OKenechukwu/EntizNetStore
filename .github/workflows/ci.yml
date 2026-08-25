@@ -51,6 +51,9 @@ jobs:
       - name: Run operational logging redaction regression
         run: npm run test:operational-logging
 
+      - name: Run canonical checkout client contract regression
+        run: npm run test:canonical-checkout
+
       - name: Type-check application
         run: npm run typecheck
 

@@ -16,6 +16,21 @@ type Role = 'buyer' | 'seller' | 'bsm';
 type Mode = 'signin' | 'signup';
 type Variant = 'combined' | 'signin';
 
+function safeInternalNext(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return null;
+  }
+
+  try {
+    const base = new URL('https://entiznetstore.local');
+    const target = new URL(value, base);
+    if (target.origin !== base.origin) return null;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function AuthCard({ variant = 'combined' as Variant }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -86,6 +101,16 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
     // Authenticated: complete any pending buyer/seller/business onboarding
     // (idempotent trusted endpoint; identity derived server-side).
     await completePendingOnboarding();
+
+    // A caller may request a same-site return target such as /checkout. Treat
+    // the query string only as navigation intent, never as authorization, and
+    // reject protocol-relative/external paths to avoid an open redirect.
+    const requestedNext = safeInternalNext(params.get('next'));
+    if (requestedNext) {
+      router.push(requestedNext);
+      return;
+    }
+
     // Canonical capability-based destination (server-derived; never from
     // client-mutable user_metadata).
     router.push(await destinationAfterAuth());

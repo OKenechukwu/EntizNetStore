@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { clearCart, countItems, getCart } from "@/lib/cart";
+import { countItems } from "@/lib/cart";
+import { loadCanonicalCartWithGuestImport } from "@/lib/cart/client";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function CartLink() {
@@ -12,43 +13,18 @@ export default function CartLink() {
   const loadCount = useCallback(async () => {
     if (loading) return;
 
-    if (!user) {
+    // Anonymous users and signed-in accounts that have not enabled Buyer yet
+    // still see their temporary guest-cart count. Once Buyer is active, the
+    // canonical server cart becomes the only authority and any guest cart is
+    // imported once through the shared non-destructive transition helper.
+    if (!user || !user.isBuyer) {
       setItemCount(countItems());
       return;
     }
 
-    if (!user.isBuyer) {
-      setItemCount(0);
-      return;
-    }
-
     try {
-      const legacy = getCart();
-      if (legacy.length > 0) {
-        const importResponse = await fetch("/api/cart/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: legacy.map((item) => ({
-              productId: item.id,
-              variantId: item.variantId || null,
-              quantity: item.qty,
-            })),
-          }),
-        });
-
-        if (importResponse.ok) {
-          const imported = await importResponse.json();
-          setItemCount(Number(imported.cart?.itemCount || 0));
-          clearCart();
-          return;
-        }
-      }
-
-      const response = await fetch("/api/cart", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to load cart");
-      const payload = await response.json();
-      setItemCount(Number(payload.cart?.itemCount || 0));
+      const { cart } = await loadCanonicalCartWithGuestImport();
+      setItemCount(Number(cart?.itemCount || 0));
     } catch (error) {
       console.error("Unable to refresh cart count", error);
     }
@@ -70,11 +46,12 @@ export default function CartLink() {
   return (
     <Link
       href="/cart"
-      className="relative text-sky-600 hover:underline flex items-center gap-1"
+      className="relative flex min-h-11 items-center gap-1 rounded-md px-2 text-sky-600 hover:underline"
+      aria-label={itemCount > 0 ? `Cart with ${itemCount} item${itemCount === 1 ? "" : "s"}` : "Cart"}
     >
       Cart
       {itemCount > 0 && (
-        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white" aria-hidden="true">
           {itemCount > 99 ? "99+" : itemCount}
         </span>
       )}
