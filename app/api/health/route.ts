@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { logOperationalError } from '@/lib/observability/operationalEvent'
+import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-type CheckStatus = 'ok' | 'unavailable'
+type CheckStatus = 'ok' | 'degraded' | 'unavailable'
 
 const requiredStorageBuckets = [
   { id: 'kyc-documents', public: false },
@@ -25,6 +25,7 @@ export async function GET() {
   const startedAt = Date.now()
   let database: CheckStatus = 'unavailable'
   let storage: CheckStatus = 'unavailable'
+  let operations: CheckStatus = 'unavailable'
 
   try {
     const admin = getSupabaseAdmin()
@@ -34,7 +35,7 @@ export async function GET() {
     ])
 
     if (databaseResult.error) {
-      logOperationalError('readiness.database_unavailable', databaseResult.error, {
+      await reportOperationalError('readiness.database_unavailable', databaseResult.error, {
         component: 'readiness',
         operation: 'database-readiness-check',
         route: '/api/health',
@@ -44,7 +45,7 @@ export async function GET() {
     }
 
     if (storageResult.error) {
-      logOperationalError('readiness.storage_unavailable', storageResult.error, {
+      await reportOperationalError('readiness.storage_unavailable', storageResult.error, {
         component: 'readiness',
         operation: 'storage-readiness-check',
         route: '/api/health',
@@ -59,7 +60,7 @@ export async function GET() {
       if (storageBoundaryMatches) {
         storage = 'ok'
       } else {
-        logOperationalError(
+        await reportOperationalError(
           'readiness.storage_boundary_misconfigured',
           'required storage bucket boundary is missing or misconfigured',
           {
@@ -70,16 +71,38 @@ export async function GET() {
         )
       }
     }
+
+    if (database === 'ok') {
+      const { data: operationalHealth, error: operationalHealthError } = await admin.rpc(
+        'operational_event_health',
+        { p_window_minutes: 15, p_threshold: 5 },
+      )
+
+      if (operationalHealthError) {
+        await reportOperationalError(
+          'readiness.operational_event_health_failed',
+          operationalHealthError,
+          {
+            component: 'readiness',
+            operation: 'operational-event-health-check',
+            route: '/api/health',
+          },
+        )
+      } else {
+        const row = Array.isArray(operationalHealth) ? operationalHealth[0] : operationalHealth
+        operations = row?.status === 'degraded' ? 'degraded' : row?.status === 'ok' ? 'ok' : 'unavailable'
+      }
+    }
   } catch (error) {
-    logOperationalError('readiness.check_failed', error, {
+    await reportOperationalError('readiness.check_failed', error, {
       component: 'readiness',
       operation: 'readiness-check',
       route: '/api/health',
     })
   }
 
-  const checks = { database, storage }
-  const healthy = database === 'ok' && storage === 'ok'
+  const checks = { database, storage, operations }
+  const healthy = database === 'ok' && storage === 'ok' && operations === 'ok'
 
   return NextResponse.json(
     {
