@@ -124,12 +124,14 @@ jobs:
               exit "$status"
             }
 
+          mkdir -p artifacts/web-responsive
           PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
             APP_ORIGIN=http://127.0.0.1:3000 \
-            node scripts/test-web-accessibility-browser.mjs || {
+            node scripts/test-web-accessibility-browser.mjs \
+            2>&1 | tee artifacts/web-responsive/accessibility-regression.log || {
               status=$?
-              echo "Accessibility browser regression failed; server log follows"
-              cat /tmp/entiznetstore-http.log
+              echo "Accessibility browser regression failed; server log follows" | tee -a artifacts/web-responsive/accessibility-regression.log
+              cat /tmp/entiznetstore-http.log | tee -a artifacts/web-responsive/accessibility-regression.log
               exit "$status"
             }
 
