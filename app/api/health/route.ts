@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logOperationalError } from '@/lib/observability/operationalEvent'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
@@ -13,12 +14,6 @@ const requiredStorageBuckets = [
   { id: 'seller-branding', public: true },
 ] as const
 
-function safeErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message.slice(0, 300)
-  if (typeof error === 'string') return error.slice(0, 300)
-  return 'unknown health-check error'
-}
-
 function responseHeaders() {
   return {
     'Cache-Control': 'private, no-store, max-age=0',
@@ -30,8 +25,6 @@ export async function GET() {
   const startedAt = Date.now()
   let database: CheckStatus = 'unavailable'
   let storage: CheckStatus = 'unavailable'
-  let databaseError: string | null = null
-  let storageError: string | null = null
 
   try {
     const admin = getSupabaseAdmin()
@@ -41,13 +34,21 @@ export async function GET() {
     ])
 
     if (databaseResult.error) {
-      databaseError = safeErrorMessage(databaseResult.error.message || 'database health check failed')
+      logOperationalError('readiness.database_unavailable', databaseResult.error, {
+        component: 'readiness',
+        operation: 'database-readiness-check',
+        route: '/api/health',
+      })
     } else {
       database = 'ok'
     }
 
     if (storageResult.error) {
-      storageError = safeErrorMessage(storageResult.error.message || 'storage health check failed')
+      logOperationalError('readiness.storage_unavailable', storageResult.error, {
+        component: 'readiness',
+        operation: 'storage-readiness-check',
+        route: '/api/health',
+      })
     } else {
       const bucketById = new Map(storageResult.data.map((bucket) => [bucket.id, bucket]))
       const storageBoundaryMatches = requiredStorageBuckets.every((expected) => {
@@ -58,25 +59,27 @@ export async function GET() {
       if (storageBoundaryMatches) {
         storage = 'ok'
       } else {
-        storageError = 'required storage bucket boundary is missing or misconfigured'
+        logOperationalError(
+          'readiness.storage_boundary_misconfigured',
+          'required storage bucket boundary is missing or misconfigured',
+          {
+            component: 'readiness',
+            operation: 'storage-boundary-check',
+            route: '/api/health',
+          },
+        )
       }
     }
   } catch (error) {
-    const message = safeErrorMessage(error)
-    databaseError = databaseError ?? message
-    storageError = storageError ?? message
+    logOperationalError('readiness.check_failed', error, {
+      component: 'readiness',
+      operation: 'readiness-check',
+      route: '/api/health',
+    })
   }
 
   const checks = { database, storage }
   const healthy = database === 'ok' && storage === 'ok'
-
-  if (!healthy) {
-    console.error('EntizNetStore readiness check failed', {
-      checks,
-      databaseError,
-      storageError,
-    })
-  }
 
   return NextResponse.json(
     {
