@@ -129,12 +129,15 @@ export default function CheckoutClient() {
       throw new Error(typeof payload.error === "string" ? payload.error : "Unable to load addresses");
     }
     const rows = Array.isArray(payload.addresses) ? (payload.addresses as Address[]) : [];
-    setAddresses(rows);
+    const shippingAddresses = rows.filter(
+      (address) => address.type === "shipping" || address.type === "both",
+    );
+    setAddresses(shippingAddresses);
     setSelectedAddressId((current) => {
-      if (current && rows.some((address) => address.id === current)) return current;
-      return rows.find((address) => address.is_default)?.id || rows[0]?.id || null;
+      if (current && shippingAddresses.some((address) => address.id === current)) return current;
+      return shippingAddresses.find((address) => address.is_default)?.id || shippingAddresses[0]?.id || null;
     });
-    return rows;
+    return shippingAddresses;
   }, []);
 
   const loadBuyerCheckout = useCallback(async () => {
@@ -381,7 +384,7 @@ export default function CheckoutClient() {
 
               {addresses.length > 0 ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {addresses.filter((address) => address.type !== "billing").map((address) => (
+                  {addresses.map((address) => (
                     <label key={address.id} className={`cursor-pointer rounded-lg border p-4 ${selectedAddressId === address.id ? "border-brand-secondary bg-brand-secondary/10" : "border-white/10"}`}>
                       <div className="flex gap-3">
                         <input
