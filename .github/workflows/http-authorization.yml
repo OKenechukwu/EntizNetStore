@@ -84,6 +84,13 @@ jobs:
             exit 1
           fi
 
+          ENTIZNETSTORE_BASE_URL=http://127.0.0.1:3000 node scripts/test-production-http-smoke.mjs || {
+            status=$?
+            echo "Production smoke regression failed; server log follows"
+            cat /tmp/entiznetstore-http.log
+            exit "$status"
+          }
+
           APP_ORIGIN=http://127.0.0.1:3000 node scripts/test-http-authorization.mjs || {
             status=$?
             echo "HTTP authorization regression failed; server log follows"
