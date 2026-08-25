@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { logOperationalError, type OperationalEventRecord } from '../lib/observability/operationalEvent.ts'
+import { shouldPersistOperationalEvent } from '../lib/observability/operationalEventSink.ts'
 
 test('logs only allow-listed provider error fields and returns the same safe record', () => {
   const logs: Array<{ message: string; details: OperationalEventRecord }> = []
@@ -82,6 +83,25 @@ test('truncates large error strings', () => {
   )
 
   assert.equal(String(logs[0].details.errorMessage).length, 500)
+})
+
+test('client-caused 4xx failures cannot manufacture aggregate production incidents', () => {
+  const base: OperationalEventRecord = {
+    event: 'storage.kyc.object_verification_failed',
+    component: 'storage',
+    operation: 'download-kyc-object-for-verification',
+    severity: 'error',
+  }
+
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: 404 }), false)
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: '409' }), false)
+  assert.equal(shouldPersistOperationalEvent({ ...base, errorStatus: 503 }), true)
+  assert.equal(shouldPersistOperationalEvent(base), true)
+  assert.equal(
+    shouldPersistOperationalEvent({ ...base, severity: 'critical', errorStatus: 400 }),
+    true,
+    'explicit critical events must always remain observable',
+  )
 })
 
 test('sensitive production routes must persist safe events and cannot regress to raw console logging', () => {
