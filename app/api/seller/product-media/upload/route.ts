@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { logOperationalError } from '@/lib/observability/operationalEvent'
+import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       .createSignedUploadUrl(filePath)
 
     if (error || !data?.signedUrl) {
-      logOperationalError(
+      await reportOperationalError(
         'storage.product_media.signed_upload_init_failed',
         error ?? 'signed upload URL was not returned',
         {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       method: 'PUT',
     })
   } catch (error) {
-    logOperationalError('storage.product_media.upload_route_failed', error, {
+    await reportOperationalError('storage.product_media.upload_route_failed', error, {
       component: 'storage',
       operation: 'initialize-product-media-upload',
       bucket: PRODUCT_MEDIA_BUCKET,
@@ -150,7 +150,7 @@ export async function DELETE(request: NextRequest) {
       .remove([filePath])
 
     if (error) {
-      logOperationalError('storage.product_media.delete_failed', error, {
+      await reportOperationalError('storage.product_media.delete_failed', error, {
         component: 'storage',
         operation: 'delete-object',
         bucket: PRODUCT_MEDIA_BUCKET,
@@ -162,7 +162,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ deleted: true })
   } catch (error) {
-    logOperationalError('storage.product_media.delete_route_failed', error, {
+    await reportOperationalError('storage.product_media.delete_route_failed', error, {
       component: 'storage',
       operation: 'delete-product-media',
       bucket: PRODUCT_MEDIA_BUCKET,
