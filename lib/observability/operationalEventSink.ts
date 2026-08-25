@@ -12,7 +12,24 @@ function boundedStatus(value: string | number | undefined) {
   return Number.isInteger(numeric) && numeric >= 100 && numeric <= 599 ? numeric : null
 }
 
+/**
+ * Only infrastructure/server failures should feed the aggregate availability
+ * signal. Expected client-caused 4xx outcomes remain redacted logs but are not
+ * persisted, otherwise a user could deliberately repeat a bad request and
+ * manufacture a production incident. Explicit critical events are always kept.
+ */
+export function shouldPersistOperationalEvent(record: OperationalEventRecord): boolean {
+  if (record.severity === 'critical') return true
+
+  const status = boundedStatus(record.errorStatus)
+  if (status !== null && status < 500) return false
+
+  return true
+}
+
 export async function persistOperationalEventBestEffort(record: OperationalEventRecord): Promise<boolean> {
+  if (!shouldPersistOperationalEvent(record)) return true
+
   try {
     const { error } = await getSupabaseAdmin().rpc('record_operational_event', {
       p_event: record.event,
