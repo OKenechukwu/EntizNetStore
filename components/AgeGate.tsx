@@ -34,13 +34,13 @@ export default function AgeGate({ children }: { children: React.ReactNode }) {
 
   if (!isVerified) {
     return (
-      <div className="age-gate-overlay p-4">
+      <div className="age-gate-overlay box-border overflow-x-hidden p-4">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="age-gate-title"
           aria-describedby="age-gate-description"
-          className="glass-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5 text-center animate-fade-in sm:p-8"
+          className="glass-card box-border max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] min-w-0 max-w-md overflow-y-auto p-5 text-center animate-fade-in sm:p-8"
         >
           <div className="mb-6">
             <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
