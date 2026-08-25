@@ -1,6 +1,6 @@
 # EntizNetStore Production Release Procedure
 
-Last reviewed: **2026-08-24**
+Last reviewed: **2026-08-25**
 
 This runbook defines the minimum release, health, rollback and migration-reconciliation procedure for EntizNetStore. It does not override `LAUNCH_BLOCKERS.md`; public launch remains blocked until every P0 requirement is verified.
 
@@ -28,6 +28,15 @@ Before merging/deploying a production candidate:
 5. Confirm required server-only secrets exist for the feature being released and no privileged value is present in Git, browser bundles or mobile configuration.
 6. Confirm external providers required by the release are configured. Payment and payout adapters must remain fail-closed while their provider is intentionally `unconfigured`.
 7. Confirm deployment capacity is available. The current Vercel Hobby plan has previously produced build-rate constraints and is not considered a durable public-launch deployment guarantee.
+8. Confirm the repository Node engine contract, package-lock root engine metadata and CI runtime remain aligned on Node 22.
+
+## Canonical Node.js runtime
+
+EntizNetStore currently standardizes production, CI and HTTP authorization regression on **Node.js 22.x**. The repository contract is `engines.node = ">=22 <23"`.
+
+Vercel may display a different project-level default, but its documented behavior is that `package.json` engine configuration overrides that setting. Production build evidence on 2026-08-25 confirmed that the repository engine forced Node 22.x even while the project setting displayed 24.x.
+
+Do not upgrade the Node major by changing only the hosting dashboard. A runtime-major change must update the repository contract and lock metadata together, pass the complete CI and HTTP authorization suites, and be re-verified from the production build log after deployment. Evidence is recorded in `docs/operations/DEPLOYMENT_RUNTIME_SECURITY_VERIFICATION_2026-08-25.md`.
 
 ## Database rollout
 
@@ -87,7 +96,9 @@ After deployment:
 2. Review error logs for health, authentication, storage, checkout/payment/refund/payout and EntizNet integration failures relevant to the release.
 3. Confirm logs do not contain tokens, assertions, service-role values, signed upload tokens or full provider secret payloads.
 4. Run representative fail-closed integration checks. Unsigned EntizNet Admin API calls must remain unauthorized.
-5. Record any new error signature and owner in the incident/runbook system before broadening traffic.
+5. Confirm the production build log selected Node 22.x from the repository engine contract.
+6. Confirm no new public API route uses a development/test/seed/mock/fixture/maintenance/migration route segment and no production API endpoint contains direct verbose console logging.
+7. Record any new error signature and owner in the incident/runbook system before broadening traffic.
 
 A clean release check is evidence for a release window; it is not a substitute for P0-07 continuous monitoring/alerts.
 
