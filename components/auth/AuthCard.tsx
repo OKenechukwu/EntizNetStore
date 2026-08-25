@@ -175,17 +175,6 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
     }
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (!busy) void handleSubmit();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, email, password, phone, address, mode, role]);
-
   const phoneHelp =
     role === 'buyer'
       ? 'Used for delivery updates and quick support calls.'
@@ -245,11 +234,18 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
         </div>
       )}
 
-      <div className="rounded-xl bg-gray-200 p-6 shadow-sm">
+      <form
+        className="rounded-xl bg-gray-200 p-6 shadow-sm"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!busy) void handleSubmit();
+        }}
+      >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Email address</label>
+            <label htmlFor="auth-email" className="block text-sm font-medium mb-2">Email address</label>
             <input
+              id="auth-email"
               className="w-full border rounded px-3 py-2 bg-white"
               placeholder="your@email.com"
               type="email"
@@ -264,9 +260,10 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
+            <label htmlFor="auth-password" className="block text-sm font-medium mb-2">Password</label>
             <div className="relative">
               <input
+                id="auth-password"
                 className="w-full border rounded px-3 py-2 bg-white pr-24"
                 placeholder={mode === 'signin' ? 'Your password' : 'Create a password'}
                 type={showPw ? 'text' : 'password'}
@@ -300,8 +297,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
           {mode === 'signup' && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-2">Phone number</label>
+                <label htmlFor="auth-phone" className="block text-sm font-medium mb-2">Phone number</label>
                 <input
+                  id="auth-phone"
                   className="w-full border rounded px-3 py-2 bg-white"
                   placeholder={role === 'buyer' ? '+49 123 4567890' : '+49 160 1234567'}
                   type="tel"
@@ -314,8 +312,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
               </div>
 
               <div className="relative">
-                <label className="block text-sm font-medium mb-2">Address</label>
+                <label htmlFor="auth-address" className="block text-sm font-medium mb-2">Address</label>
                 <input
+                  id="auth-address"
                   className="w-full border rounded px-3 py-2 bg-white"
                   placeholder="Street, city, country…"
                   type="text"
@@ -350,16 +349,16 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             </>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
 
-          <button onClick={handleSubmit} className="luxury-button-outline w-full py-2 disabled:opacity-60" disabled={busy} type="button">
+          <button className="luxury-button-outline w-full py-2 disabled:opacity-60" disabled={busy} type="submit">
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
           </button>
         </div>
 
         <pre className="mt-6 whitespace-pre-wrap text-sm opacity-70">{log}</pre>
         <p className="mt-4 text-xs opacity-60">By continuing, you agree to our Terms and acknowledge our Privacy Policy.</p>
-      </div>
+      </form>
     </div>
   );
 }
