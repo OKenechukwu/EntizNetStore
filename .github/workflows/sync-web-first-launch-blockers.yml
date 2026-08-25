@@ -1,0 +1,222 @@
+name: Sync Web-First Launch Blockers
+
+on:
+  push:
+    branches:
+      - codex/web-first-launch
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: codex/web-first-launch
+          fetch-depth: 0
+
+      - name: Synchronize canonical launch blockers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('LAUNCH_BLOCKERS.md')
+          source = path.read_text()
+
+          def replace_section(text: str, start: str, end: str, replacement: str) -> str:
+              if text.count(start) != 1:
+                  raise SystemExit(f'expected exactly one start marker: {start}')
+              if text.count(end) != 1:
+                  raise SystemExit(f'expected exactly one end marker: {end}')
+              before, rest = text.split(start, 1)
+              _, after = rest.split(end, 1)
+              return before + replacement.rstrip() + '\n\n' + end + after
+
+          old_m2 = 'Historical M2 Vercel Hobby build-rate limiting remains evidence for P0-06; later production deployments supersede the old M2 preview as current runtime evidence.'
+          new_m2 = 'Historical M2 Vercel Hobby build-rate limiting remains recorded as an incident, but the project now runs on Vercel Pro and current production deployments supersede the old Hobby-capacity evidence.'
+          if source.count(old_m2) != 1:
+              raise SystemExit('expected historical Vercel Hobby sentence once')
+          source = source.replace(old_m2, new_m2, 1)
+
+          p004 = '''## P0-04 — Authorization/RLS HTTP regression coverage
+
+**Status: IN PROGRESS — BROAD REAL HTTP MATRIX + SECURITY-DEFINER SURFACE VERIFIED**
+
+Verified:
+
+- database-level cross-account, role/capability, Admin and trusted-worker isolation remains extensive across M1–M3 and commerce/payment/payout suites;
+- PR #13 established production-built real HTTP authorization tests against a freshly replayed Supabase stack with anonymous, Buyer, Seller/cross-account, Admin and unsigned EntizNet roles;
+- PR #15 extended high-risk storage/media ownership coverage to Seller storefront/branding, KYC path ownership and cross-account product-media deletion boundaries;
+- PR #25 exact head `fe3b4a9c19bc194eb787e54668e562debd0f036f` passed CI run `32867931444` and HTTP Authorization Regression run `32867931437`;
+- PR #25 freezes the authenticated public `SECURITY DEFINER` surface to an exact reviewed 21-function allow-list, requires every retained client privileged RPC to preserve `auth.uid()` scoping and requires the anonymous public privileged RPC surface to remain empty;
+- live Supabase verification after PR #25 confirmed the retired Stripe compatibility wrapper is anonymous/authenticated denied and service-role only, while the canonical provider-neutral payment-reference RPC remains authenticated/self-scoped;
+- PR #25 merged as `5db7250c05a8d08779f3af0d9524f24ebeddbc5b`; canonical production health returned HTTP 200 with database/storage/operations all `ok` and exact version `5db7250c05a8`.
+
+Still required before clearing P0-04:
+
+- controlled authenticated verification against a deployed production-like environment rather than only local-Supabase HTTP execution;
+- repeat the representative matrix after any material auth/session/RLS architecture change;
+- keep any future browser-callable privileged RPC addition behind the explicit CI review allow-list.
+'''
+          source = replace_section(
+              source,
+              '## P0-04 — Authorization/RLS HTTP regression coverage',
+              '## P0-05 — Seller/Admin/KYC/storage security completion',
+              p004,
+          )
+
+          p005 = '''## P0-05 — Seller/Admin/KYC/storage security completion
+
+**Status: IN PROGRESS — STORAGE/MEDIA OWNERSHIP VERIFIED; MALWARE/CONTENT SCANNING PENDING**
+
+Verified controls include private KYC/message storage, size and magic-byte validation, Seller media ownership verification, RPC-only catalogue mutation, KYC/product moderation, trusted conversation-key access, reports/reviews/prohibited-product enforcement and narrow upload allow-lists.
+
+Additional verified hardening:
+
+- PR #11 verified storage compensation/recovery for KYC, messaging and Seller branding partial failures;
+- PR #13 verified representative real HTTP KYC/product-media/message-attachment authorization and ownership behavior;
+- PR #15 merged as `8bc9271c16aaa1ab6342521afe97f8692943270a` and added Seller storefront/branding, KYC path ownership, product-media cross-account delete denial and direct bucket-boundary regressions;
+- KYC and message buckets remain private; product-media and Seller-branding buckets retain their intentional public/private boundaries with server-controlled upload/delete routes;
+- PR #17 made Storage bucket/public-private readiness part of canonical `/api/health`;
+- PR #18 redacts sensitive operational storage-route failures before logging/persistence.
+
+Still required:
+
+- malware/content scanning or an explicitly approved equivalent upload-safety architecture appropriate to public-launch risk;
+- final production content/moderation policy for accepted upload classes and escalation;
+- re-verify public/private media boundaries after any storage-provider or upload architecture change.
+'''
+          source = replace_section(
+              source,
+              '## P0-05 — Seller/Admin/KYC/storage security completion',
+              '## P0-06 — Production deployment and migration hardening',
+              p005,
+          )
+
+          p006 = '''## P0-06 — Production deployment and migration hardening
+
+**Status: IN PROGRESS — RELEASE/HEALTH/RUNTIME GUARDS + VERCEL PRO CAPACITY VERIFIED**
+
+Verified:
+
+- dedicated Vercel project `entiznetstore` linked to `OKenechukwu/EntizNetStore`;
+- project is now on Vercel Pro; exact-head previews and production deployments no longer depend on the former Hobby build-rate window;
+- canonical HTTPS production runtime has deployed M3 and subsequent P0 hardening successfully;
+- exact source commit/deployment/runtime checks are part of release verification;
+- production build uses the canonical npm lockfile, effective Node 22 engine contract and CI runtime guards;
+- PR #12 established DB-backed `GET /api/health`, production security headers, reproducible production smoke verification and the release/rollback runbook;
+- PR #16 added dynamic public-API route inventory guards, effective-runtime verification and verbose operational logging rejection;
+- PR #18 added bounded structured error redaction for high-risk operational routes;
+- PR #25 production deployment `dpl_94WD4YipkZuTxAAmJRQ8H5CqSHa2` reached READY on exact merge `5db7250c05a8d08779f3af0d9524f24ebeddbc5b` with no error/fatal runtime logs in the verification window;
+- this web-first launch slice introduces `SITE_INDEXING_ENABLED`, defaulting to false so search indexing is an explicit production-launch action rather than an accidental development setting.
+
+Still required:
+
+- canonical owned production domain + DNS/HTTPS validation;
+- final production/preview/staging secret-target isolation review;
+- final CSP review for the actually selected payment/payout/identity browser integrations;
+- set and verify `SITE_INDEXING_ENABLED=true` only when public production is intentionally ready to be indexed;
+- final release rehearsal on the owned launch domain after remaining P0 external-provider/configuration blockers are cleared.
+'''
+          source = replace_section(
+              source,
+              '## P0-06 — Production deployment and migration hardening',
+              '## P0-07 — Observability and commerce incident response',
+              p006,
+          )
+
+          p007 = '''## P0-07 — Observability and commerce incident response
+
+**Status: IN PROGRESS — STORAGE READINESS + PRIVATE EVENT LEDGER + 15-MIN INCIDENT SIGNAL VERIFIED**
+
+Verified/implemented foundations:
+
+- canonical `/api/health` fails closed when database, required Storage boundaries or operational-event health are not `ok`;
+- PR #17 added Storage bucket/public-private readiness to health and production smoke verification;
+- PR #18 added bounded structured operational-event redaction that fingerprints actor/record identifiers and rejects raw stacks, tokens, signed URLs and arbitrary provider payloads;
+- the private `app_private.operational_events` ledger persists only a safe allow-listed event subset, retains events for 30 days and exposes service-role-only aggregate health;
+- repeated error/critical events use a 5-events/15-minute degradation threshold and the production monitor runs every 15 minutes;
+- repository incident automation creates/updates a GitHub production incident on failed canonical smoke and records/closes recovery after health returns;
+- `docs/operations/INCIDENT_RESPONSE.md` defines severity, containment, recovery and evidence-handling rules;
+- PR #25 production verification again showed database/storage/operations healthy and no error/fatal Vercel runtime logs in the reviewed window.
+
+Still required before P0-07 is `VERIFIED`:
+
+- external alert/log-drain/SIEM destination and retention/escalation ownership appropriate to public operations;
+- processor-specific payment/refund inconsistency and callback reconciliation alerts once a real payment provider is selected;
+- payout/escrow reconciliation alerts once the launch payout provider is selected;
+- EntizNet handoff/Admin-service failure alerts after production signing configuration is enabled;
+- recorded production monitor incident/recovery execution evidence on the final launch configuration.
+'''
+          source = replace_section(
+              source,
+              '## P0-07 — Observability and commerce incident response',
+              '## P0-08 — EntizNet identity/capability integration contract',
+              p007,
+          )
+
+          p010 = '''## P0-10 — Responsive web and accessibility public-launch pass
+
+**Status: OPEN — WEB PUBLIC-LAUNCH BLOCKER**
+
+EntizNetStore public V1 launches on the web before the native apps. The web therefore must be a first-class phone/tablet/desktop product, not merely a desktop precursor to mobile.
+
+Required before public web launch:
+
+- verify core Buyer, Seller, Business and Admin launch-scope flows across target phone, tablet and desktop viewports;
+- verify keyboard navigation, focus management, labels/semantics, contrast and screen-reader behavior for critical paths;
+- verify touch ergonomics, sticky/fixed controls and mobile keyboard behavior on forms and checkout;
+- verify loading, empty, validation, error, retry and recovery states on constrained/mobile connections;
+- verify the shared `Download App` navigation entry and `/apps` availability page across responsive breakpoints;
+- complete a production-like accessibility/responsive regression pass on the launch domain.
+
+Architecture/sequence: `docs/architecture/WEB_FIRST_LAUNCH_AND_NATIVE_MOBILE.md`.
+'''
+          marker = '---\n\n# P1 — polished V1/product parity'
+          if source.count(marker) != 1:
+              raise SystemExit('expected P1 boundary exactly once')
+          source = source.replace(marker, p010.rstrip() + '\n\n---\n\n# P1 — polished V1/product parity', 1)
+
+          native = '''## P1-01 — Native iOS/Android marketplace client
+
+**Status: DEFERRED UNTIL AFTER PUBLIC WEB V1 — NOT A WEB-LAUNCH BLOCKER**
+
+React Native + TypeScript mobile remains a first-class product, not a web wrapper. Public responsive web launches first. The web includes a stable `Download App` entry and `/apps` page; until legitimate store listings exist, iOS/Android states remain clearly marked coming soon.
+
+After the web launch gates are cleared, native work proceeds through shared domain/API contracts, secure device session storage, Buyer/Seller mobile flows, push notifications, deep links/EntizNet entry points and production mobile observability. Expo is preferred unless repository/platform inspection gives a strong reason otherwise.
+
+Architecture/sequence: `docs/architecture/WEB_FIRST_LAUNCH_AND_NATIVE_MOBILE.md`.
+
+## P1-02 — Native store-review and mobile parity hardening
+
+**Status: OPEN — AFTER NATIVE FOUNDATION**
+
+Before either native client is submitted, re-audit the then-current Apple App Store and Google Play rules against the actual EntizNetStore catalogue/content, age gating, payments, privacy/account controls and Seller functionality. Acceptance is a release gate, not an assumption.
+
+Required work includes separate iOS/Android signing and release configuration, privacy declarations, app permissions, universal/app links, notifications, screenshots/metadata, accessibility, production store-build verification and response to review findings. Official `/apps` store links are enabled only after legitimate listings exist.
+'''
+          source = replace_section(
+              source,
+              '## P1-01 — Native iOS/Android marketplace client',
+              '## P1-03 — Marketplace policy/operational content',
+              native,
+          )
+
+          path.write_text(source)
+          PY
+
+      - name: Commit blocker synchronization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add LAUNCH_BLOCKERS.md
+          git diff --cached --check
+          git commit -m "Align launch blockers with web-first release sequence"
+          git push origin HEAD:codex/web-first-launch
