@@ -32,6 +32,7 @@ const password = "A11yRegression-Only-2026!";
 const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const createdUserIds = [];
 const browserErrors = [];
+const failedResponses = [];
 
 function cookieHeader(cookieJar) {
   return [...cookieJar.entries()].map(([name, entry]) => `${name}=${entry.value}`).join("; ");
@@ -119,11 +120,26 @@ function browserCookies(identity) {
 function watchBrowserErrors(page, label) {
   page.on("console", (message) => {
     if (message.type() === "error") {
-      browserErrors.push(`[${label}] console: ${message.text()}`);
+      const location = message.location();
+      const source = location?.url ? ` source=${location.url}${location.lineNumber != null ? `:${location.lineNumber}` : ""}` : "";
+      browserErrors.push(`[${label}] console: ${message.text()}${source}`);
     }
   });
   page.on("pageerror", (error) => {
     browserErrors.push(`[${label}] pageerror: ${error.message}`);
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      const request = response.request();
+      failedResponses.push(
+        `[${label}] response: ${request.method()} ${response.status()} ${response.url()}`,
+      );
+    }
+  });
+  page.on("requestfailed", (request) => {
+    failedResponses.push(
+      `[${label}] requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText || "unknown error"}`,
+    );
   });
 }
 
@@ -323,7 +339,11 @@ try {
   await openAndAudit(adminPage, "/admin/products", "admin products", "/admin/products");
   await adminContext.close();
 
-  assert.deepEqual(browserErrors, [], `Browser errors detected:\n${browserErrors.join("\n")}`);
+  assert.deepEqual(
+    browserErrors,
+    [],
+    `Browser errors detected:\n${browserErrors.join("\n")}\n\nFailed HTTP responses observed:\n${failedResponses.join("\n")}`,
+  );
   console.log("Authenticated web accessibility regression passed.");
 } finally {
   await browser.close();
