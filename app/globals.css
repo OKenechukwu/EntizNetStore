@@ -263,10 +263,10 @@ html, body {
 /* =========================================
    Light-surface contrast corrections
    ========================================= */
-/* The bright brand gold is intentionally retained on dark surfaces. On light
-   surfaces, use a deeper gold that preserves the same brand hue while meeting
-   WCAG AA contrast requirements. */
-[data-theme="light"] header .text-brand-secondary,
+/* The bright brand gold is intentionally retained for dark surfaces, fills,
+   borders, and decorative accents. Text rendered on light surfaces uses a
+   deeper gold that preserves the brand hue while meeting WCAG AA. */
+[data-theme="light"] .text-brand-secondary,
 [data-theme="light"] .text-accent-gold {
   color: #705c00;
 }
