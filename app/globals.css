@@ -265,41 +265,42 @@ html, body {
    ========================================= */
 /* The bright brand gold is intentionally retained for dark surfaces, fills,
    borders, and decorative accents. Text rendered on light surfaces uses a
-   deeper gold that preserves the brand hue while meeting WCAG AA. */
+   deeper gold that preserves the brand hue while meeting WCAG AA even when a
+   translucent surface is composited over light media. */
 [data-theme="light"] .text-brand-secondary,
 [data-theme="light"] .text-accent-gold,
 [data-theme="light"] .hover\:text-brand-secondary:hover,
 [data-theme="light"] .group:hover .group-hover\:text-brand-secondary {
-  color: #705c00;
+  color: #604e00;
 }
 
 [data-theme="light"] .border-accent-gold {
-  border-color: #705c00;
+  border-color: #604e00;
 }
 
 [data-theme="light"] .luxury-button-outline {
-  color: #705c00;
-  border-color: #705c00;
+  color: #604e00;
+  border-color: #604e00;
 }
 
 [data-theme="light"] .luxury-button-outline:hover {
-  background: #705c00;
+  background: #604e00;
   color: #ffffff;
 }
 
 .auth-page-card .text-accent-gold,
 .auth-page-card .text-brand-secondary,
 .auth-page-card .luxury-button-outline {
-  color: #705c00;
+  color: #604e00;
 }
 
 .auth-page-card .border-accent-gold,
 .auth-page-card .luxury-button-outline {
-  border-color: #705c00;
+  border-color: #604e00;
 }
 
 .auth-page-card .luxury-button-outline:hover {
-  background: #705c00;
+  background: #604e00;
   color: #ffffff;
 }
 
