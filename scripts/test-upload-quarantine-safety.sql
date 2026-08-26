@@ -43,8 +43,9 @@ BEGIN
     raise exception 'upload_scan_jobs must have RLS enabled';
   end if;
 
-  if has_table_privilege('public', 'public.upload_scan_jobs', 'SELECT')
-     or has_table_privilege('anon', 'public.upload_scan_jobs', 'SELECT')
+  -- PUBLIC grants would also be inherited by anon/authenticated, so checking
+  -- those effective privileges catches both direct and PUBLIC exposure.
+  if has_table_privilege('anon', 'public.upload_scan_jobs', 'SELECT')
      or has_table_privilege('authenticated', 'public.upload_scan_jobs', 'SELECT')
      or has_table_privilege('anon', 'public.upload_scan_jobs', 'INSERT')
      or has_table_privilege('authenticated', 'public.upload_scan_jobs', 'INSERT')
