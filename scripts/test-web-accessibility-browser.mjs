@@ -51,14 +51,16 @@ async function createIdentity(label, appMetadata = {}) {
   const cookieJar = new Map();
   const authClient = createServerClient(supabaseUrl, anonKey, {
     cookies: {
-      get(name) {
-        return cookieJar.get(name)?.value;
+      getAll() {
+        return [...cookieJar.entries()].map(([name, entry]) => ({
+          name,
+          value: entry.value,
+        }));
       },
-      set(name, value, options) {
-        cookieJar.set(name, { value, options: options || {} });
-      },
-      remove(name, options) {
-        cookieJar.set(name, { value: "", options: { ...(options || {}), maxAge: 0 } });
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieJar.set(name, { value, options: options || {} });
+        });
       },
     },
   });
