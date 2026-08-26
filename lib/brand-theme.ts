@@ -64,19 +64,24 @@ export function getBrandTheme(brand: Brand, mode: 'light' | 'dark' = 'light'): B
       },
     }
   }
-  
-  // EntizNetStore: Luxury gold & ivory theme (original)
+
+  // EntizNetStore: luxury gold & ivory theme. Bright luxury gold is retained
+  // for dark mode and filled CTAs. Light surfaces use a deeper gold for text
+  // and inline accents so small copy meets WCAG AA against warm ivory/white.
+  const accessibleLightGold = '#705C00'
+  const accent = mode === 'light' ? accessibleLightGold : config.colors.accent
+
   return {
     brand,
     colors: {
       primary: config.colors.primary,       // #0B0B0D
-      accent: config.colors.accent,         // #D4AF37 (luxury gold)
+      accent,
       background: mode === 'light' ? config.colors.background : '#0B0B0D',
       surface: mode === 'light' ? '#FFFFFF' : '#1A1A1D',
       text: {
         primary: mode === 'light' ? '#0B0B0D' : '#F7F6F3',
         secondary: mode === 'light' ? '#1A1A1D' : '#E5E5E5',
-        accent: config.colors.accent,
+        accent,
       },
       glass: {
         bg: mode === 'light' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(26, 26, 29, 0.7)',

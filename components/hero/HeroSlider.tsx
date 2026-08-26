@@ -193,8 +193,9 @@ export default function HeroSlider({
               ? "-fallback"
               : "")
           }
-          role="tabpanel"
-          aria-label={`Slide ${current + 1}: ${currentSlide.title}`}
+          role="group"
+          aria-roledescription="slide"
+          aria-label={`Slide ${current + 1} of ${slides.length}: ${currentSlide.title}`}
           initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 1.03 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.99 }}
@@ -320,30 +321,30 @@ export default function HeroSlider({
         </div>
       </motion.div>
 
-      {/* Dots */}
-      <div
-        className="absolute bottom-4 right-6"
-        role="tablist"
-        aria-label="Slide navigation"
-      >
-        <div className="flex gap-2">
+      {/* Slide navigation */}
+      <nav className="absolute bottom-2 right-4" aria-label="Slide navigation">
+        <div className="flex gap-1">
           {slides.map((s, i) => (
             <button
               key={s.id}
+              type="button"
               onClick={() => goTo(i)}
-              role="tab"
-              aria-selected={i === current}
-              aria-controls={`slide-${i}`}
+              aria-current={i === current ? "true" : undefined}
               aria-label={`Go to slide ${i + 1}: ${s.title}`}
-              className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                i === current
-                  ? "bg-white shadow-lg scale-110"
-                  : "bg-white/50 hover:bg-white/70"
-              }`}
-            />
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110"
+            >
+              <span
+                aria-hidden="true"
+                className={`block w-3 h-3 rounded-full transition-all duration-300 ${
+                  i === current
+                    ? "bg-white shadow-lg scale-110"
+                    : "bg-white/50 group-hover:bg-white/70"
+                }`}
+              />
+            </button>
           ))}
         </div>
-      </div>
+      </nav>
 
       {/* Play / Pause */}
       <button

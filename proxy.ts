@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
-export function proxy(request: NextRequest) {
-  const response = NextResponse.next();
+export async function proxy(request: NextRequest) {
+  // Preserve the exact response returned by the Supabase session refresher so
+  // rotated auth cookies remain synchronized between browser and server.
+  const response = await updateSupabaseSession(request);
 
   if (!request.cookies.get("locale")) {
     response.cookies.set("locale", "en", {

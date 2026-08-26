@@ -59,7 +59,7 @@ export default function AppsPage() {
           <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             <Link
               href="/"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-secondary px-6 py-3 text-sm font-bold text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-secondary px-6 py-3 text-sm font-bold text-primary-black transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Globe2 className="h-4 w-4" aria-hidden="true" />
               Shop on the web

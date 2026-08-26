@@ -3,43 +3,35 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { destinationAfterAuth } from "@/lib/auth/capabilitiesClient";
 
+/**
+ * Hydrates the browser auth client and handles global sign-out only.
+ *
+ * Explicit sign-in/callback surfaces own post-auth navigation because they
+ * know the caller's intended `next` destination. Supabase may emit SIGNED_IN
+ * while restoring or rotating an already-authenticated session; globally
+ * redirecting on that event can incorrectly yank users out of checkout,
+ * Seller workflows, or any other page they intentionally opened.
+ */
 export default function SessionWatcher() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // On first load, hydrate auth state & update UI
-    (async () => {
-      await supabase.auth.getSession();
-      setReady(true);
-      // No redirect on first load; we only redirect after explicit login
-    })();
+    let mounted = true;
 
-    // Listen for auth changes (login/logout/token refresh)
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === "SIGNED_IN") {
-        // Recovery links and the OAuth/PKCE callback sign the user in on
-        // their own pages, which handle navigation themselves — do not
-        // yank the user away from them.
-        const path = window.location.pathname;
-        if (
-          path.startsWith("/auth/reset-password") ||
-          path.startsWith("/auth/callback")
-        ) {
-          return;
-        }
-        // Canonical capability-based destination (server-derived).
-        router.push(await destinationAfterAuth());
-      }
+    void supabase.auth.getSession().finally(() => {
+      if (mounted) setReady(true);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
-        // After logout, go to public home
-        router.push("/");
+        router.replace("/");
       }
     });
 
     return () => {
+      mounted = false;
       sub.subscription.unsubscribe();
     };
   }, [router]);

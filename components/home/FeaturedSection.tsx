@@ -103,8 +103,9 @@ export default function FeaturedSection({
                   </div>
                 )}
 
-                {/* Gold price, converted & formatted */}
-                <p className="text-sm font-bold text-[#D4AF37]">
+                {/* Theme-aware gold price text remains bright on dark surfaces
+                    and uses the accessible deeper brand gold on light ones. */}
+                <p className="text-sm font-bold text-brand-secondary">
                   {formatted}
                 </p>
               </div>

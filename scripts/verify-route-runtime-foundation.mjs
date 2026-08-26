@@ -43,8 +43,11 @@ if (!exists("proxy.ts")) {
   fail("Next 16 root proxy.ts is required");
 } else {
   const proxy = read("proxy.ts");
+  if (!/\bexport\s+async\s+function\s+proxy\s*\(/.test(proxy)) {
+    fail("Next 16 proxy must be async so Supabase auth tokens can be refreshed before request handling");
+  }
   for (const requiredFragment of [
-    "export function proxy",
+    'updateSupabaseSession',
     'request.cookies.get("locale")',
     'request.cookies.get("currency")',
     'matcher: ["/((?!_next|.*\\\\..*).*)"]',
@@ -52,6 +55,27 @@ if (!exists("proxy.ts")) {
     if (!proxy.includes(requiredFragment)) {
       fail(`Proxy lost required request/cookie control: ${requiredFragment}`);
     }
+  }
+}
+
+if (!exists("lib/supabase/proxy.ts")) {
+  fail("Supabase SSR session refresher is required at lib/supabase/proxy.ts");
+} else {
+  const supabaseProxy = read("lib/supabase/proxy.ts");
+  for (const requiredFragment of [
+    'createServerClient',
+    'request.cookies.getAll()',
+    'request.cookies.set(name, value)',
+    'response.cookies.set(name, value, options)',
+    'response.headers.set("Cache-Control", "private, no-store, max-age=0")',
+    'supabase.auth.getClaims()',
+  ]) {
+    if (!supabaseProxy.includes(requiredFragment)) {
+      fail(`Supabase SSR proxy lost required session control: ${requiredFragment}`);
+    }
+  }
+  if (/supabase\.auth\.getSession\s*\(/.test(supabaseProxy)) {
+    fail("Supabase SSR proxy must validate with getClaims(), not trust getSession()");
   }
 }
 

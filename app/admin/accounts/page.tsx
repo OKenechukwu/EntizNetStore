@@ -33,7 +33,7 @@ function first(value: string | string[] | undefined, fallback = "") {
 }
 
 function StatusPill({ value }: { value: string | null }) {
-  if (!value) return <span className="text-xs opacity-50">—</span>;
+  if (!value) return <span className="text-xs text-foreground/70">—</span>;
   const good = value === "active" || value === "verified";
   return (
     <span className={`rounded-full px-2 py-1 text-xs font-medium ${good ? "bg-emerald-100 text-emerald-800" : value === "suspended" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
@@ -89,25 +89,28 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
         <div>
           <Link href="/admin" className="text-sm text-sky-700 hover:underline">← Admin dashboard</Link>
           <h1 className="mt-2 text-3xl font-bold">Marketplace accounts</h1>
-          <p className="mt-1 text-sm opacity-70">Buyer, Seller and Business capabilities are managed independently. EntizNet linkage is shown alongside local Store state.</p>
+          <p className="mt-1 text-sm text-foreground/70">Buyer, Seller and Business capabilities are managed independently. EntizNet linkage is shown alongside local Store state.</p>
         </div>
-        <div className="text-sm opacity-70">{total.toLocaleString()} account{total === 1 ? "" : "s"}</div>
+        <div className="text-sm text-foreground/70">{total.toLocaleString()} account{total === 1 ? "" : "s"}</div>
       </div>
 
       <form className="mb-6 grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_180px_180px_auto]" method="get">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="Email, name, Store UUID or EntizNet UUID" className="rounded-md border px-3 py-2" />
-        <select name="capability" defaultValue={capability} className="rounded-md border px-3 py-2">
+        <label className="sr-only" htmlFor="account-search-query">Search marketplace accounts</label>
+        <input id="account-search-query" name="query" defaultValue={query} maxLength={200} placeholder="Email, name, Store UUID or EntizNet UUID" className="rounded-md border px-3 py-2" />
+        <label className="sr-only" htmlFor="account-capability-filter">Filter by capability</label>
+        <select id="account-capability-filter" name="capability" defaultValue={capability} className="rounded-md border px-3 py-2">
           <option value="all">All capabilities</option>
           <option value="buyer">Buyer</option>
           <option value="seller">Seller</option>
           <option value="business">Business</option>
         </select>
-        <select name="status" defaultValue={status} className="rounded-md border px-3 py-2">
+        <label className="sr-only" htmlFor="account-status-filter">Filter by account state</label>
+        <select id="account-status-filter" name="status" defaultValue={status} className="rounded-md border px-3 py-2">
           <option value="all">All states</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
         </select>
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">Search</button>
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">Search</button>
       </form>
 
       {searchError ? (
@@ -115,7 +118,7 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
       ) : accounts.length === 0 ? (
         <div className="rounded-xl border p-10 text-center">
           <h2 className="font-semibold">No accounts match these filters</h2>
-          <p className="mt-1 text-sm opacity-70">Try a broader search or a different capability/state filter.</p>
+          <p className="mt-1 text-sm text-foreground/70">Try a broader search or a different capability/state filter.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border">
@@ -137,19 +140,19 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
                     <Link href={`/admin/accounts/${account.user_id}`} className="font-semibold text-sky-700 hover:underline">
                       {account.email || account.user_id}
                     </Link>
-                    <div className="mt-1 max-w-56 truncate font-mono text-[11px] opacity-50" title={account.user_id}>{account.user_id}</div>
+                    <div className="mt-1 max-w-56 truncate font-mono text-[11px] text-foreground/70" title={account.user_id}>{account.user_id}</div>
                   </td>
                   <td className="px-4 py-4">
-                    {account.has_buyer ? <div className="space-y-2"><StatusPill value={account.buyer_status} /><div className="text-xs opacity-60">{account.buyer_display_name || "Buyer"}</div></div> : <span className="opacity-40">—</span>}
+                    {account.has_buyer ? <div className="space-y-2"><StatusPill value={account.buyer_status} /><div className="text-xs text-foreground/70">{account.buyer_display_name || "Buyer"}</div></div> : <span className="text-foreground/70">—</span>}
                   </td>
                   <td className="px-4 py-4">
-                    {account.has_seller ? <div className="space-y-2"><StatusPill value={account.seller_status} /><StatusPill value={account.seller_verification_status} /><div className="text-xs opacity-60">{account.seller_storefront_name}</div></div> : <span className="opacity-40">—</span>}
+                    {account.has_seller ? <div className="space-y-2"><StatusPill value={account.seller_status} /><StatusPill value={account.seller_verification_status} /><div className="text-xs text-foreground/70">{account.seller_storefront_name}</div></div> : <span className="text-foreground/70">—</span>}
                   </td>
                   <td className="px-4 py-4">
-                    {account.has_business ? <div className="space-y-2"><StatusPill value={account.business_status} /><StatusPill value={account.business_verification_status} /><div className="text-xs opacity-60">{account.business_display_name}</div></div> : <span className="opacity-40">—</span>}
+                    {account.has_business ? <div className="space-y-2"><StatusPill value={account.business_status} /><StatusPill value={account.business_verification_status} /><div className="text-xs text-foreground/70">{account.business_display_name}</div></div> : <span className="text-foreground/70">—</span>}
                   </td>
                   <td className="px-4 py-4">
-                    {account.entiznet_user_id ? <div><StatusPill value={account.entiznet_link_status} /><div className="mt-2 max-w-44 truncate font-mono text-[11px] opacity-50" title={account.entiznet_user_id}>{account.entiznet_user_id}</div></div> : <span className="text-xs opacity-50">Standalone</span>}
+                    {account.entiznet_user_id ? <div><StatusPill value={account.entiznet_link_status} /><div className="mt-2 max-w-44 truncate font-mono text-[11px] text-foreground/70" title={account.entiznet_user_id}>{account.entiznet_user_id}</div></div> : <span className="text-xs text-foreground/70">Standalone</span>}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex max-w-48 flex-col gap-2">
@@ -167,9 +170,9 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
 
       {totalPages > 1 && (
         <div className="mt-6 flex items-center justify-between gap-3 text-sm">
-          <Link aria-disabled={page <= 1} href={makePageHref(Math.max(page - 1, 1))} className={`rounded-md border px-3 py-2 ${page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-slate-50"}`}>Previous</Link>
+          <Link aria-disabled={page <= 1} href={makePageHref(Math.max(page - 1, 1))} className={`rounded-md border px-3 py-2 ${page <= 1 ? "pointer-events-none text-foreground/70" : "hover:bg-slate-50"}`}>Previous</Link>
           <span>Page {page} of {totalPages}</span>
-          <Link aria-disabled={page >= totalPages} href={makePageHref(Math.min(page + 1, totalPages))} className={`rounded-md border px-3 py-2 ${page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-slate-50"}`}>Next</Link>
+          <Link aria-disabled={page >= totalPages} href={makePageHref(Math.min(page + 1, totalPages))} className={`rounded-md border px-3 py-2 ${page >= totalPages ? "pointer-events-none text-foreground/70" : "hover:bg-slate-50"}`}>Next</Link>
         </div>
       )}
     </div>

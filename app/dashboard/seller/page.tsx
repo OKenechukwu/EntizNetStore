@@ -140,7 +140,7 @@ function SellerDashboardCards({ profile }: { profile: unknown }) {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-lg bg-charcoal/20">
               <span>Verification Status</span>
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 capitalize">
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-950 text-amber-100 capitalize">
                 {(profile as any)?.verification_status || "pending"}
               </span>
             </div>

@@ -122,7 +122,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   // Hydrate locale and currency from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     const savedLocale = localStorage.getItem("locale") || "en";
     const savedCurrency = localStorage.getItem("currency") || "USD";
     setLocaleState(savedLocale);
@@ -132,7 +132,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       const c = localStorage.getItem("currency") || "USD";
       setCurrencyState(c);
     };
-    
+
     window.addEventListener("currencyChange", handleCurrencyChange);
     return () => window.removeEventListener("currencyChange", handleCurrencyChange);
   }, []);
@@ -166,10 +166,13 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 export function useBrand(): BrandContextType {
   const ctx = useContext(BrandContext);
   if (ctx === undefined) {
-    // Safe default to prevent runtime crash
+    // The root application shell is dark by default. If a legacy consumer is
+    // mounted outside this provider, its defensive theme must match that shell;
+    // returning the old light fallback created light page surfaces with inherited
+    // dark-shell foreground text and failed WCAG contrast on authenticated routes.
     const fallbackBrand = "entiznetstore" as Brand;
-    const mode: ThemeMode = "light";
-    const resolved = "light" as const;
+    const mode: ThemeMode = "dark";
+    const resolved = "dark" as const;
     if (typeof window !== "undefined") {
       console.warn(
         "[useBrand] No BrandProvider found above this component. Using fallback theme. " +

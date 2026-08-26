@@ -102,23 +102,33 @@ export async function getCurrentSession(): Promise<Session | null> {
 }
 
 // Capability creation and mutation are server-only through trusted /api routes.
-// Browser code may read the current user's profiles through RLS.
+// Browser code may read the current user's profiles through RLS. Capability
+// absence is expected in the additive account model. Use a zero-or-one array
+// query instead of PostgREST's object media type so an absent capability is an
+// ordinary HTTP 200 with [] rather than a browser-visible HTTP 406.
+async function firstProfile<T>(
+  table: 'profiles_buyer' | 'profiles_seller' | 'profiles_business',
+  userId: string,
+): Promise<T | null> {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', userId)
+    .limit(1);
+  if (error || !data?.length) return null;
+  return data[0] as T;
+}
+
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
-  const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
-  if (error) return null;
-  return data;
+  return firstProfile<BuyerProfile>('profiles_buyer', userId);
 }
 
 export async function getSellerProfile(userId: string): Promise<SellerProfile | null> {
-  const { data, error } = await supabase.from('profiles_seller').select('*').eq('id', userId).single();
-  if (error) return null;
-  return data;
+  return firstProfile<SellerProfile>('profiles_seller', userId);
 }
 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
-  const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).single();
-  if (error) return null;
-  return data;
+  return firstProfile<BusinessProfile>('profiles_business', userId);
 }
 
 // Compatibility helper for the existing Buyer dashboard. The userId argument is
@@ -137,12 +147,12 @@ export async function updateBuyerProfile(_userId: string, updates: Partial<Buyer
 
 export async function getUserRole(userId: string): Promise<UserRole> {
   const [sellerResult, businessResult, buyerResult] = await Promise.all([
-    supabase.from('profiles_seller').select('id').eq('id', userId).maybeSingle(),
-    supabase.from('profiles_business').select('id').eq('id', userId).maybeSingle(),
-    supabase.from('profiles_buyer').select('id').eq('id', userId).maybeSingle(),
+    supabase.from('profiles_seller').select('id').eq('id', userId).limit(1),
+    supabase.from('profiles_business').select('id').eq('id', userId).limit(1),
+    supabase.from('profiles_buyer').select('id').eq('id', userId).limit(1),
   ]);
-  if (sellerResult.data) return 'seller';
-  if (businessResult.data) return 'bsm';
-  if (buyerResult.data) return 'buyer';
+  if (sellerResult.data?.length) return 'seller';
+  if (businessResult.data?.length) return 'bsm';
+  if (buyerResult.data?.length) return 'buyer';
   return 'buyer';
 }
