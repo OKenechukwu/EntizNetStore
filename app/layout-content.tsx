@@ -68,47 +68,26 @@ function Navigation() {
           </Link>
 
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <Link
-              href="/store"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/store" className="hover:text-accent-gold transition-colors">
               {t("store")}
             </Link>
-            <Link
-              href="/categories"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/categories" className="hover:text-accent-gold transition-colors">
               {t("categories")}
             </Link>
-            <Link
-              href="/brands"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/brands" className="hover:text-accent-gold transition-colors">
               {t("brands")}
             </Link>
-            <Link
-              href="/popular"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/popular" className="hover:text-accent-gold transition-colors">
               {t("popular")}
             </Link>
-            <Link
-              href="/on-sale"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/on-sale" className="hover:text-accent-gold transition-colors">
               {t("onSale")}
             </Link>
-            <Link
-              href="/platform"
-              className="hover:text-accent-gold transition-colors"
-            >
+            <Link href="/platform" className="hover:text-accent-gold transition-colors">
               {t("experience")}
             </Link>
             {user && (
-              <Link
-                href="/messages"
-                className="hover:text-accent-gold transition-colors"
-              >
+              <Link href="/messages" className="hover:text-accent-gold transition-colors">
                 {t("messages")}
               </Link>
             )}
@@ -124,24 +103,15 @@ function Navigation() {
 
           {user ? (
             <div className="flex items-center gap-3">
-              <Link
-                href={dashboardHref}
-                className="text-sm hover:text-accent-gold transition-colors"
-              >
+              <Link href={dashboardHref} className="text-sm hover:text-accent-gold transition-colors">
                 {t("dashboard")}
               </Link>
-              <button
-                onClick={signOut}
-                className="luxury-button-outline text-sm px-4 py-2"
-              >
+              <button onClick={signOut} className="luxury-button-outline text-sm px-4 py-2">
                 {t("signOut")}
               </button>
             </div>
           ) : (
-            <Link
-              href="/auth"
-              className="luxury-button-outline text-sm px-4 py-2"
-            >
+            <Link href="/auth" className="luxury-button-outline text-sm px-4 py-2">
               {t("signIn")}
             </Link>
           )}
@@ -156,11 +126,11 @@ function Footer() {
   const { t } = useI18n();
 
   return (
-    <footer className="border-t border-opacity-20 mt-20">
-      <div className="w-full px-6 md:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+    <footer className="site-footer mt-20 border-t border-opacity-20 bg-card text-foreground">
+      <div className="w-full px-6 py-16 md:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-4">
-            <h3 className="font-serif font-bold text-xl text-accent-gold">
+            <h3 className="font-serif text-xl font-bold text-accent-gold">
               {config.name}
             </h3>
             <p className="text-sm opacity-80">{config.description}</p>
@@ -170,28 +140,16 @@ function Footer() {
           <div className="space-y-4">
             <h4 className="font-semibold text-accent-gold">{t("footer.shop")}</h4>
             <div className="space-y-2 text-sm">
-              <Link
-                href="/categories"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/categories" className="block hover:text-accent-gold transition-colors">
                 {t("footer.categories")}
               </Link>
-              <Link
-                href="/brands"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/brands" className="block hover:text-accent-gold transition-colors">
                 {t("footer.brands")}
               </Link>
-              <Link
-                href="/popular"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/popular" className="block hover:text-accent-gold transition-colors">
                 {t("footer.popular")}
               </Link>
-              <Link
-                href="/on-sale"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/on-sale" className="block hover:text-accent-gold transition-colors">
                 {t("footer.sale")}
               </Link>
             </div>
@@ -200,28 +158,16 @@ function Footer() {
           <div className="space-y-4">
             <h4 className="font-semibold text-accent-gold">{t("footer.support")}</h4>
             <div className="space-y-2 text-sm">
-              <Link
-                href="/help"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/help" className="block hover:text-accent-gold transition-colors">
                 {t("footer.helpCenter")}
               </Link>
-              <Link
-                href="/privacy"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/privacy" className="block hover:text-accent-gold transition-colors">
                 {t("footer.privacy")}
               </Link>
-              <Link
-                href="/terms"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/terms" className="block hover:text-accent-gold transition-colors">
                 {t("footer.terms")}
               </Link>
-              <Link
-                href="/contact"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/contact" className="block hover:text-accent-gold transition-colors">
                 {t("footer.contact")}
               </Link>
             </div>
@@ -236,16 +182,10 @@ function Footer() {
               >
                 {t("footer.becomeSeller")}
               </Link>
-              <Link
-                href="/dashboard/vendor"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/dashboard/seller" className="block hover:text-accent-gold transition-colors">
                 {t("footer.sellerDashboard")}
               </Link>
-              <Link
-                href="/seller/resources"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/seller/resources" className="block hover:text-accent-gold transition-colors">
                 {t("footer.sellerResources")}
               </Link>
             </div>
@@ -260,23 +200,17 @@ function Footer() {
               >
                 {t("footer.sellAsBsm")}
               </Link>
-              <Link
-                href="/auth?mode=signin&role=bsm"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/dashboard/bsm" className="block hover:text-accent-gold transition-colors">
                 {t("footer.bsmDashboard")}
               </Link>
-              <Link
-                href="/bsm/resources"
-                className="block hover:text-accent-gold transition-colors"
-              >
+              <Link href="/bsm/resources" className="block hover:text-accent-gold transition-colors">
                 {t("footer.bsmResources")}
               </Link>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-opacity-20 mt-12 pt-8 text-center text-sm opacity-60">
+        <div className="mt-12 border-t border-opacity-20 pt-8 text-center text-sm opacity-60">
           <p>
             &copy; {new Date().getFullYear()} {config.name}. {t("footer.copyright")}
           </p>
@@ -294,8 +228,8 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           <NotificationProvider>
             <AgeGate>
               <div className="min-h-screen w-full transition-colors duration-300">
-                {/* Navigation now handled in app/layout.tsx Header */}
-                <main className="w-full">{children}</main>
+                {/* The root layout owns the single page-level main landmark. */}
+                <div className="w-full">{children}</div>
                 <Footer />
                 <AdminChatWidget />
               </div>
