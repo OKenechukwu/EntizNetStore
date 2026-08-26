@@ -26,6 +26,7 @@ jobs:
       PAYMENT_PROVIDER: unconfigured
       NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
       PAYOUT_PROVIDER: unconfigured
+      UPLOAD_SCANNER_MODE: deterministic
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -47,6 +48,9 @@ jobs:
 
       - name: Run storage failure recovery regression
         run: npm run test:storage-recovery
+
+      - name: Run upload scanner fail-closed regression
+        run: npm run test:upload-scanner
 
       - name: Run operational logging redaction regression
         run: npm run test:operational-logging
@@ -92,6 +96,9 @@ jobs:
 
       - name: Run M1 BSM verification regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-bsm-verification.sql
+
+      - name: Run P0 upload quarantine database boundary regression
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-upload-quarantine-safety.sql
 
       - name: Run P0 operational event ledger regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-operational-event-ledger.sql
