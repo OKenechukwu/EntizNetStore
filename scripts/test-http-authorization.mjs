@@ -78,6 +78,28 @@ async function expectStatus(label, response, expected) {
   return payload ? JSON.parse(payload) : null
 }
 
+async function uploadSignedBytes(uploadURL, bytes, contentType) {
+  const response = await fetch(uploadURL, {
+    method: 'PUT',
+    headers: { 'content-type': contentType },
+    body: bytes,
+  })
+  const body = await response.clone().text().catch(() => '')
+  assert.ok(response.ok, `signed quarantine upload failed: HTTP ${response.status}; body=${body.slice(0, 500)}`)
+}
+
+async function assertScanJob(uploadId, expectedStatus, expectedBucket) {
+  const { data, error } = await admin
+    .from('upload_scan_jobs')
+    .select('id, actor_id, purpose, quarantine_path, destination_bucket, destination_path, status, verified_mime, byte_size, sha256, scanner, scanner_result_code, scanned_at, promoted_at')
+    .eq('id', uploadId)
+    .single()
+  if (error) throw error
+  assert.equal(data.status, expectedStatus)
+  if (expectedBucket) assert.equal(data.destination_bucket, expectedBucket)
+  return data
+}
+
 function productPayload() {
   return {
     title: 'HTTP ownership regression product',
@@ -132,6 +154,11 @@ const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=',
   'base64',
 )
+const eicarPdf = Buffer.concat([
+  Buffer.from('%PDF-1.4\n', 'ascii'),
+  Buffer.from('X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*', 'ascii'),
+  Buffer.from('\n%%EOF\n', 'ascii'),
+])
 
 try {
   const buyer = await createUser('buyer')
@@ -267,7 +294,7 @@ try {
     'anonymous KYC upload initialization denied',
     await appFetch('/api/kyc/upload', {
       method: 'POST',
-      json: { documentType: 'identity', fileName: 'id.png' },
+      json: { documentType: 'identity', fileName: 'id.png', fileSize: onePixelPng.length, mimeType: 'image/png' },
     }),
     401,
   )
@@ -276,30 +303,93 @@ try {
     await appFetch('/api/kyc/upload', {
       cookie: buyer.cookie,
       method: 'POST',
-      json: { documentType: 'identity', fileName: 'id.png' },
+      json: { documentType: 'identity', fileName: 'id.png', fileSize: onePixelPng.length, mimeType: 'image/png' },
     }),
     403,
   )
   const kycUpload = await expectStatus(
-    'seller can initialize private KYC upload',
+    'seller can initialize private KYC quarantine upload',
     await appFetch('/api/kyc/upload', {
       cookie: sellerA.cookie,
       method: 'POST',
-      json: { documentType: 'identity', fileName: 'id.png' },
+      json: { documentType: 'identity', fileName: 'id.png', fileSize: onePixelPng.length, mimeType: 'image/png' },
     }),
     200,
   )
-  assert.equal(kycUpload.bucket, 'kyc-documents')
-  assert.equal(kycUpload.filePath.startsWith(`${sellerA.id}/identity/`), true)
+  assert.equal(kycUpload.bucket, 'upload-quarantine')
+  assert.match(kycUpload.uploadId, /^[0-9a-f-]{36}$/i)
+  assert.equal(typeof kycUpload.uploadURL, 'string')
+  assert.equal('filePath' in kycUpload, false)
+  await uploadSignedBytes(kycUpload.uploadURL, onePixelPng, 'image/png')
   await expectStatus(
-    'another seller cannot register seller A KYC path',
+    'seller B cannot finalize seller A KYC quarantine job',
+    await appFetch('/api/kyc/upload', {
+      cookie: sellerB.cookie,
+      method: 'PUT',
+      json: { uploadId: kycUpload.uploadId },
+    }),
+    404,
+  )
+  const finalizedKyc = await expectStatus(
+    'seller A can scan and promote owned KYC document',
+    await appFetch('/api/kyc/upload', {
+      cookie: sellerA.cookie,
+      method: 'PUT',
+      json: { uploadId: kycUpload.uploadId },
+    }),
+    200,
+  )
+  assert.equal(finalizedKyc.filePath.startsWith(`${sellerA.id}/identity/`), true)
+  const cleanKycJob = await assertScanJob(kycUpload.uploadId, 'clean', 'kyc-documents')
+  assert.equal(cleanKycJob.actor_id, sellerA.id)
+  assert.equal(cleanKycJob.verified_mime, 'image/png')
+  assert.match(cleanKycJob.sha256, /^[0-9a-f]{64}$/)
+  assert.equal(cleanKycJob.scanner, 'deterministic-ci')
+  assert.ok(cleanKycJob.scanned_at)
+  assert.ok(cleanKycJob.promoted_at)
+  await expectStatus(
+    'another seller cannot register seller A promoted KYC path',
     await appFetch('/api/kyc/documents', {
       cookie: sellerB.cookie,
       method: 'POST',
-      json: { documentType: 'identity', fileName: 'stolen.png', filePath: kycUpload.filePath },
+      json: { documentType: 'identity', fileName: 'stolen.png', filePath: finalizedKyc.filePath },
     }),
     400,
   )
+  await expectStatus(
+    'seller can discard an unregistered clean KYC promotion',
+    await appFetch('/api/kyc/upload', {
+      cookie: sellerA.cookie,
+      method: 'DELETE',
+      json: { uploadId: kycUpload.uploadId },
+    }),
+    200,
+  )
+
+  const infectedKycUpload = await expectStatus(
+    'seller can initialize malware-regression KYC quarantine upload',
+    await appFetch('/api/kyc/upload', {
+      cookie: sellerA.cookie,
+      method: 'POST',
+      json: { documentType: 'address_proof', fileName: 'eicar.pdf', fileSize: eicarPdf.length, mimeType: 'application/pdf' },
+    }),
+    200,
+  )
+  await uploadSignedBytes(infectedKycUpload.uploadURL, eicarPdf, 'application/pdf')
+  const infectedFinalize = await expectStatus(
+    'EICAR KYC fixture is blocked before promotion',
+    await appFetch('/api/kyc/upload', {
+      cookie: sellerA.cookie,
+      method: 'PUT',
+      json: { uploadId: infectedKycUpload.uploadId },
+    }),
+    400,
+  )
+  assert.equal(infectedFinalize.code, 'eicar_test_signature')
+  const blockedKycJob = await assertScanJob(infectedKycUpload.uploadId, 'blocked', 'kyc-documents')
+  assert.equal(blockedKycJob.scanner_result_code, 'eicar_test_signature')
+  const blockedDestination = await admin.storage.from('kyc-documents').download(blockedKycJob.destination_path)
+  assert.ok(blockedDestination.error, 'blocked KYC object unexpectedly reached destination storage')
 
   await expectStatus(
     'buyer cannot initialize product-media upload',
@@ -311,7 +401,7 @@ try {
     403,
   )
   const productMediaUpload = await expectStatus(
-    'seller can initialize owned product-media upload',
+    'seller can initialize owned product-media quarantine upload',
     await appFetch('/api/seller/product-media/upload', {
       cookie: sellerA.cookie,
       method: 'POST',
@@ -319,17 +409,70 @@ try {
     }),
     200,
   )
-  assert.equal(productMediaUpload.bucket, 'product-media')
-  assert.equal(productMediaUpload.filePath.startsWith(`${sellerA.id}/`), true)
+  assert.equal(productMediaUpload.bucket, 'upload-quarantine')
+  assert.match(productMediaUpload.uploadId, /^[0-9a-f-]{36}$/i)
+  assert.equal('publicUrl' in productMediaUpload, false)
+  assert.equal('filePath' in productMediaUpload, false)
+  await uploadSignedBytes(productMediaUpload.uploadURL, onePixelPng, 'image/png')
   await expectStatus(
-    'seller B cannot delete seller A product-media path',
+    'seller B cannot finalize seller A product-media quarantine job',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerB.cookie,
+      method: 'PUT',
+      json: { uploadId: productMediaUpload.uploadId },
+    }),
+    404,
+  )
+  const productMediaFinal = await expectStatus(
+    'seller scans before product-media public promotion',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerA.cookie,
+      method: 'PUT',
+      json: { uploadId: productMediaUpload.uploadId },
+    }),
+    200,
+  )
+  assert.equal(productMediaFinal.filePath.startsWith(`${sellerA.id}/`), true)
+  assert.equal(typeof productMediaFinal.publicUrl, 'string')
+  const mediaJob = await assertScanJob(productMediaUpload.uploadId, 'clean', 'product-media')
+  assert.equal(mediaJob.scanner, 'deterministic-ci')
+  assert.match(mediaJob.sha256, /^[0-9a-f]{64}$/)
+  const publicMediaResponse = await fetch(productMediaFinal.publicUrl)
+  assert.equal(publicMediaResponse.status, 200, 'clean product media was not publicly reachable after promotion')
+  await expectStatus(
+    'seller B cannot delete seller A promoted product-media path',
     await appFetch('/api/seller/product-media/upload', {
       cookie: sellerB.cookie,
       method: 'DELETE',
-      json: { filePath: productMediaUpload.filePath },
+      json: { filePath: productMediaFinal.filePath },
     }),
     400,
   )
+
+  const spoofBytes = Buffer.from('not-a-real-image')
+  const spoofUpload = await expectStatus(
+    'seller can initialize spoof-regression product-media quarantine upload',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerA.cookie,
+      method: 'POST',
+      json: { fileName: 'spoof.png', fileSize: spoofBytes.length, mimeType: 'image/png' },
+    }),
+    200,
+  )
+  await uploadSignedBytes(spoofUpload.uploadURL, spoofBytes, 'image/png')
+  const spoofFinalize = await expectStatus(
+    'spoofed product image is rejected before public promotion',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerA.cookie,
+      method: 'PUT',
+      json: { uploadId: spoofUpload.uploadId },
+    }),
+    400,
+  )
+  assert.equal(spoofFinalize.code, 'magic_bytes_or_mime_mismatch')
+  const spoofJob = await assertScanJob(spoofUpload.uploadId, 'blocked', 'product-media')
+  const spoofDestination = await admin.storage.from('product-media').download(spoofJob.destination_path)
+  assert.ok(spoofDestination.error, 'spoofed product image unexpectedly reached public storage')
 
   await expectStatus(
     'anonymous branding upload denied',
@@ -358,7 +501,7 @@ try {
     400,
   )
   const brandingUpload = await expectStatus(
-    'seller can upload validated owned branding',
+    'seller can upload scanned owned branding',
     await appFetch('/api/seller/branding', {
       cookie: sellerA.cookie,
       method: 'POST',
@@ -406,7 +549,7 @@ try {
   senderUpload.set('messageId', messageId)
   senderUpload.set('file', new File([onePixelPng], 'sender.png', { type: 'image/png' }))
   const attachmentResult = await expectStatus(
-    'message sender can attach validated media',
+    'message sender can attach scanned media',
     await appFetch('/api/messages/attachments/upload', {
       cookie: buyer.cookie,
       method: 'POST',
@@ -450,6 +593,16 @@ try {
   )
 
   await expectStatus(
+    'seller A can delete own promoted product media',
+    await appFetch('/api/seller/product-media/upload', {
+      cookie: sellerA.cookie,
+      method: 'DELETE',
+      json: { filePath: productMediaFinal.filePath },
+    }),
+    200,
+  )
+
+  await expectStatus(
     'seller A can delete own product',
     await appFetch(`/api/seller/products/${createdProduct.id}`, {
       cookie: sellerA.cookie,
@@ -460,6 +613,29 @@ try {
 
   process.stdout.write('HTTP authorization regression suite passed\n')
 } finally {
+  if (createdUserIds.length) {
+    const { data: jobs, error: jobError } = await admin
+      .from('upload_scan_jobs')
+      .select('quarantine_path, destination_bucket, destination_path')
+      .in('actor_id', createdUserIds)
+    if (!jobError && jobs?.length) {
+      const quarantinePaths = jobs.map((job) => job.quarantine_path).filter(Boolean)
+      if (quarantinePaths.length) {
+        const { error } = await admin.storage.from('upload-quarantine').remove(quarantinePaths)
+        if (error) process.stderr.write(`warning: unable to clean quarantine test objects: ${error.message}\n`)
+      }
+      for (const bucket of ['kyc-documents', 'message-attachments', 'product-media', 'seller-branding']) {
+        const paths = jobs
+          .filter((job) => job.destination_bucket === bucket)
+          .map((job) => job.destination_path)
+          .filter(Boolean)
+        if (!paths.length) continue
+        const { error } = await admin.storage.from(bucket).remove(paths)
+        if (error) process.stderr.write(`warning: unable to clean ${bucket} test objects: ${error.message}\n`)
+      }
+    }
+  }
+
   for (const userId of createdUserIds.reverse()) {
     const { error } = await admin.auth.admin.deleteUser(userId)
     if (error) process.stderr.write(`warning: unable to delete CI auth user ${userId}: ${error.message}\n`)
