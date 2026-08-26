@@ -43,7 +43,7 @@ export default function AgeGate({ children }: { children: React.ReactNode }) {
           className="glass-card box-border max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] min-w-0 max-w-md overflow-y-auto p-5 text-center animate-fade-in sm:p-8"
         >
           <div className="mb-6">
-            <h1 className="font-serif text-3xl font-bold text-accent-gold mb-2">
+            <h1 className="mb-2 font-serif text-3xl font-bold !text-[#D1B000]">
               EntizNet Store
             </h1>
             <div className="mx-auto mb-6 h-0.5 w-16 bg-accent-gold" aria-hidden="true" />
@@ -74,7 +74,7 @@ export default function AgeGate({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => handleVerifyAge(false)}
-              className="luxury-button-outline min-h-11 w-full px-6 py-3 sm:w-auto"
+              className="luxury-button-outline min-h-11 w-full px-6 py-3 !text-[#D1B000] !border-[#D1B000] hover:!bg-[#D1B000] hover:!text-[#0B0B0D] sm:w-auto"
             >
               No, I am under 18
             </button>
