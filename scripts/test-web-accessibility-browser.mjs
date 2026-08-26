@@ -263,6 +263,100 @@ async function openAndAudit(page, pathname, label, expectedPathPrefix = pathname
   process.stdout.write(`ok - ${label} accessibility\n`);
 }
 
+async function assertFocusedInViewport(page, locator, label) {
+  await locator.waitFor({ state: "visible" });
+  const state = await locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      focused: document.activeElement === element,
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  });
+  assert.equal(state.focused, true, `${label}: expected control to hold keyboard focus`);
+  assert.ok(
+    state.top >= -1 && state.bottom <= state.height + 1 && state.left >= -1 && state.right <= state.width + 1,
+    `${label}: focused control is outside the visible viewport (${JSON.stringify(state)})`,
+  );
+}
+
+async function assertAuthValidationAndKeyboard(page) {
+  await page.route("https://photon.komoot.io/api/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        features: [
+          { properties: { label: "1 Session Road, Baguio City, Philippines" } },
+          { properties: { label: "2 Burnham Park, Baguio City, Philippines" } },
+        ],
+      }),
+    });
+  });
+
+  const submit = page.getByRole("button", { name: "Create Account" });
+  const email = page.getByLabel("Email address");
+  const passwordInput = page.getByLabel("Password", { exact: true });
+  const phone = page.getByLabel("Phone number");
+  const address = page.getByLabel("Address", { exact: true });
+
+  await submit.click();
+  await page.getByRole("alert").waitFor();
+  assert.equal(await page.getByRole("alert").innerText(), "Please enter your email.");
+  assert.equal(await email.getAttribute("aria-invalid"), "true");
+  await assertFocusedInViewport(page, email, "signup email validation");
+  await assertAxe(page, "signup email validation state");
+
+  await email.fill(`validation-${runId}@example.test`);
+  await submit.click();
+  assert.equal(await page.getByRole("alert").innerText(), "Please enter your password.");
+  await assertFocusedInViewport(page, passwordInput, "signup password validation");
+
+  await passwordInput.fill(password);
+  const showPassword = page.getByRole("button", { name: "Show password" });
+  await showPassword.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await passwordInput.getAttribute("type"), "text", "password reveal must be keyboard operable");
+  assert.equal(
+    await showPassword.evaluate((element) => document.activeElement === element),
+    true,
+    "password reveal should retain focus after keyboard activation",
+  );
+
+  await submit.click();
+  assert.equal(await page.getByRole("alert").innerText(), "Please enter your phone number.");
+  await assertFocusedInViewport(page, phone, "signup phone validation");
+
+  await phone.fill("+63 900 000 0000");
+  await page.setViewportSize({ width: 390, height: 520 });
+  await submit.click();
+  assert.equal(await page.getByRole("alert").innerText(), "Please enter your address.");
+  await assertFocusedInViewport(page, address, "signup address validation with compact visual viewport");
+
+  await address.fill("Bag");
+  const listbox = page.getByRole("listbox", { name: "Address suggestions" });
+  await listbox.waitFor({ state: "visible" });
+  assert.equal(await address.getAttribute("aria-expanded"), "true");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(
+    await address.getAttribute("aria-activedescendant"),
+    "auth-address-suggestion-0",
+    "ArrowDown must activate the first address suggestion",
+  );
+  await page.keyboard.press("Enter");
+  assert.equal(await address.inputValue(), "1 Session Road, Baguio City, Philippines");
+  assert.equal(await address.getAttribute("aria-expanded"), "false");
+  await assertFocusedInViewport(page, address, "address suggestion keyboard selection");
+  await assertAxe(page, "signup completed keyboard interaction state");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  process.stdout.write("ok - signup validation, compact viewport and address keyboard recovery\n");
+}
+
 async function newContext(browser, identity, viewport = { width: 1280, height: 900 }) {
   const context = await browser.newContext({ viewport });
   if (identity) {
@@ -274,6 +368,7 @@ async function newContext(browser, identity, viewport = { width: 1280, height: 9
 
 const buyer = await createIdentity("buyer");
 const seller = await createIdentity("seller");
+const business = await createIdentity("business");
 const adminUser = await createIdentity("admin", { role: "admin" });
 
 await expectStatus(
@@ -294,6 +389,15 @@ await expectStatus(
   }),
   200,
 );
+await expectStatus(
+  "business onboarding",
+  await appFetch("/api/onboarding/business", {
+    cookie: business.cookie,
+    method: "POST",
+    json: { display_name: "Accessibility BSM", business_kind: "manufacturer" },
+  }),
+  200,
+);
 
 const browser = await chromium.launch({ headless: true });
 try {
@@ -303,6 +407,13 @@ try {
   await openAndAudit(anonymousPage, "/", "anonymous home", "/");
   await openAndAudit(anonymousPage, "/apps", "anonymous apps", "/apps");
   await openAndAudit(anonymousPage, "/auth?mode=signin", "anonymous sign-in", "/auth");
+  await openAndAudit(
+    anonymousPage,
+    "/auth?mode=signup&role=bsm",
+    "anonymous BSM sign-up",
+    "/auth",
+  );
+  await assertAuthValidationAndKeyboard(anonymousPage);
   await anonymousContext.close();
 
   const buyerContext = await newContext(browser, buyer, { width: 390, height: 844 });
@@ -311,12 +422,20 @@ try {
   await openAndAudit(buyerPage, "/cart", "buyer cart", "/cart");
   await openAndAudit(buyerPage, "/checkout", "buyer checkout", "/checkout");
   await openAndAudit(buyerPage, "/dashboard/buyer", "buyer dashboard", "/dashboard/buyer");
+  await openAndAudit(
+    buyerPage,
+    "/dashboard/buyer/orders",
+    "buyer order history",
+    "/dashboard/buyer/orders",
+  );
+  await openAndAudit(buyerPage, "/dashboard/profile", "buyer profile", "/dashboard/profile");
+  await openAndAudit(buyerPage, "/dashboard/messages", "buyer messages", "/dashboard/messages");
   await buyerContext.close();
 
   const sellerContext = await newContext(browser, seller, { width: 820, height: 1180 });
   const sellerPage = await sellerContext.newPage();
   watchBrowserErrors(sellerPage, "seller");
-  await openAndAudit(sellerPage, "/seller/dashboard", "seller dashboard", "/dashboard/seller");
+  await openAndAudit(sellerPage, "/dashboard/seller", "seller dashboard", "/dashboard/seller");
   await openAndAudit(
     sellerPage,
     "/dashboard/seller/branding",
@@ -325,18 +444,65 @@ try {
   );
   await openAndAudit(
     sellerPage,
+    "/dashboard/seller/analytics",
+    "seller analytics",
+    "/dashboard/seller/analytics",
+  );
+  await openAndAudit(
+    sellerPage,
     "/dashboard/verification",
     "seller verification",
     "/dashboard/verification",
   );
+  await openAndAudit(sellerPage, "/dashboard/store", "seller store", "/dashboard/store");
+  await openAndAudit(sellerPage, "/dashboard/messages", "seller messages", "/dashboard/messages");
   await sellerContext.close();
+
+  const businessContext = await newContext(browser, business, { width: 1024, height: 1366 });
+  const businessPage = await businessContext.newPage();
+  watchBrowserErrors(businessPage, "business");
+  await openAndAudit(businessPage, "/dashboard/bsm", "business dashboard", "/dashboard/bsm");
+  await openAndAudit(
+    businessPage,
+    "/dashboard/seller",
+    "business seller dashboard",
+    "/dashboard/seller",
+  );
+  await openAndAudit(
+    businessPage,
+    "/dashboard/seller/branding",
+    "business branding",
+    "/dashboard/seller/branding",
+  );
+  await openAndAudit(
+    businessPage,
+    "/dashboard/verification",
+    "business verification",
+    "/dashboard/verification",
+  );
+  await openAndAudit(businessPage, "/dashboard/store", "business store", "/dashboard/store");
+  await businessContext.close();
 
   const adminContext = await newContext(browser, adminUser, { width: 1440, height: 900 });
   const adminPage = await adminContext.newPage();
   watchBrowserErrors(adminPage, "admin");
-  await openAndAudit(adminPage, "/admin", "admin dashboard", "/admin");
-  await openAndAudit(adminPage, "/admin/accounts", "admin accounts", "/admin/accounts");
-  await openAndAudit(adminPage, "/admin/products", "admin products", "/admin/products");
+  const adminRoutes = [
+    ["/admin", "admin dashboard"],
+    ["/admin/accounts", "admin accounts"],
+    ["/admin/products", "admin products"],
+    ["/admin/kyc", "admin KYC"],
+    ["/admin/orders", "admin orders"],
+    ["/admin/refunds", "admin refunds"],
+    ["/admin/disputes", "admin disputes"],
+    ["/admin/finance", "admin finance"],
+    ["/admin/trust-safety", "admin trust and safety"],
+    ["/admin/catalog", "admin catalog"],
+    ["/admin/communications", "admin communications"],
+    ["/admin/audit", "admin audit"],
+  ];
+  for (const [pathname, label] of adminRoutes) {
+    await openAndAudit(adminPage, pathname, label, pathname);
+  }
   await adminContext.close();
 
   assert.deepEqual(
@@ -344,7 +510,7 @@ try {
     [],
     `Browser errors detected:\n${browserErrors.join("\n")}\n\nFailed HTTP responses observed:\n${failedResponses.join("\n")}`,
   );
-  console.log("Authenticated web accessibility regression passed.");
+  console.log("Authenticated critical-flow web accessibility regression passed.");
 } finally {
   await browser.close();
   for (const userId of createdUserIds.reverse()) {
