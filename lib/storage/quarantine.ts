@@ -19,6 +19,8 @@ export type UploadDestinationBucket =
   | 'seller-branding'
   | 'message-attachments';
 
+type UploadScanStatus = 'pending_upload' | 'scanning' | 'clean' | 'blocked' | 'failed';
+
 const PURPOSE_BUCKET: Record<UploadPurpose, UploadDestinationBucket> = {
   product_media: 'product-media',
   kyc: 'kyc-documents',
@@ -42,7 +44,7 @@ type UploadScanJob = {
   destination_bucket: UploadDestinationBucket;
   destination_path: string;
   declared_mime: string;
-  status: 'pending_upload' | 'scanning' | 'clean' | 'blocked' | 'failed';
+  status: UploadScanStatus;
   verified_mime: string | null;
   byte_size: number | null;
   sha256: string | null;
@@ -77,6 +79,11 @@ export type QuarantineFinalizeResult =
       kind: QuarantineFailureKind;
       code: string;
     };
+
+type TransitionResult = {
+  error: unknown | null;
+  transitioned: boolean;
+};
 
 function normalizedDeclaredMime(value: string) {
   return value.trim().toLowerCase();
@@ -170,6 +177,27 @@ async function updateJob(uploadId: string, patch: Record<string, unknown>) {
     .eq('id', uploadId);
 }
 
+async function transitionJob(
+  uploadId: string,
+  actorId: string,
+  expectedStatus: UploadScanStatus,
+  patch: Record<string, unknown>,
+): Promise<TransitionResult> {
+  const { data, error } = await getSupabaseAdmin()
+    .from('upload_scan_jobs')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', uploadId)
+    .eq('actor_id', actorId)
+    .eq('status', expectedStatus)
+    .select('id')
+    .maybeSingle();
+
+  return {
+    error: error ?? null,
+    transitioned: Boolean(data?.id),
+  };
+}
+
 async function removeQuarantine(path: string, actorId: string, uploadId: string, operation: string) {
   return removeStorageObjectBestEffort(
     getSupabaseAdmin().storage.from(UPLOAD_QUARANTINE_BUCKET),
@@ -181,6 +209,16 @@ async function removeQuarantine(path: string, actorId: string, uploadId: string,
       recordId: uploadId,
     },
   );
+}
+
+function transitionFailure(result: TransitionResult, status: UploadScanStatus): QuarantineFinalizeResult | null {
+  if (result.error) {
+    return { ok: false, kind: 'ledger_failed', code: 'scan_ledger_update_failed' };
+  }
+  if (!result.transitioned) {
+    return { ok: false, kind: 'invalid_state', code: `upload_scan_job_not_${status}` };
+  }
+  return null;
 }
 
 export async function initializeSignedQuarantineUpload(input: {
@@ -199,7 +237,7 @@ export async function initializeSignedQuarantineUpload(input: {
     .createSignedUploadUrl(job.quarantinePath);
 
   if (error || !data?.signedUrl) {
-    await updateJob(job.uploadId, {
+    await transitionJob(job.uploadId, input.actorId, 'pending_upload', {
       status: 'failed',
       scanner: 'configuration',
       scanner_result_code: 'signed_upload_init_failed',
@@ -261,20 +299,24 @@ export async function finalizeQuarantinedUpload(input: {
   const quarantine = admin.storage.from(UPLOAD_QUARANTINE_BUCKET);
   const { data: blob, error: downloadError } = await quarantine.download(job.quarantine_path);
   if (downloadError || !blob) {
-    await updateJob(job.id, {
+    const transition = await transitionJob(job.id, input.actorId, 'pending_upload', {
       status: 'failed',
       scanner: 'storage',
       scanner_result_code: 'quarantine_object_missing',
     });
+    const failed = transitionFailure(transition, 'pending_upload');
+    if (failed) return failed;
     return { ok: false, kind: 'missing_object', code: 'quarantine_object_missing' };
   }
 
   if (blob.size <= 0 || blob.size > input.maxBytes || blob.size > UPLOAD_QUARANTINE_MAX_BYTES) {
-    await updateJob(job.id, {
+    const transition = await transitionJob(job.id, input.actorId, 'pending_upload', {
       status: 'blocked',
       scanner: 'byte-validator',
       scanner_result_code: 'invalid_file_size',
     });
+    const failed = transitionFailure(transition, 'pending_upload');
+    if (failed) return failed;
     await removeQuarantine(job.quarantine_path, input.actorId, job.id, 'reject-invalid-quarantine-size');
     return { ok: false, kind: 'invalid_file', code: 'invalid_file_size' };
   }
@@ -286,26 +328,26 @@ export async function finalizeQuarantinedUpload(input: {
     declaredMime: job.declared_mime,
   });
   if (!validated) {
-    await updateJob(job.id, {
+    const transition = await transitionJob(job.id, input.actorId, 'pending_upload', {
       status: 'blocked',
       scanner: 'byte-validator',
       scanner_result_code: 'magic_bytes_or_mime_mismatch',
     });
+    const failed = transitionFailure(transition, 'pending_upload');
+    if (failed) return failed;
     await removeQuarantine(job.quarantine_path, input.actorId, job.id, 'reject-invalid-quarantine-bytes');
     return { ok: false, kind: 'invalid_file', code: 'magic_bytes_or_mime_mismatch' };
   }
 
   const sha256 = sha256Hex(validated.bytes);
-  const { error: scanningUpdateError } = await updateJob(job.id, {
+  const scanningTransition = await transitionJob(job.id, input.actorId, 'pending_upload', {
     status: 'scanning',
     verified_mime: validated.mimeType,
     byte_size: validated.size,
     sha256,
   });
-  if (scanningUpdateError) {
-    await removeQuarantine(job.quarantine_path, input.actorId, job.id, 'rollback-scan-ledger-update');
-    return { ok: false, kind: 'ledger_failed', code: 'scan_ledger_update_failed' };
-  }
+  const scanningFailure = transitionFailure(scanningTransition, 'pending_upload');
+  if (scanningFailure) return scanningFailure;
 
   const scan = await scanUploadBytes(validated.bytes, {
     mimeType: validated.mimeType,
@@ -313,13 +355,15 @@ export async function finalizeQuarantinedUpload(input: {
   });
   if (scan.verdict !== 'clean') {
     const blocked = scan.verdict === 'blocked';
-    await updateJob(job.id, {
+    const terminalTransition = await transitionJob(job.id, input.actorId, 'scanning', {
       status: blocked ? 'blocked' : 'failed',
       scanner: scan.scanner,
       scanner_version: scan.version || null,
       scanner_result_code: scan.code,
       scanned_at: new Date().toISOString(),
     });
+    const terminalFailure = transitionFailure(terminalTransition, 'scanning');
+    if (terminalFailure) return terminalFailure;
     await removeQuarantine(
       job.quarantine_path,
       input.actorId,
@@ -342,19 +386,21 @@ export async function finalizeQuarantinedUpload(input: {
       : 'private, max-age=0',
   });
   if (promoteError) {
-    await updateJob(job.id, {
+    const failureTransition = await transitionJob(job.id, input.actorId, 'scanning', {
       status: 'failed',
       scanner: scan.scanner,
       scanner_version: scan.version || null,
       scanner_result_code: 'destination_promotion_failed',
       scanned_at: new Date().toISOString(),
     });
+    const failed = transitionFailure(failureTransition, 'scanning');
+    if (failed) return failed;
     await removeQuarantine(job.quarantine_path, input.actorId, job.id, 'rollback-failed-promotion');
     return { ok: false, kind: 'promotion_failed', code: 'destination_promotion_failed' };
   }
 
   const now = new Date().toISOString();
-  const { error: cleanUpdateError } = await updateJob(job.id, {
+  const cleanTransition = await transitionJob(job.id, input.actorId, 'scanning', {
     status: 'clean',
     scanner: scan.scanner,
     scanner_version: scan.version || null,
@@ -362,7 +408,7 @@ export async function finalizeQuarantinedUpload(input: {
     scanned_at: now,
     promoted_at: now,
   });
-  if (cleanUpdateError) {
+  if (cleanTransition.error || !cleanTransition.transitioned) {
     await removeStorageObjectBestEffort(destination, job.destination_path, {
       bucket: job.destination_bucket,
       operation: 'rollback-unrecorded-clean-promotion',
@@ -417,7 +463,7 @@ export async function quarantineAndFinalizeServerFile(input: {
     });
 
   if (quarantineError) {
-    await updateJob(job.uploadId, {
+    await transitionJob(job.uploadId, input.actorId, 'pending_upload', {
       status: 'failed',
       scanner: 'storage',
       scanner_result_code: 'quarantine_upload_failed',
