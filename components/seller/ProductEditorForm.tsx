@@ -163,6 +163,7 @@ export default function ProductEditorForm({
 
     setUploading(true);
     const uploaded: string[] = [];
+    const pendingUploadIds = new Set<string>();
     try {
       for (const file of selected) {
         const initResponse = await fetch("/api/seller/product-media/upload", {
@@ -171,27 +172,49 @@ export default function ProductEditorForm({
           body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
         });
         const init = await initResponse.json().catch(() => ({}));
-        if (!initResponse.ok || !init.uploadURL || !init.publicUrl) {
+        if (!initResponse.ok || !init.uploadURL || !init.uploadId) {
           throw new Error(init.error || "Unable to initialize product image upload");
         }
+        pendingUploadIds.add(init.uploadId);
 
         const uploadResponse = await fetch(init.uploadURL, {
           method: "PUT",
           headers: { "Content-Type": file.type },
           body: file,
         });
-        if (!uploadResponse.ok) throw new Error("Product image upload failed");
-        uploaded.push(init.publicUrl);
+        if (!uploadResponse.ok) throw new Error("Product image quarantine upload failed");
+
+        const finalizeResponse = await fetch("/api/seller/product-media/upload", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadId: init.uploadId }),
+        });
+        const finalized = await finalizeResponse.json().catch(() => ({}));
+        if (!finalizeResponse.ok || !finalized.publicUrl) {
+          throw new Error(finalized.error || "Product image did not pass upload safety verification");
+        }
+
+        pendingUploadIds.delete(init.uploadId);
+        uploaded.push(finalized.publicUrl);
       }
       setMediaUrls((current) => [...current, ...uploaded]);
     } catch (caught) {
-      await Promise.allSettled(uploaded.map((publicUrl) =>
-        fetch("/api/seller/product-media/upload", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ publicUrl }),
-        }),
-      ));
+      await Promise.allSettled([
+        ...uploaded.map((publicUrl) =>
+          fetch("/api/seller/product-media/upload", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ publicUrl }),
+          }),
+        ),
+        ...Array.from(pendingUploadIds).map((uploadId) =>
+          fetch("/api/seller/product-media/upload", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uploadId }),
+          }),
+        ),
+      ]);
       setError(caught instanceof Error ? caught.message : "Unable to upload product images");
     } finally {
       setUploading(false);
@@ -410,7 +433,7 @@ export default function ProductEditorForm({
       </section>
 
       <section className="space-y-4 rounded-2xl border p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Product images</h2><p className="text-sm opacity-65">Up to 10 validated JPEG, PNG or WebP images. The first image is the cover.</p></div><button type="button" disabled={uploading || mediaUrls.length >= MAX_MEDIA} onClick={() => fileInput.current?.click()} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">{uploading ? "Uploading…" : "Upload images"}</button><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(event) => void uploadFiles(event.target.files)} /></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Product images</h2><p className="text-sm opacity-65">Up to 10 safety-scanned JPEG, PNG or WebP images. The first image is the cover.</p></div><button type="button" disabled={uploading || mediaUrls.length >= MAX_MEDIA} onClick={() => fileInput.current?.click()} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">{uploading ? "Scanning upload…" : "Upload images"}</button><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(event) => void uploadFiles(event.target.files)} /></div>
         {mediaUrls.length > 0 && <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">{mediaUrls.map((url, index) => <div key={url} className="overflow-hidden rounded-lg border bg-white">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={url} alt={`Product image ${index + 1}`} className="aspect-square w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2 text-xs"><span>{index === 0 ? "Cover image" : `Image ${index + 1}`}</span><button type="button" onClick={() => void removeMedia(url)} className="text-red-700">Remove</button></div></div>)}</div>}
       </section>
 
