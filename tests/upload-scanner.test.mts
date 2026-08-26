@@ -89,6 +89,56 @@ test('missing production scanner endpoint fails closed', async () => {
   }
 });
 
+test('production remote scanner requires HTTPS and bearer authentication', async () => {
+  const snapshot = {
+    UPLOAD_SCANNER_MODE: process.env.UPLOAD_SCANNER_MODE,
+    UPLOAD_SCANNER_URL: process.env.UPLOAD_SCANNER_URL,
+    UPLOAD_SCANNER_TOKEN: process.env.UPLOAD_SCANNER_TOKEN,
+    NODE_ENV: process.env.NODE_ENV,
+  };
+  process.env.UPLOAD_SCANNER_MODE = 'remote';
+  process.env.NODE_ENV = 'production';
+  delete process.env.UPLOAD_SCANNER_TOKEN;
+
+  try {
+    process.env.UPLOAD_SCANNER_URL = 'http://scanner.example.test/scan';
+    const insecure = await scanUploadBytes(png, { mimeType: 'image/png' });
+    assert.equal(insecure.verdict, 'unavailable');
+    assert.equal(insecure.code, 'scanner_endpoint_must_use_https');
+
+    process.env.UPLOAD_SCANNER_URL = 'https://scanner.example.test/scan';
+    const unauthenticated = await scanUploadBytes(png, { mimeType: 'image/png' });
+    assert.equal(unauthenticated.verdict, 'unavailable');
+    assert.equal(unauthenticated.code, 'scanner_token_missing');
+  } finally {
+    restoreEnvironment(snapshot);
+  }
+});
+
+test('scanner endpoint rejects embedded credentials and URL fragments', async () => {
+  const snapshot = {
+    UPLOAD_SCANNER_MODE: process.env.UPLOAD_SCANNER_MODE,
+    UPLOAD_SCANNER_URL: process.env.UPLOAD_SCANNER_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  };
+  process.env.UPLOAD_SCANNER_MODE = 'remote';
+  process.env.NODE_ENV = 'test';
+
+  try {
+    process.env.UPLOAD_SCANNER_URL = 'https://user:pass@scanner.example.test/scan';
+    const credentials = await scanUploadBytes(png, { mimeType: 'image/png' });
+    assert.equal(credentials.verdict, 'unavailable');
+    assert.equal(credentials.code, 'scanner_endpoint_unsafe');
+
+    process.env.UPLOAD_SCANNER_URL = 'https://scanner.example.test/scan#secret';
+    const fragment = await scanUploadBytes(png, { mimeType: 'image/png' });
+    assert.equal(fragment.verdict, 'unavailable');
+    assert.equal(fragment.code, 'scanner_endpoint_unsafe');
+  } finally {
+    restoreEnvironment(snapshot);
+  }
+});
+
 test('sha256 fingerprint is deterministic and full length', () => {
   const first = sha256Hex(png);
   const second = sha256Hex(png);
