@@ -298,7 +298,7 @@ try {
   const sellerContext = await newContext(browser, seller, { width: 820, height: 1180 });
   const sellerPage = await sellerContext.newPage();
   watchBrowserErrors(sellerPage, "seller");
-  await openAndAudit(sellerPage, "/seller/dashboard", "seller dashboard", "/seller/dashboard");
+  await openAndAudit(sellerPage, "/seller/dashboard", "seller dashboard", "/dashboard/seller");
   await openAndAudit(
     sellerPage,
     "/dashboard/seller/branding",
