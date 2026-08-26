@@ -2,6 +2,8 @@
 
 Status: launch-gate documentation for the public web V1.
 
+Gate ownership: release engineering. A failed accessibility or responsive-browser check blocks promotion until the exact finding is fixed and the full exact-head matrix is rerun.
+
 ## Purpose
 
 The public web release must be usable on phone, tablet and desktop by keyboard and assistive-technology users. Accessibility findings are product defects: the release gate must not suppress axe rules, ignore known violations, or weaken authorization merely to make CI pass.
