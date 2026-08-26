@@ -22,6 +22,8 @@ The gate refuses to run unless all of the following are true:
 
 `DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY` exists only in the GitHub environment secret store used by this gate. It is consumed by the Node test process to create and remove disposable identities. It is never sent to the deployed application, browser code, logs or artifacts.
 
+Vercel Deployment Protection remains enabled. Protected preview requests use the server-side `VERCEL_AUTOMATION_BYPASS_SECRET` through the documented `x-vercel-protection-bypass` header. `scripts/deployed-vercel-bypass.mjs` injects that header only when a request targets the exact configured application origin; requests to Supabase or any other origin never receive the Vercel bypass secret.
+
 ## GitHub environment contract
 
 Create protected environments named:
@@ -34,6 +36,7 @@ Each environment used for this gate needs:
 - secret `DEPLOYED_AUTH_SUPABASE_URL`
 - secret `DEPLOYED_AUTH_SUPABASE_ANON_KEY`
 - secret `DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY`
+- secret `VERCEL_AUTOMATION_BYPASS_SECRET` when the target deployment uses Vercel Deployment Protection
 
 Repository/environment variable:
 
@@ -70,7 +73,7 @@ Run **Deployed Authorization Gate** manually after an exact preview/staging depl
 - `preview` or `staging`;
 - explicit disposable-mutation consent.
 
-The workflow uses a protected GitHub environment so target credentials are scoped separately from ordinary CI.
+The workflow uses a protected GitHub environment so target credentials and the Vercel automation bypass remain scoped separately from ordinary CI.
 
 ## P0-04 completion evidence
 
