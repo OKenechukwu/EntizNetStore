@@ -61,16 +61,27 @@ create table if not exists public.upload_scan_jobs (
       and quarantine_path !~ '[[:cntrl:]]'
       and quarantine_path !~ '(^|/)\.\.(/|$)'
       and position('\\' in quarantine_path) = 0
+      and quarantine_path like actor_id::text || '/%'
     ),
   constraint upload_scan_jobs_destination_bucket_check
     check (destination_bucket in ('product-media', 'kyc-documents', 'seller-branding', 'message-attachments')),
+  constraint upload_scan_jobs_purpose_destination_check
+    check (
+      (purpose = 'product_media' and destination_bucket = 'product-media')
+      or (purpose = 'kyc' and destination_bucket = 'kyc-documents')
+      or (purpose = 'seller_branding' and destination_bucket = 'seller-branding')
+      or (purpose = 'message_attachment' and destination_bucket = 'message-attachments')
+    ),
   constraint upload_scan_jobs_destination_path_check
     check (
       char_length(destination_path) between 8 and 500
       and destination_path !~ '[[:cntrl:]]'
       and destination_path !~ '(^|/)\.\.(/|$)'
       and position('\\' in destination_path) = 0
+      and destination_path like actor_id::text || '/%'
     ),
+  constraint upload_scan_jobs_destination_unique
+    unique (destination_bucket, destination_path),
   constraint upload_scan_jobs_declared_mime_check
     check (declared_mime in ('application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp')),
   constraint upload_scan_jobs_verified_mime_check
@@ -84,12 +95,25 @@ create table if not exists public.upload_scan_jobs (
   constraint upload_scan_jobs_scanner_version_check
     check (scanner_version is null or (char_length(scanner_version) between 1 and 80 and scanner_version !~ '[[:cntrl:]]')),
   constraint upload_scan_jobs_result_code_check
-    check (scanner_result_code is null or (char_length(scanner_result_code) between 1 and 120 and scanner_result_code !~ '[[:cntrl:]]'))
+    check (scanner_result_code is null or (char_length(scanner_result_code) between 1 and 120 and scanner_result_code !~ '[[:cntrl:]]')),
+  constraint upload_scan_jobs_clean_evidence_check
+    check (
+      status <> 'clean'
+      or (
+        verified_mime is not null
+        and byte_size is not null
+        and sha256 is not null
+        and scanner is not null
+        and scanner_result_code is not null
+        and scanned_at is not null
+        and promoted_at is not null
+      )
+    )
 );
 
 alter table public.upload_scan_jobs enable row level security;
 revoke all on table public.upload_scan_jobs from public, anon, authenticated;
-grant all on table public.upload_scan_jobs to service_role;
+grant select, insert, update, delete on table public.upload_scan_jobs to service_role;
 
 create index if not exists idx_upload_scan_jobs_actor_created
   on public.upload_scan_jobs(actor_id, created_at desc);
