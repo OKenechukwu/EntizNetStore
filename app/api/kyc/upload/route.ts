@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { abandonQuarantinedUpload } from '@/lib/storage/abandonQuarantine'
+import { discardUnregisteredKycUpload } from '@/lib/storage/discardKycUpload'
 import {
   extensionForUploadMime,
   finalizeQuarantinedUpload,
@@ -193,20 +193,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Upload ID is required' }, { status: 400 })
     }
 
-    const abandoned = await abandonQuarantinedUpload({
+    const discarded = await discardUnregisteredKycUpload({
       uploadId: body.uploadId,
       actorId: auth.user.id,
     })
-    if (!abandoned.ok) {
-      const status = abandoned.code === 'not_found' ? 404 : 409
-      return NextResponse.json({ error: 'Unable to abandon KYC upload', code: abandoned.code }, { status })
+    if (!discarded.ok) {
+      const status = discarded.code === 'not_found' ? 404 : 409
+      return NextResponse.json({ error: 'Unable to discard KYC upload', code: discarded.code }, { status })
     }
 
-    return NextResponse.json({ abandoned: true })
+    return NextResponse.json({ discarded: true })
   } catch (error) {
     await reportOperationalError('storage.kyc.abandon_route_failed', error, {
       component: 'storage',
-      operation: 'abandon-kyc-quarantine',
+      operation: 'discard-unregistered-kyc-upload',
       bucket: 'upload-quarantine',
       route: '/api/kyc/upload',
     })
