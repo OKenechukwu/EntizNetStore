@@ -19,7 +19,14 @@ export type UploadDestinationBucket =
   | 'seller-branding'
   | 'message-attachments';
 
-type UploadScanStatus = 'pending_upload' | 'scanning' | 'clean' | 'blocked' | 'failed';
+type UploadScanStatus =
+  | 'pending_upload'
+  | 'scanning'
+  | 'clean'
+  | 'registering'
+  | 'registered'
+  | 'blocked'
+  | 'failed';
 
 const PURPOSE_BUCKET: Record<UploadPurpose, UploadDestinationBucket> = {
   product_media: 'product-media',
@@ -168,13 +175,6 @@ async function createJob(input: {
   });
   if (error) throw new Error('upload_scan_job_create_failed');
   return { uploadId, quarantinePath, mimeType };
-}
-
-async function updateJob(uploadId: string, patch: Record<string, unknown>) {
-  return getSupabaseAdmin()
-    .from('upload_scan_jobs')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', uploadId);
 }
 
 async function transitionJob(
