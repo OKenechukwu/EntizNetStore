@@ -303,17 +303,18 @@ async function assertAuthValidationAndKeyboard(page) {
   const passwordInput = page.getByLabel("Password", { exact: true });
   const phone = page.getByLabel("Phone number");
   const address = page.getByLabel("Address", { exact: true });
+  const formError = page.locator("#auth-form-error");
 
   await submit.click();
-  await page.getByRole("alert").waitFor();
-  assert.equal(await page.getByRole("alert").innerText(), "Please enter your email.");
+  await formError.waitFor({ state: "visible" });
+  assert.equal(await formError.innerText(), "Please enter your email.");
   assert.equal(await email.getAttribute("aria-invalid"), "true");
   await assertFocusedInViewport(page, email, "signup email validation");
   await assertAxe(page, "signup email validation state");
 
   await email.fill(`validation-${runId}@example.test`);
   await submit.click();
-  assert.equal(await page.getByRole("alert").innerText(), "Please enter your password.");
+  assert.equal(await formError.innerText(), "Please enter your password.");
   await assertFocusedInViewport(page, passwordInput, "signup password validation");
 
   await passwordInput.fill(password);
@@ -328,13 +329,13 @@ async function assertAuthValidationAndKeyboard(page) {
   );
 
   await submit.click();
-  assert.equal(await page.getByRole("alert").innerText(), "Please enter your phone number.");
+  assert.equal(await formError.innerText(), "Please enter your phone number.");
   await assertFocusedInViewport(page, phone, "signup phone validation");
 
   await phone.fill("+63 900 000 0000");
   await page.setViewportSize({ width: 390, height: 520 });
   await submit.click();
-  assert.equal(await page.getByRole("alert").innerText(), "Please enter your address.");
+  assert.equal(await formError.innerText(), "Please enter your address.");
   await assertFocusedInViewport(page, address, "signup address validation with compact visual viewport");
 
   await address.fill("Bag");
