@@ -4,10 +4,21 @@ import { reportOperationalError } from '@/lib/observability/operationalEventSink
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
-import { safeOriginalFileName, validateUploadedFile } from '@/lib/storage/validatedUpload';
+import { safeOriginalFileName } from '@/lib/storage/validatedUpload';
+import {
+  extensionForUploadMime,
+  quarantineAndFinalizeServerFile,
+} from '@/lib/storage/quarantine';
 
 const BUCKET = 'message-attachments';
 const MAX_BYTES = 15 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabase();
@@ -25,6 +36,16 @@ export async function POST(request: NextRequest) {
   if (!(file instanceof File) || typeof messageId !== 'string' || !messageId) {
     return NextResponse.json({ error: 'File and messageId are required' }, { status: 400 });
   }
+  if (
+    file.size <= 0 ||
+    file.size > MAX_BYTES ||
+    !ALLOWED_MIME_TYPES.has(file.type.toLowerCase())
+  ) {
+    return NextResponse.json(
+      { error: 'Attachments must be PDF, JPEG, PNG, or WebP files up to 15MB' },
+      { status: 400 },
+    );
+  }
 
   const admin = getSupabaseAdmin();
   const { data: message, error: messageError } = await admin
@@ -39,44 +60,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Only the message sender can attach files' }, { status: 403 });
   }
 
-  const validated = await validateUploadedFile(file, { maxBytes: MAX_BYTES });
-  if (!validated) {
+  const filePath = `${user.id}/${message.id}/${randomUUID()}${extensionForUploadMime(file.type)}`;
+  const finalized = await quarantineAndFinalizeServerFile({
+    actorId: user.id,
+    purpose: 'message_attachment',
+    destinationBucket: BUCKET,
+    destinationPath: filePath,
+    file,
+    maxBytes: MAX_BYTES,
+  });
+
+  if (!finalized.ok) {
+    const status = finalized.kind === 'scanner_unavailable'
+      ? 503
+      : finalized.kind === 'blocked' || finalized.kind === 'invalid_file'
+        ? 400
+        : 500;
+    if (status >= 500) {
+      await reportOperationalError('storage.message_attachment.scan_or_promotion_failed', finalized.code, {
+        component: 'storage',
+        operation: 'scan-and-promote-message-attachment',
+        bucket: 'upload-quarantine',
+        route: '/api/messages/attachments/upload',
+        actorId: user.id,
+        recordId: message.id,
+      });
+    }
     return NextResponse.json(
-      { error: 'Attachments must be a real PDF, JPEG, PNG, or WebP file up to 15MB' },
-      { status: 400 },
+      {
+        error: finalized.kind === 'scanner_unavailable'
+          ? 'Upload safety scanner is unavailable. The attachment was not accepted.'
+          : finalized.kind === 'blocked'
+            ? 'The attachment did not pass the safety scan.'
+            : finalized.kind === 'invalid_file'
+              ? 'The attachment content does not match an allowed file format.'
+              : 'Unable to store attachment safely',
+      },
+      { status },
     );
   }
 
-  // Deliberately exclude executables, archives, office macros, scripts and
-  // arbitrary binary formats. Signature validation reduces spoofing; it is not
-  // represented as antivirus scanning and can later sit behind a malware scanner.
-  const filePath = `${user.id}/${message.id}/${randomUUID()}${validated.extension}`;
   const storage = admin.storage.from(BUCKET);
-  const { error: uploadError } = await storage.upload(filePath, validated.bytes, {
-    contentType: validated.mimeType,
-    upsert: false,
-    cacheControl: '3600',
-  });
-  if (uploadError) {
-    await reportOperationalError('storage.message_attachment.upload_failed', uploadError, {
-      component: 'storage',
-      operation: 'upload-message-attachment',
-      bucket: BUCKET,
-      route: '/api/messages/attachments/upload',
-      actorId: user.id,
-      recordId: message.id,
-    });
-    return NextResponse.json({ error: 'Unable to upload attachment' }, { status: 500 });
-  }
-
   const { data: attachment, error: insertError } = await admin
     .from('message_attachments')
     .insert({
       message_id: message.id,
-      file_path: filePath,
+      file_path: finalized.destinationPath,
       file_name: safeOriginalFileName(file.name),
-      file_size: validated.size,
-      mime_type: validated.mimeType,
+      file_size: finalized.size,
+      mime_type: finalized.mimeType,
     })
     .select('id, message_id, file_name, file_size, mime_type, created_at')
     .single();
@@ -84,7 +116,7 @@ export async function POST(request: NextRequest) {
   if (insertError) {
     await removeStorageObjectBestEffort(
       storage,
-      filePath,
+      finalized.destinationPath,
       {
         bucket: BUCKET,
         operation: 'rollback-attachment-registration',

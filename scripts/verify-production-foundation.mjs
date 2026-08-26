@@ -173,6 +173,7 @@ for (const requiredPath of [
   "LAUNCH_BLOCKERS.md",
   "app/api/health/route.ts",
   "docs/architecture/ADR-0001-account-capabilities.md",
+  "docs/architecture/ADR-0004-upload-quarantine-malware-scanning.md",
   "docs/operations/BACKUP_RECOVERY.md",
   "docs/operations/DEPLOYMENT_RUNTIME_SECURITY_VERIFICATION_2026-08-25.md",
   "docs/operations/ENVIRONMENT_SECRETS.md",
@@ -181,12 +182,17 @@ for (const requiredPath of [
   "docs/operations/PRODUCTION_RELEASE.md",
   "docs/operations/STORAGE_SECURITY_VERIFICATION_2026-08-25.md",
   "lib/observability/operationalEventSink.ts",
+  "lib/storage/quarantine.ts",
+  "lib/storage/uploadScanner.ts",
   "scripts/test-http-authorization.mjs",
   "scripts/test-operational-event-ledger.sql",
   "scripts/test-production-http-smoke.mjs",
   "scripts/test-storage-boundary.mjs",
+  "scripts/test-upload-quarantine-safety.sql",
   "supabase/migrations/20260825153000_operational_event_ledger.sql",
+  "supabase/migrations/20260826065000_p0_upload_quarantine_scanning.sql",
   "supabase/seed.sql",
+  "tests/upload-scanner.test.mts",
 ]) {
   if (!exists(requiredPath)) fail(`Required production-foundation file missing: ${requiredPath}`);
 }
@@ -196,6 +202,9 @@ if (!pkg.scripts?.["test:production-http-smoke"]) {
 }
 if (!pkg.scripts?.["test:operational-logging"]) {
   fail("package.json must expose test:operational-logging");
+}
+if (!pkg.scripts?.["test:upload-scanner"]) {
+  fail("package.json must expose test:upload-scanner");
 }
 
 for (const workflowPath of [".github/workflows/ci.yml", ".github/workflows/http-authorization.yml"]) {
@@ -211,8 +220,15 @@ for (const workflowPath of [".github/workflows/ci.yml", ".github/workflows/http-
 
 if (exists(".github/workflows/ci.yml")) {
   const ci = read(".github/workflows/ci.yml");
-  if (!ci.includes("scripts/test-operational-event-ledger.sql")) {
-    fail("CI must execute the operational event ledger regression");
+  for (const requiredFragment of [
+    "scripts/test-operational-event-ledger.sql",
+    "scripts/test-upload-quarantine-safety.sql",
+    "npm run test:upload-scanner",
+    "UPLOAD_SCANNER_MODE: deterministic",
+  ]) {
+    if (!ci.includes(requiredFragment)) {
+      fail(`CI is missing required production-safety control: ${requiredFragment}`);
+    }
   }
 }
 
@@ -237,6 +253,8 @@ if (exists(".github/workflows/http-authorization.yml")) {
   for (const requiredFragment of [
     "scripts/test-http-authorization.mjs",
     "scripts/test-storage-boundary.mjs",
+    "npm run test:upload-scanner",
+    "UPLOAD_SCANNER_MODE: deterministic",
     "ENTIZNETSTORE_BASE_URL=http://127.0.0.1:3000 node scripts/test-production-http-smoke.mjs",
     "supabase db reset --local",
   ]) {
@@ -252,6 +270,7 @@ if (exists("app/api/health/route.ts")) {
     "admin.storage.listBuckets()",
     "kyc-documents",
     "message-attachments",
+    "upload-quarantine",
     "product-media",
     "seller-branding",
     "operational_event_health",
@@ -295,14 +314,47 @@ if (exists("supabase/migrations/20260825153000_operational_event_ledger.sql")) {
   }
 }
 
+if (exists("supabase/migrations/20260826065000_p0_upload_quarantine_scanning.sql")) {
+  const uploadMigration = read("supabase/migrations/20260826065000_p0_upload_quarantine_scanning.sql");
+  for (const requiredFragment of [
+    "'upload-quarantine'",
+    "public.upload_scan_jobs",
+    "enable row level security",
+    "upload_scan_jobs_purpose_destination_check",
+    "upload_scan_jobs_clean_evidence_check",
+    "to service_role",
+  ]) {
+    if (!uploadMigration.includes(requiredFragment)) {
+      fail(`Upload quarantine migration lost required control: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists("lib/storage/uploadScanner.ts")) {
+  const scanner = read("lib/storage/uploadScanner.ts");
+  for (const requiredFragment of [
+    "deterministic_mode_forbidden_in_production",
+    "scanner_endpoint_must_use_https",
+    "scanner_token_missing",
+    "redirect: 'error'",
+    "MAX_RESPONSE_BYTES",
+  ]) {
+    if (!scanner.includes(requiredFragment)) {
+      fail(`Upload scanner lost fail-closed control: ${requiredFragment}`);
+    }
+  }
+}
+
 if (exists("scripts/test-http-authorization.mjs")) {
   const httpRegression = read("scripts/test-http-authorization.mjs");
   for (const requiredFragment of [
     "/api/seller/storefront",
     "/api/seller/branding",
     "/api/kyc/documents",
-    "seller B cannot delete seller A product-media path",
+    "seller B cannot delete seller A promoted product-media path",
     "seller branding rejects spoofed image bytes",
+    "EICAR KYC fixture is blocked before promotion",
+    "spoofed product image is rejected before public promotion",
     "seller storefront update is authenticated-self scoped",
   ]) {
     if (!httpRegression.includes(requiredFragment)) {

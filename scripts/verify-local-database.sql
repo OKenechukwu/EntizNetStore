@@ -17,15 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-  if v_public_tables <> 45 then
-    raise exception 'Expected 45 public tables, found %', v_public_tables;
+  if v_public_tables <> 46 then
+    raise exception 'Expected 46 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-  if v_rls_tables <> 45 then
-    raise exception 'Expected RLS on all 45 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 46 then
+    raise exception 'Expected RLS on all 46 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -34,11 +34,11 @@ begin
     and c.relkind = 'r'
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-  -- Reviews, content pages and notifications now have scoped policies while
-  -- prohibited-product rules remain trusted-worker-only. Nine operational
-  -- tables intentionally remain deny-by-default.
-  if v_no_policy_tables <> 9 then
-    raise exception 'Expected 9 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- Reviews, content pages and notifications have scoped policies while
+  -- prohibited-product rules and the upload scan ledger remain trusted-worker-only.
+  -- Ten operational tables intentionally remain deny-by-default.
+  if v_no_policy_tables <> 10 then
+    raise exception 'Expected 10 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -63,7 +63,7 @@ with expected(name) as (
     ('product_media'), ('product_moderation_events'), ('product_variants'),
     ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
     ('profiles_seller_private'), ('prohibited_product_rules'),
-    ('refund_provider_events'), ('refund_requests'), ('reviews')
+    ('refund_provider_events'), ('refund_requests'), ('reviews'), ('upload_scan_jobs')
 ), actual(name) as (
   select c.relname::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -81,7 +81,18 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical 45-table M3 baseline';
+    raise exception 'Public table set differs from canonical 46-table marketplace baseline';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'kyc_documents'
+      and column_name = 'upload_scan_job_id'
+      and data_type = 'uuid'
+  ) then
+    raise exception 'KYC documents lost upload_scan_job_id evidence link';
   end if;
 end
 $$;
@@ -121,6 +132,13 @@ begin
   if not found or v_public or v_limit is distinct from 15728640
      or not coalesce(v_mimes @> array['application/pdf','image/jpeg','image/jpg','image/png','image/webp']::text[], false) then
     raise exception 'Message attachment bucket contract differs from baseline';
+  end if;
+
+  select public, file_size_limit, allowed_mime_types into v_public, v_limit, v_mimes
+  from storage.buckets where id = 'upload-quarantine';
+  if not found or v_public or v_limit is distinct from 15728640
+     or not coalesce(v_mimes @> array['application/pdf','image/jpeg','image/jpg','image/png','image/webp']::text[], false) then
+    raise exception 'Upload quarantine bucket contract differs from baseline';
   end if;
 end
 $$;
@@ -192,7 +210,7 @@ begin
   foreach v_table in array array[
     'admin_audit_logs','payment_webhook_events','payout_provider_events',
     'marketplace_capability_state_events','entiznet_handoff_events','refund_provider_events',
-    'prohibited_product_rules'
+    'prohibited_product_rules','upload_scan_jobs'
   ] loop
     if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
@@ -202,6 +220,12 @@ begin
       raise exception 'service_role missing operational table access: %', v_table;
     end if;
   end loop;
+
+  if not has_table_privilege('service_role','public.upload_scan_jobs','INSERT')
+     or not has_table_privilege('service_role','public.upload_scan_jobs','UPDATE')
+     or not has_table_privilege('service_role','public.upload_scan_jobs','DELETE') then
+    raise exception 'service_role upload scan ledger mutation privileges are incomplete';
+  end if;
 end
 $$;
 
@@ -246,7 +270,9 @@ begin
     'marketplace_reports_one_active_per_reporter_subject','idx_marketplace_reports_status_priority_created',
     'idx_marketplace_reports_subject_created','idx_marketplace_reports_reporter_created',
     'idx_marketplace_reports_assigned_admin','idx_prohibited_product_rules_active_severity',
-    'idx_prohibited_product_rules_created_by','idx_prohibited_product_rules_updated_by'
+    'idx_prohibited_product_rules_created_by','idx_prohibited_product_rules_updated_by',
+    'idx_upload_scan_jobs_actor_created','idx_upload_scan_jobs_status_created',
+    'idx_upload_scan_jobs_purpose_created','idx_kyc_documents_upload_scan_job_id'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;

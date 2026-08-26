@@ -21,7 +21,12 @@ export type ValidatedFile = {
   extension: '.pdf' | '.jpg' | '.png' | '.webp';
 };
 
-function detectMime(bytes: Uint8Array): Pick<ValidatedFile, 'mimeType' | 'extension'> | null {
+function normalizeMime(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'image/jpg' ? 'image/jpeg' : normalized;
+}
+
+export function detectUploadedMime(bytes: Uint8Array): Pick<ValidatedFile, 'mimeType' | 'extension'> | null {
   if (
     bytes.length >= 5 &&
     bytes[0] === 0x25 &&
@@ -68,16 +73,18 @@ function detectMime(bytes: Uint8Array): Pick<ValidatedFile, 'mimeType' | 'extens
   return null;
 }
 
-export async function validateUploadedFile(
-  file: File,
-  options: { maxBytes: number; imagesOnly?: boolean },
-): Promise<ValidatedFile | null> {
-  if (!file || file.size <= 0 || file.size > options.maxBytes) return null;
+export function validateUploadedBytes(
+  bytes: Uint8Array,
+  options: { maxBytes: number; imagesOnly?: boolean; declaredMime?: string },
+): ValidatedFile | null {
+  if (!bytes?.byteLength || bytes.byteLength > options.maxBytes) return null;
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const detected = detectMime(bytes);
+  const detected = detectUploadedMime(bytes);
   if (!detected) return null;
   if (options.imagesOnly && detected.mimeType === 'application/pdf') return null;
+
+  const declaredMime = normalizeMime(options.declaredMime);
+  if (declaredMime && declaredMime !== detected.mimeType) return null;
 
   return {
     bytes,
@@ -85,6 +92,19 @@ export async function validateUploadedFile(
     mimeType: detected.mimeType,
     extension: detected.extension,
   };
+}
+
+export async function validateUploadedFile(
+  file: File,
+  options: { maxBytes: number; imagesOnly?: boolean },
+): Promise<ValidatedFile | null> {
+  if (!file || file.size <= 0 || file.size > options.maxBytes) return null;
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return validateUploadedBytes(bytes, {
+    ...options,
+    declaredMime: file.type || undefined,
+  });
 }
 
 export function safeOriginalFileName(value: string): string {

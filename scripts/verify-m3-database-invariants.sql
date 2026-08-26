@@ -2,6 +2,7 @@
 
 -- Structural M3 release gate. This complements behavioral suites by locking the
 -- production security/performance shape into every fresh database reproduction.
+-- Later P0 hardening may add tables, but every public table must remain RLS-protected.
 
 do $$
 declare
@@ -20,8 +21,8 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_public_tables <> 45 or v_rls_tables <> v_public_tables then
-    raise exception 'M3 public-table/RLS invariant failed: tables %, RLS %',
+  if v_public_tables <> 46 or v_rls_tables <> v_public_tables then
+    raise exception 'M3/P0 public-table/RLS invariant failed: tables %, RLS %',
       v_public_tables, v_rls_tables;
   end if;
 
@@ -37,8 +38,9 @@ begin
      or to_regclass('public.refund_requests') is null
      or to_regclass('public.refund_provider_events') is null
      or to_regclass('public.marketplace_reports') is null
-     or to_regclass('public.prohibited_product_rules') is null then
-    raise exception 'One or more required M3 tables are missing';
+     or to_regclass('public.prohibited_product_rules') is null
+     or to_regclass('public.upload_scan_jobs') is null then
+    raise exception 'One or more required M3/P0 tables are missing';
   end if;
 
   select array_agg(required.name order by required.name)

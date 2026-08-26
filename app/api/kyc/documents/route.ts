@@ -1,11 +1,15 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { reportOperationalError } from '@/lib/observability/operationalEventSink';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { sanitizeInput } from '@/lib/security';
 import { removeStorageObjectBestEffort } from '@/lib/storage/compensation';
+import { sha256Hex } from '@/lib/storage/uploadScanner';
+import { validateUploadedBytes } from '@/lib/storage/validatedUpload';
 
 const KYC_BUCKET = 'kyc-documents';
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const VALID_DOCUMENT_TYPES = [
   'identity',
   'business_license',
@@ -13,78 +17,37 @@ const VALID_DOCUMENT_TYPES = [
   'address_proof',
   'bank_statement',
 ] as const;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 type DocumentType = (typeof VALID_DOCUMENT_TYPES)[number];
 
-type InspectedFile = {
-  size: number;
-  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+type CleanKycScanJob = {
+  id: string;
+  status: string;
+  destination_path: string;
+  verified_mime: string | null;
+  byte_size: number | null;
+  sha256: string | null;
 };
 
-function pathFromSignedUploadUrl(value: string): string | null {
-  try {
-    const marker = `/object/upload/sign/${KYC_BUCKET}/`;
-    const pathname = new URL(value).pathname;
-    const index = pathname.indexOf(marker);
-    if (index < 0) return null;
-    return decodeURIComponent(pathname.slice(index + marker.length));
-  } catch {
-    return null;
-  }
-}
-
-function inspectSignature(bytes: Uint8Array, size: number): InspectedFile | null {
-  if (size <= 0 || size > MAX_FILE_SIZE) return null;
-
-  if (
-    bytes.length >= 5 &&
-    bytes[0] === 0x25 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x44 &&
-    bytes[3] === 0x46 &&
-    bytes[4] === 0x2d
-  ) {
-    return { size, mimeType: 'application/pdf' };
-  }
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return { size, mimeType: 'image/jpeg' };
-  }
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a
-  ) {
-    return { size, mimeType: 'image/png' };
-  }
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return { size, mimeType: 'image/webp' };
-  }
-  return null;
-}
-
 async function deleteRejectedUpload(filePath: string, ownerId: string, operation: string) {
-  await removeStorageObjectBestEffort(
+  return removeStorageObjectBestEffort(
     getSupabaseAdmin().storage.from(KYC_BUCKET),
     filePath,
     { bucket: KYC_BUCKET, operation, ownerId },
   );
+}
+
+async function failCleanScanJob(uploadId: string, ownerId: string, code: string) {
+  return getSupabaseAdmin()
+    .from('upload_scan_jobs')
+    .update({
+      status: 'failed',
+      scanner_result_code: code,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', uploadId)
+    .eq('actor_id', ownerId)
+    .eq('status', 'clean');
 }
 
 export async function POST(request: NextRequest) {
@@ -99,11 +62,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: sellerProfile } = await supabase
+    const { data: sellerProfiles } = await supabase
       .from('profiles_seller')
       .select('id, verification_status')
       .eq('id', user.id)
-      .maybeSingle();
+      .limit(1);
+    const sellerProfile = sellerProfiles?.[0] ?? null;
 
     if (!sellerProfile) {
       return NextResponse.json({ error: 'Seller capability required' }, { status: 403 });
@@ -112,7 +76,6 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       documentType?: string;
       filePath?: string;
-      uploadURL?: string;
       fileName?: string;
       fileSize?: number;
       mimeType?: string;
@@ -120,14 +83,14 @@ export async function POST(request: NextRequest) {
 
     const documentType = sanitizeInput(body.documentType ?? '') as DocumentType;
     const fileName = sanitizeInput(body.fileName ?? '');
-    const filePath = body.filePath || (body.uploadURL ? pathFromSignedUploadUrl(body.uploadURL) : null);
+    const filePath = typeof body.filePath === 'string' ? body.filePath : null;
 
     if (!VALID_DOCUMENT_TYPES.includes(documentType)) {
       return NextResponse.json({ error: 'Invalid document type' }, { status: 400 });
     }
     if (!fileName || !filePath) {
       return NextResponse.json(
-        { error: 'Document type, file path, and file name are required' },
+        { error: 'Document type, verified file path, and file name are required' },
         { status: 400 },
       );
     }
@@ -143,13 +106,41 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('seller_id', user.id)
       .eq('file_path', filePath)
-      .maybeSingle();
+      .limit(1);
 
-    if (existing) {
+    if (existing?.length) {
       return NextResponse.json(
-        { error: 'This KYC upload is already registered', documentId: existing.id },
+        { error: 'This KYC upload is already registered', documentId: existing[0].id },
         { status: 409 },
       );
+    }
+
+    const { data: scanJobData, error: scanJobError } = await admin
+      .from('upload_scan_jobs')
+      .select('id, status, destination_path, verified_mime, byte_size, sha256')
+      .eq('actor_id', user.id)
+      .eq('purpose', 'kyc')
+      .eq('destination_bucket', KYC_BUCKET)
+      .eq('destination_path', filePath)
+      .maybeSingle();
+    const scanJob = scanJobData as CleanKycScanJob | null;
+
+    if (scanJobError || !scanJob) {
+      return NextResponse.json(
+        { error: 'KYC registration requires a verified clean upload scan' },
+        { status: 409 },
+      );
+    }
+    if (scanJob.status !== 'clean') {
+      return NextResponse.json(
+        { error: 'KYC upload is not available for registration', uploadStatus: scanJob.status },
+        { status: 409 },
+      );
+    }
+    if (!scanJob.verified_mime || !scanJob.byte_size || !scanJob.sha256) {
+      await failCleanScanJob(scanJob.id, user.id, 'clean_scan_evidence_missing');
+      await deleteRejectedUpload(filePath, user.id, 'reject-kyc-missing-scan-evidence');
+      return NextResponse.json({ error: 'KYC scan evidence is incomplete' }, { status: 409 });
     }
 
     const { data: blob, error: downloadError } = await admin.storage
@@ -157,53 +148,111 @@ export async function POST(request: NextRequest) {
       .download(filePath);
 
     if (downloadError || !blob) {
+      await failCleanScanJob(scanJob.id, user.id, 'promoted_kyc_object_missing');
       await reportOperationalError(
         'storage.kyc.object_verification_failed',
-        downloadError ?? 'uploaded KYC object was not returned',
+        downloadError ?? 'promoted KYC object was not returned',
         {
           component: 'storage',
-          operation: 'download-kyc-object-for-verification',
+          operation: 'download-promoted-kyc-for-registration',
           bucket: KYC_BUCKET,
           route: '/api/kyc/documents',
           actorId: user.id,
+          recordId: scanJob.id,
         },
       );
       return NextResponse.json(
-        { error: 'Uploaded KYC object was not found; upload must complete before registration' },
+        { error: 'Verified KYC object was not found' },
         { status: 409 },
       );
     }
 
     if (blob.size <= 0 || blob.size > MAX_FILE_SIZE) {
-      await deleteRejectedUpload(filePath, user.id, 'reject-oversized-kyc');
-      return NextResponse.json({ error: 'Uploaded file exceeds the 10MB limit' }, { status: 400 });
+      await failCleanScanJob(scanJob.id, user.id, 'post_scan_size_mismatch');
+      await deleteRejectedUpload(filePath, user.id, 'reject-post-scan-kyc-size');
+      return NextResponse.json({ error: 'Verified KYC object failed integrity verification' }, { status: 409 });
     }
 
-    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
-    const inspected = inspectSignature(signature, blob.size);
-    if (!inspected) {
-      await deleteRejectedUpload(filePath, user.id, 'reject-invalid-kyc-signature');
-      return NextResponse.json(
-        { error: 'Unsupported KYC document. Upload a real PDF, JPEG, PNG, or WebP file.' },
-        { status: 400 },
-      );
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const validated = validateUploadedBytes(bytes, {
+      maxBytes: MAX_FILE_SIZE,
+      declaredMime: scanJob.verified_mime,
+    });
+    const digest = sha256Hex(bytes);
+    if (
+      !validated ||
+      validated.size !== scanJob.byte_size ||
+      validated.mimeType !== scanJob.verified_mime ||
+      digest !== scanJob.sha256
+    ) {
+      await failCleanScanJob(scanJob.id, user.id, 'post_scan_integrity_mismatch');
+      await deleteRejectedUpload(filePath, user.id, 'reject-post-scan-kyc-integrity');
+      await reportOperationalError('storage.kyc.post_scan_integrity_mismatch', 'promoted KYC bytes changed after scan', {
+        component: 'storage',
+        operation: 'verify-promoted-kyc-integrity',
+        bucket: KYC_BUCKET,
+        route: '/api/kyc/documents',
+        actorId: user.id,
+        recordId: scanJob.id,
+      });
+      return NextResponse.json({ error: 'Verified KYC object failed integrity verification' }, { status: 409 });
     }
 
+    // Registration and cleanup race on the same clean state. Claiming
+    // clean -> registering before creating the document guarantees that only
+    // one path can win; discard uses clean -> failed.
+    const { data: claimed, error: claimError } = await admin
+      .from('upload_scan_jobs')
+      .update({ status: 'registering', updated_at: new Date().toISOString() })
+      .eq('id', scanJob.id)
+      .eq('actor_id', user.id)
+      .eq('status', 'clean')
+      .select('id')
+      .maybeSingle();
+
+    if (claimError) {
+      await reportOperationalError('storage.kyc.registration_claim_failed', claimError, {
+        component: 'storage',
+        operation: 'claim-clean-kyc-registration',
+        bucket: KYC_BUCKET,
+        route: '/api/kyc/documents',
+        actorId: user.id,
+        recordId: scanJob.id,
+      });
+      return NextResponse.json({ error: 'Unable to claim KYC upload for registration' }, { status: 500 });
+    }
+    if (!claimed) {
+      return NextResponse.json({ error: 'KYC upload is already being registered or discarded' }, { status: 409 });
+    }
+
+    const documentId = randomUUID();
     const { data: document, error: insertError } = await admin
       .from('kyc_documents')
       .insert({
+        id: documentId,
         seller_id: user.id,
         document_type: documentType,
         file_path: filePath,
         file_name: fileName,
-        file_size: inspected.size,
-        mime_type: inspected.mimeType,
+        file_size: validated.size,
+        mime_type: validated.mimeType,
         verification_status: 'pending',
+        upload_scan_job_id: scanJob.id,
       })
       .select()
       .single();
 
     if (insertError) {
+      await admin
+        .from('upload_scan_jobs')
+        .update({
+          status: 'failed',
+          scanner_result_code: 'kyc_registration_insert_failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', scanJob.id)
+        .eq('actor_id', user.id)
+        .eq('status', 'registering');
       await deleteRejectedUpload(filePath, user.id, 'rollback-kyc-registration');
       await reportOperationalError('storage.kyc.registration_failed', insertError, {
         component: 'storage',
@@ -211,8 +260,52 @@ export async function POST(request: NextRequest) {
         bucket: KYC_BUCKET,
         route: '/api/kyc/documents',
         actorId: user.id,
+        recordId: scanJob.id,
       });
       return NextResponse.json({ error: 'Failed to save document record' }, { status: 500 });
+    }
+
+    const registeredAt = new Date().toISOString();
+    const { data: registeredJob, error: registrationFinalizeError } = await admin
+      .from('upload_scan_jobs')
+      .update({
+        status: 'registered',
+        registered_at: registeredAt,
+        registered_record_id: documentId,
+        updated_at: registeredAt,
+      })
+      .eq('id', scanJob.id)
+      .eq('actor_id', user.id)
+      .eq('status', 'registering')
+      .select('id')
+      .maybeSingle();
+
+    if (registrationFinalizeError || !registeredJob) {
+      await admin.from('kyc_documents').delete().eq('id', documentId).eq('seller_id', user.id);
+      await admin
+        .from('upload_scan_jobs')
+        .update({
+          status: 'failed',
+          scanner_result_code: 'kyc_registration_finalize_failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', scanJob.id)
+        .eq('actor_id', user.id)
+        .eq('status', 'registering');
+      await deleteRejectedUpload(filePath, user.id, 'rollback-unrecorded-kyc-registration');
+      await reportOperationalError(
+        'storage.kyc.registration_ledger_finalize_failed',
+        registrationFinalizeError ?? 'registration state did not transition',
+        {
+          component: 'storage',
+          operation: 'finalize-kyc-registration-ledger',
+          bucket: KYC_BUCKET,
+          route: '/api/kyc/documents',
+          actorId: user.id,
+          recordId: scanJob.id,
+        },
+      );
+      return NextResponse.json({ error: 'Failed to finalize document registration' }, { status: 500 });
     }
 
     const { data: verificationRequest } = await admin

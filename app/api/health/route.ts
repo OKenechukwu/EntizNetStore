@@ -10,6 +10,7 @@ type CheckStatus = 'ok' | 'degraded' | 'unavailable'
 const requiredStorageBuckets = [
   { id: 'kyc-documents', public: false },
   { id: 'message-attachments', public: false },
+  { id: 'upload-quarantine', public: false },
   { id: 'product-media', public: true },
   { id: 'seller-branding', public: true },
 ] as const
