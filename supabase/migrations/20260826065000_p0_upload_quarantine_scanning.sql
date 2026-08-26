@@ -51,10 +51,12 @@ create table if not exists public.upload_scan_jobs (
   updated_at timestamptz not null default now(),
   scanned_at timestamptz,
   promoted_at timestamptz,
+  registered_at timestamptz,
+  registered_record_id uuid,
   constraint upload_scan_jobs_purpose_check
     check (purpose in ('product_media', 'kyc', 'seller_branding', 'message_attachment')),
   constraint upload_scan_jobs_status_check
-    check (status in ('pending_upload', 'scanning', 'clean', 'blocked', 'failed')),
+    check (status in ('pending_upload', 'scanning', 'clean', 'registering', 'registered', 'blocked', 'failed')),
   constraint upload_scan_jobs_quarantine_path_check
     check (
       char_length(quarantine_path) between 8 and 500
@@ -98,7 +100,7 @@ create table if not exists public.upload_scan_jobs (
     check (scanner_result_code is null or (char_length(scanner_result_code) between 1 and 120 and scanner_result_code !~ '[[:cntrl:]]')),
   constraint upload_scan_jobs_clean_evidence_check
     check (
-      status <> 'clean'
+      status not in ('clean', 'registering', 'registered')
       or (
         verified_mime is not null
         and byte_size is not null
@@ -108,6 +110,21 @@ create table if not exists public.upload_scan_jobs (
         and scanned_at is not null
         and promoted_at is not null
       )
+    ),
+  constraint upload_scan_jobs_registration_state_check
+    check (
+      status not in ('registering', 'registered')
+      or purpose = 'kyc'
+    ),
+  constraint upload_scan_jobs_registered_evidence_check
+    check (
+      status <> 'registered'
+      or (registered_at is not null and registered_record_id is not null)
+    ),
+  constraint upload_scan_jobs_registration_metadata_check
+    check (
+      (registered_at is null and registered_record_id is null)
+      or status = 'registered'
     )
 );
 
@@ -121,5 +138,20 @@ create index if not exists idx_upload_scan_jobs_status_created
   on public.upload_scan_jobs(status, created_at desc);
 create index if not exists idx_upload_scan_jobs_purpose_created
   on public.upload_scan_jobs(purpose, created_at desc);
+
+alter table public.kyc_documents
+  add column if not exists upload_scan_job_id uuid;
+
+alter table public.kyc_documents
+  drop constraint if exists kyc_documents_upload_scan_job_id_fkey;
+alter table public.kyc_documents
+  add constraint kyc_documents_upload_scan_job_id_fkey
+  foreign key (upload_scan_job_id)
+  references public.upload_scan_jobs(id)
+  on delete restrict;
+
+create unique index if not exists idx_kyc_documents_upload_scan_job_id
+  on public.kyc_documents(upload_scan_job_id)
+  where upload_scan_job_id is not null;
 
 commit;
