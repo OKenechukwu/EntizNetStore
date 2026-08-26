@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { abandonQuarantinedUpload } from '@/lib/storage/abandonQuarantine'
 import {
   PRODUCT_MEDIA_BUCKET,
   PRODUCT_MEDIA_MAX_FILE_SIZE,
@@ -184,7 +185,24 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const body = (await request.json()) as { filePath?: string; publicUrl?: string }
+    const body = (await request.json()) as {
+      uploadId?: string
+      filePath?: string
+      publicUrl?: string
+    }
+
+    if (body.uploadId) {
+      const abandoned = await abandonQuarantinedUpload({
+        uploadId: body.uploadId,
+        actorId: auth.user.id,
+      })
+      if (!abandoned.ok) {
+        const status = abandoned.code === 'not_found' ? 404 : 409
+        return NextResponse.json({ error: 'Unable to abandon quarantine upload', code: abandoned.code }, { status })
+      }
+      return NextResponse.json({ abandoned: true })
+    }
+
     const configuredUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
     let filePath = body.filePath ?? null
 
