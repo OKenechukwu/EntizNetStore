@@ -52,7 +52,9 @@ requireFragments('supabase/migrations/20260826065000_p0_upload_quarantine_scanni
   'registered_at',
   'registered_record_id',
   'upload_scan_job_id',
-  'upload_scan_jobs_registration_evidence_check',
+  'upload_scan_jobs_registration_state_check',
+  'upload_scan_jobs_registered_evidence_check',
+  'upload_scan_jobs_registration_metadata_check',
 ])
 
 requireFragments('app/api/kyc/documents/route.ts', [
