@@ -67,6 +67,7 @@ if (!exists("lib/supabase/proxy.ts")) {
     'request.cookies.getAll()',
     'request.cookies.set(name, value)',
     'response.cookies.set(name, value, options)',
+    'response.headers.set("Cache-Control", "private, no-store, max-age=0")',
     'supabase.auth.getClaims()',
   ]) {
     if (!supabaseProxy.includes(requiredFragment)) {
