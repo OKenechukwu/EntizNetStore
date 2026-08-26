@@ -60,17 +60,20 @@ requireFragments('app/api/kyc/documents/route.ts', [
   "status: 'registered'",
   'upload_scan_job_id',
   'sha256Hex',
-  "eq('status', 'clean')",
+  ".eq('status', 'clean')",
 ])
 
 requireFragments('lib/storage/quarantine.ts', [
-  "eq('status', 'pending_upload')",
-  "eq('status', 'scanning')",
-  'scan_claim_conflict',
+  'async function transitionJob(',
+  'expectedStatus: UploadScanStatus',
+  ".eq('actor_id', actorId)",
+  ".eq('status', expectedStatus)",
+  "transitionJob(job.id, input.actorId, 'pending_upload'",
+  "transitionJob(job.id, input.actorId, 'scanning'",
 ])
 
 requireFragments('lib/storage/discardKycUpload.ts', [
-  "eq('status', 'clean')",
+  ".eq('status', 'clean')",
   'already_finalized',
 ])
 
