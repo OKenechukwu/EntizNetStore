@@ -84,11 +84,6 @@ export default async function AdminLandingPage() {
             <p className="text-sm opacity-70">{operation.description}</p>
           </Link>
         ))}
-
-        <Link href="/admin/i18n/seed" className="block rounded-xl border border-dashed p-6 transition hover:shadow-md">
-          <h2 className="mb-1 text-lg font-semibold">Translation Seeding</h2>
-          <p className="text-sm opacity-70">Restricted utility for seeding i18n translations. This is not a routine marketplace operation.</p>
-        </Link>
       </div>
     </div>
   );
