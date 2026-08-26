@@ -110,6 +110,13 @@ jobs:
             exit "$status"
           }
 
+          APP_ORIGIN=http://127.0.0.1:3000 npm run test:upload-safety-http || {
+            status=$?
+            echo "Upload safety lifecycle HTTP regression failed; server log follows"
+            cat /tmp/entiznetstore-http.log
+            exit "$status"
+          }
+
           APP_ORIGIN=http://127.0.0.1:3000 node scripts/test-checkout-http-boundary.mjs || {
             status=$?
             echo "Checkout HTTP boundary regression failed; server log follows"
