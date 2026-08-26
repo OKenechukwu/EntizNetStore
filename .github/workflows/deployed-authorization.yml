@@ -83,4 +83,5 @@ jobs:
           DEPLOYED_AUTH_SUPABASE_ANON_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_ANON_KEY }}
           DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
           DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ vars.ENTIZNETSTORE_PRODUCTION_SUPABASE_URL }}
-        run: node scripts/test-deployed-auth-authorization.mjs
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node --import ./scripts/deployed-vercel-bypass.mjs scripts/test-deployed-auth-authorization.mjs
