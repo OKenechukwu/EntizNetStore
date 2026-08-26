@@ -21,6 +21,7 @@ const png = Buffer.from(
 const cases = [
   { bucket: 'kyc-documents', expectedPublic: false, path: `boundary-test/${runId}/kyc.png` },
   { bucket: 'message-attachments', expectedPublic: false, path: `boundary-test/${runId}/message.png` },
+  { bucket: 'upload-quarantine', expectedPublic: false, path: `boundary-test/${runId}/quarantine.png` },
   { bucket: 'product-media', expectedPublic: true, path: `boundary-test/${runId}/product.png` },
   { bucket: 'seller-branding', expectedPublic: true, path: `boundary-test/${runId}/branding.png` },
 ]
