@@ -18,7 +18,7 @@ export async function updateSupabaseSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet, headers) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -28,9 +28,13 @@ export async function updateSupabaseSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
-          Object.entries(headers).forEach(([key, value]) =>
-            response.headers.set(key, value),
-          );
+
+          // The pinned @supabase/ssr release predates the newer setAll(...,
+          // headers) callback. Preserve the same cache-safety invariant
+          // explicitly whenever auth cookies are rotated.
+          response.headers.set("Cache-Control", "private, no-store, max-age=0");
+          response.headers.set("Pragma", "no-cache");
+          response.headers.set("Expires", "0");
         },
       },
     },
