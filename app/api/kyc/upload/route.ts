@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { abandonQuarantinedUpload } from '@/lib/storage/abandonQuarantine'
 import {
   extensionForUploadMime,
   finalizeQuarantinedUpload,
@@ -170,6 +171,42 @@ export async function PUT(request: NextRequest) {
     await reportOperationalError('storage.kyc.finalize_route_failed', error, {
       component: 'storage',
       operation: 'finalize-kyc-quarantine',
+      bucket: 'upload-quarantine',
+      route: '/api/kyc/upload',
+    })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireSeller()
+    if (!auth.user) {
+      return NextResponse.json(
+        { error: auth.status === 401 ? 'Unauthorized' : 'Seller capability required' },
+        { status: auth.status },
+      )
+    }
+
+    const body = (await request.json()) as { uploadId?: string }
+    if (!body.uploadId) {
+      return NextResponse.json({ error: 'Upload ID is required' }, { status: 400 })
+    }
+
+    const abandoned = await abandonQuarantinedUpload({
+      uploadId: body.uploadId,
+      actorId: auth.user.id,
+    })
+    if (!abandoned.ok) {
+      const status = abandoned.code === 'not_found' ? 404 : 409
+      return NextResponse.json({ error: 'Unable to abandon KYC upload', code: abandoned.code }, { status })
+    }
+
+    return NextResponse.json({ abandoned: true })
+  } catch (error) {
+    await reportOperationalError('storage.kyc.abandon_route_failed', error, {
+      component: 'storage',
+      operation: 'abandon-kyc-quarantine',
       bucket: 'upload-quarantine',
       route: '/api/kyc/upload',
     })
