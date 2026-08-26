@@ -75,8 +75,10 @@ requireFragments('lib/storage/quarantine.ts', [
 ])
 
 requireFragments('lib/storage/discardKycUpload.ts', [
+  "data.status === 'registered'",
+  "data.status === 'registering' || data.status === 'scanning'",
+  "scanner_result_code: 'registration_abandoned_cleanup_pending'",
   ".eq('status', 'clean')",
-  'already_finalized',
 ])
 
 if (failures.length) {
