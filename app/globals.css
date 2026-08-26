@@ -267,7 +267,9 @@ html, body {
    borders, and decorative accents. Text rendered on light surfaces uses a
    deeper gold that preserves the brand hue while meeting WCAG AA. */
 [data-theme="light"] .text-brand-secondary,
-[data-theme="light"] .text-accent-gold {
+[data-theme="light"] .text-accent-gold,
+[data-theme="light"] .hover\:text-brand-secondary:hover,
+[data-theme="light"] .group:hover .group-hover\:text-brand-secondary {
   color: #705c00;
 }
 
