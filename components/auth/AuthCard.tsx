@@ -15,6 +15,14 @@ import {
 type Role = 'buyer' | 'seller' | 'bsm';
 type Mode = 'signin' | 'signup';
 type Variant = 'combined' | 'signin';
+type AuthField = 'email' | 'password' | 'phone' | 'address';
+
+type PhotonFeature = {
+  properties?: {
+    label?: string;
+    name?: string;
+  };
+};
 
 function safeInternalNext(value: string | null): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
@@ -43,18 +51,42 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invalidField, setInvalidField] = useState<AuthField | null>(null);
   const [log, setLog] = useState('');
 
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [addrOpen, setAddrOpen] = useState(false);
   const [addrSuggestions, setAddrSuggestions] = useState<string[]>([]);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
   const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const append = (m: string) => setLog((s) => s + m + '\n');
+  const append = (message: string) => setLog((current) => current + message + '\n');
   const clear = () => {
     setError(null);
+    setInvalidField(null);
     setLog('');
+  };
+
+  const focusField = (field: AuthField) => {
+    const target = {
+      email: emailRef,
+      password: passwordRef,
+      phone: phoneRef,
+      address: addressRef,
+    }[field];
+    target.current?.focus();
+  };
+
+  const failValidation = (field: AuthField, message: string) => {
+    setError(message);
+    setInvalidField(field);
+    focusField(field);
   };
 
   useEffect(() => {
@@ -68,33 +100,82 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
     }
   }, [params, variant]);
 
-  const fetchAddr = async (q: string) => {
-    if (!q || q.length < 3) {
+  useEffect(
+    () => () => {
+      if (addrTimer.current) clearTimeout(addrTimer.current);
+    },
+    [],
+  );
+
+  const fetchAddr = async (query: string) => {
+    if (!query || query.length < 3) {
       setAddrSuggestions([]);
+      setActiveSuggestion(-1);
       return;
     }
     try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`);
-      const data = await res.json();
-      const list = (data?.features || [])
-        .map((f: any) => f?.properties?.label || f?.properties?.name)
-        .filter(Boolean);
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+      if (!res.ok) throw new Error('address_lookup_failed');
+      const data = (await res.json()) as { features?: PhotonFeature[] };
+      const list = (data.features || [])
+        .map((feature) => feature.properties?.label || feature.properties?.name)
+        .filter((value): value is string => Boolean(value));
       setAddrSuggestions(list);
+      setActiveSuggestion(-1);
+      setAddrOpen(list.length > 0);
     } catch {
       setAddrSuggestions([]);
+      setActiveSuggestion(-1);
+      setAddrOpen(false);
     }
   };
 
-  const onAddrInput = (v: string) => {
-    setAddress(v);
+  const onAddrInput = (value: string) => {
+    setAddress(value);
     setAddrOpen(true);
+    setActiveSuggestion(-1);
+    if (invalidField === 'address') {
+      setInvalidField(null);
+      setError(null);
+    }
     if (addrTimer.current) clearTimeout(addrTimer.current);
-    addrTimer.current = setTimeout(() => fetchAddr(v), 300);
+    addrTimer.current = setTimeout(() => void fetchAddr(value), 300);
   };
 
-  const selectAddr = (v: string) => {
-    setAddress(v);
+  const selectAddr = (value: string) => {
+    setAddress(value);
     setAddrOpen(false);
+    setActiveSuggestion(-1);
+    addressRef.current?.focus();
+  };
+
+  const onAddressKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setAddrOpen(false);
+      setActiveSuggestion(-1);
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      if (addrSuggestions.length === 0) return;
+      event.preventDefault();
+      setAddrOpen(true);
+      setActiveSuggestion((current) => Math.min(current + 1, addrSuggestions.length - 1));
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      if (addrSuggestions.length === 0) return;
+      event.preventDefault();
+      setAddrOpen(true);
+      setActiveSuggestion((current) => (current <= 0 ? addrSuggestions.length - 1 : current - 1));
+      return;
+    }
+
+    if (event.key === 'Enter' && addrOpen && activeSuggestion >= 0) {
+      event.preventDefault();
+      selectAddr(addrSuggestions[activeSuggestion]);
+    }
   };
 
   const goAfterAuth = async () => {
@@ -119,21 +200,33 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
   const handleSubmit = async () => {
     clear();
 
-    if (!email) return setError('Please enter your email.');
-    if (!password) return setError('Please enter your password.');
+    if (!email) {
+      failValidation('email', 'Please enter your email.');
+      return;
+    }
+    if (!password) {
+      failValidation('password', 'Please enter your password.');
+      return;
+    }
     if (mode === 'signup') {
-      if (!phone) return setError('Please enter your phone number.');
-      if (!address) return setError('Please enter your address.');
+      if (!phone) {
+        failValidation('phone', 'Please enter your phone number.');
+        return;
+      }
+      if (!address) {
+        failValidation('address', 'Please enter your address.');
+        return;
+      }
     }
 
     setBusy(true);
     try {
       if (mode === 'signin') {
         append('Signing in…');
-        const { error } = await signInWithPassword(email, password);
-        if (error) {
-          setError(error.message);
-          append(`Error: ${error.message}`);
+        const { error: signInError } = await signInWithPassword(email, password);
+        if (signInError) {
+          setError(signInError.message);
+          append(`Error: ${signInError.message}`);
         } else {
           append('Signed in ✓');
           await goAfterAuth();
@@ -166,10 +259,10 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
         append('Account created. Please verify your email, then sign in.');
         if (variant === 'combined') setMode('signin');
       }
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      setError(msg);
-      append(`Unexpected error: ${msg}`);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
+      append(`Unexpected error: ${message}`);
     } finally {
       setBusy(false);
     }
@@ -216,6 +309,8 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
       </button>
     ) : null;
 
+  const errorId = error ? 'auth-form-error' : undefined;
+
   return (
     <div className="w-full max-w-xl px-4">
       <h1 className="text-2xl font-semibold mb-6 text-center">Welcome to EntizNet</h1>
@@ -236,6 +331,7 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
 
       <form
         className="rounded-xl bg-gray-200 p-6 shadow-sm"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           if (!busy) void handleSubmit();
@@ -245,13 +341,22 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
           <div>
             <label htmlFor="auth-email" className="block text-sm font-medium mb-2">Email address</label>
             <input
+              ref={emailRef}
               id="auth-email"
               className="w-full border rounded px-3 py-2 bg-white"
               placeholder="your@email.com"
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (invalidField === 'email') {
+                  setInvalidField(null);
+                  setError(null);
+                }
+              }}
+              aria-invalid={invalidField === 'email' || undefined}
+              aria-describedby={invalidField === 'email' ? errorId : undefined}
               disabled={busy}
             />
             {mode === 'signup' && (
@@ -263,18 +368,27 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             <label htmlFor="auth-password" className="block text-sm font-medium mb-2">Password</label>
             <div className="relative">
               <input
+                ref={passwordRef}
                 id="auth-password"
                 className="w-full border rounded px-3 py-2 bg-white pr-24"
                 placeholder={mode === 'signin' ? 'Your password' : 'Create a password'}
                 type={showPw ? 'text' : 'password'}
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (invalidField === 'password') {
+                    setInvalidField(null);
+                    setError(null);
+                  }
+                }}
+                aria-invalid={invalidField === 'password' || undefined}
+                aria-describedby={invalidField === 'password' ? errorId : undefined}
                 disabled={busy}
               />
               <button
                 type="button"
-                onClick={() => setShowPw((s) => !s)}
+                onClick={() => setShowPw((current) => !current)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 border rounded"
                 aria-label={showPw ? 'Hide password' : 'Show password'}
                 disabled={busy}
@@ -299,13 +413,22 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
               <div>
                 <label htmlFor="auth-phone" className="block text-sm font-medium mb-2">Phone number</label>
                 <input
+                  ref={phoneRef}
                   id="auth-phone"
                   className="w-full border rounded px-3 py-2 bg-white"
                   placeholder={role === 'buyer' ? '+49 123 4567890' : '+49 160 1234567'}
                   type="tel"
                   autoComplete="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(event) => {
+                    setPhone(event.target.value);
+                    if (invalidField === 'phone') {
+                      setInvalidField(null);
+                      setError(null);
+                    }
+                  }}
+                  aria-invalid={invalidField === 'phone' || undefined}
+                  aria-describedby={invalidField === 'phone' ? errorId : undefined}
                   disabled={busy}
                 />
                 <p className="text-xs mt-1 opacity-70">{phoneHelp}</p>
@@ -314,33 +437,59 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
               <div className="relative">
                 <label htmlFor="auth-address" className="block text-sm font-medium mb-2">Address</label>
                 <input
+                  ref={addressRef}
                   id="auth-address"
                   className="w-full border rounded px-3 py-2 bg-white"
                   placeholder="Street, city, country…"
                   type="text"
+                  role="combobox"
                   autoComplete="street-address"
+                  aria-autocomplete="list"
+                  aria-expanded={addrOpen && addrSuggestions.length > 0}
+                  aria-controls="auth-address-suggestions"
+                  aria-activedescendant={
+                    addrOpen && activeSuggestion >= 0
+                      ? `auth-address-suggestion-${activeSuggestion}`
+                      : undefined
+                  }
+                  aria-invalid={invalidField === 'address' || undefined}
+                  aria-describedby={invalidField === 'address' ? errorId : undefined}
                   value={address}
-                  onChange={(e) => onAddrInput(e.target.value)}
-                  onFocus={() => addrSuggestions.length && setAddrOpen(true)}
+                  onChange={(event) => onAddrInput(event.target.value)}
+                  onFocus={() => {
+                    if (addrSuggestions.length > 0) setAddrOpen(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setAddrOpen(false), 100);
+                  }}
+                  onKeyDown={onAddressKeyDown}
                   disabled={busy}
                 />
                 <p className="text-xs mt-1 opacity-70">{addressHelp}</p>
 
                 {addrOpen && addrSuggestions.length > 0 && (
                   <ul
+                    id="auth-address-suggestions"
+                    role="listbox"
+                    aria-label="Address suggestions"
                     className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow"
-                    onMouseLeave={() => setAddrOpen(false)}
                   >
-                    {addrSuggestions.map((s, i) => (
+                    {addrSuggestions.map((suggestion, index) => (
                       <li
-                        key={`${s}-${i}`}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectAddr(s);
+                        id={`auth-address-suggestion-${index}`}
+                        role="option"
+                        aria-selected={activeSuggestion === index}
+                        key={`${suggestion}-${index}`}
+                        onMouseEnter={() => setActiveSuggestion(index)}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          selectAddr(suggestion);
                         }}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                        className={`px-3 py-2 cursor-pointer text-sm ${
+                          activeSuggestion === index ? 'bg-gray-100' : 'hover:bg-gray-100'
+                        }`}
                       >
-                        {s}
+                        {suggestion}
                       </li>
                     ))}
                   </ul>
@@ -349,7 +498,7 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             </>
           )}
 
-          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+          {error && <p id="auth-form-error" className="text-sm text-red-600" role="alert">{error}</p>}
 
           <button className="luxury-button-outline w-full py-2 disabled:opacity-60" disabled={busy} type="submit">
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
