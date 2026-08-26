@@ -102,21 +102,23 @@ export async function getCurrentSession(): Promise<Session | null> {
 }
 
 // Capability creation and mutation are server-only through trusted /api routes.
-// Browser code may read the current user's profiles through RLS.
+// Browser code may read the current user's profiles through RLS. Capability
+// absence is expected in the additive account model, so maybeSingle() is used to
+// avoid turning a legitimate zero-row result into a noisy PostgREST HTTP 406.
 export async function getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
-  const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles_buyer').select('*').eq('id', userId).maybeSingle();
   if (error) return null;
   return data;
 }
 
 export async function getSellerProfile(userId: string): Promise<SellerProfile | null> {
-  const { data, error } = await supabase.from('profiles_seller').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles_seller').select('*').eq('id', userId).maybeSingle();
   if (error) return null;
   return data;
 }
 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
-  const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles_business').select('*').eq('id', userId).maybeSingle();
   if (error) return null;
   return data;
 }
