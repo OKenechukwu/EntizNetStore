@@ -17,6 +17,7 @@ export type UploadScanContext = {
 const MAX_TIMEOUT_MS = 30_000;
 const MIN_TIMEOUT_MS = 1_000;
 const DEFAULT_TIMEOUT_MS = 12_000;
+const MAX_RESPONSE_BYTES = 64 * 1024;
 const EICAR_MARKER = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
 
 function boundedText(value: unknown, fallback: string, max = 120) {
@@ -106,11 +107,30 @@ export async function scanUploadBytes(
     };
   }
 
-  if (url.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && url.hostname === '127.0.0.1')) {
+  if (url.username || url.password || url.hash) {
+    return {
+      verdict: 'unavailable',
+      scanner: 'configuration',
+      code: 'scanner_endpoint_unsafe',
+    };
+  }
+
+  const localDevelopmentEndpoint = process.env.NODE_ENV !== 'production' &&
+    (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+  if (url.protocol !== 'https:' && !localDevelopmentEndpoint) {
     return {
       verdict: 'unavailable',
       scanner: 'configuration',
       code: 'scanner_endpoint_must_use_https',
+    };
+  }
+
+  const token = process.env.UPLOAD_SCANNER_TOKEN?.trim();
+  if (process.env.NODE_ENV === 'production' && !token) {
+    return {
+      verdict: 'unavailable',
+      scanner: 'configuration',
+      code: 'scanner_token_missing',
     };
   }
 
@@ -119,8 +139,8 @@ export async function scanUploadBytes(
     'Content-Type': 'application/octet-stream',
     'X-EntizNetStore-Content-Type': boundedText(context.mimeType, 'application/octet-stream', 100),
     'X-EntizNetStore-SHA256': sha256,
+    Accept: 'application/json',
   };
-  const token = process.env.UPLOAD_SCANNER_TOKEN?.trim();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
@@ -130,6 +150,7 @@ export async function scanUploadBytes(
       body: bytes,
       signal: AbortSignal.timeout(configuredTimeout()),
       cache: 'no-store',
+      redirect: 'error',
     });
 
     if (!response.ok) {
@@ -140,13 +161,37 @@ export async function scanUploadBytes(
       };
     }
 
-    const payload = (await response.json().catch(() => null)) as null | {
-      verdict?: unknown;
-      scanner?: unknown;
-      engine?: unknown;
-      version?: unknown;
-      code?: unknown;
-    };
+    const contentLength = Number.parseInt(response.headers.get('content-length') || '', 10);
+    if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+      return {
+        verdict: 'unavailable',
+        scanner: 'remote',
+        code: 'scanner_response_too_large',
+      };
+    }
+
+    const responseText = await response.text();
+    if (Buffer.byteLength(responseText, 'utf8') > MAX_RESPONSE_BYTES) {
+      return {
+        verdict: 'unavailable',
+        scanner: 'remote',
+        code: 'scanner_response_too_large',
+      };
+    }
+
+    const payload = (() => {
+      try {
+        return JSON.parse(responseText) as {
+          verdict?: unknown;
+          scanner?: unknown;
+          engine?: unknown;
+          version?: unknown;
+          code?: unknown;
+        };
+      } catch {
+        return null;
+      }
+    })();
     if (!payload || (payload.verdict !== 'clean' && payload.verdict !== 'blocked')) {
       return {
         verdict: 'unavailable',
@@ -165,7 +210,7 @@ export async function scanUploadBytes(
     return {
       verdict: 'unavailable',
       scanner: 'remote',
-      code: error instanceof Error && error.name === 'TimeoutError'
+      code: error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
         ? 'scanner_timeout'
         : 'scanner_request_failed',
     };
