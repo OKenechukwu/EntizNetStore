@@ -499,7 +499,7 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
             </>
           )}
 
-          {error && <p id="auth-form-error" className="text-sm text-red-600" role="alert">{error}</p>}
+          {error && <p id="auth-form-error" className="text-sm text-red-700" role="alert">{error}</p>}
 
           <button className="luxury-button-outline w-full py-2 disabled:opacity-60" disabled={busy} type="submit">
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
