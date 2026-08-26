@@ -28,6 +28,7 @@ export default function KYCDocumentUploader({
   const handleFileUpload = async (file: File) => {
     setIsUploading(true)
     setUploadProgress(0)
+    let uploadId: string | null = null
 
     try {
       const uploadResponse = await fetch('/api/kyc/upload', {
@@ -44,6 +45,7 @@ export default function KYCDocumentUploader({
       if (!uploadResponse.ok || !initialized.uploadURL || !initialized.uploadId) {
         throw new Error(initialized.error || 'Failed to initialize secure upload')
       }
+      uploadId = initialized.uploadId
 
       setUploadProgress(20)
       const uploadFileResponse = await fetch(initialized.uploadURL, {
@@ -59,7 +61,7 @@ export default function KYCDocumentUploader({
       const finalizeResponse = await fetch('/api/kyc/upload', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadId: initialized.uploadId }),
+        body: JSON.stringify({ uploadId }),
       })
       const finalized = await finalizeResponse.json().catch(() => ({}))
       if (!finalizeResponse.ok || !finalized.filePath) {
@@ -83,9 +85,17 @@ export default function KYCDocumentUploader({
         throw new Error(saved.error || 'Failed to register verified document')
       }
 
+      uploadId = null
       setUploadProgress(100)
       onUploadComplete(documentType, file.name)
     } catch (error) {
+      if (uploadId) {
+        await fetch('/api/kyc/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uploadId }),
+        }).catch(() => undefined)
+      }
       console.error('KYC upload failed')
       alert(error instanceof Error ? error.message : 'Failed to upload document. Please try again.')
     } finally {
