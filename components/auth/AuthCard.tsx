@@ -331,7 +331,6 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
 
       <form
         className="rounded-xl bg-gray-200 p-6 shadow-sm"
-        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           if (!busy) void handleSubmit();
@@ -446,7 +445,9 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
                   autoComplete="street-address"
                   aria-autocomplete="list"
                   aria-expanded={addrOpen && addrSuggestions.length > 0}
-                  aria-controls="auth-address-suggestions"
+                  aria-controls={
+                    addrOpen && addrSuggestions.length > 0 ? 'auth-address-suggestions' : undefined
+                  }
                   aria-activedescendant={
                     addrOpen && activeSuggestion >= 0
                       ? `auth-address-suggestion-${activeSuggestion}`
