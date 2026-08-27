@@ -98,17 +98,17 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       </div>
 
       <form method="get" className="mb-6 grid gap-3 rounded-xl border p-4 lg:grid-cols-[1fr_170px_170px_170px_auto]">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="Order, user, storefront or payment reference" className="rounded-md border px-3 py-2" />
-        <select name="orderStatus" defaultValue={orderStatus} className="rounded-md border px-3 py-2">
+        <input aria-label="Search orders" name="query" defaultValue={query} maxLength={200} placeholder="Order, user, storefront or payment reference" className="rounded-md border px-3 py-2" />
+        <select aria-label="Order status" name="orderStatus" defaultValue={orderStatus} className="rounded-md border px-3 py-2">
           {orderStatuses.map((value) => <option key={value} value={value}>{value === "all" ? "All order states" : value}</option>)}
         </select>
-        <select name="paymentStatus" defaultValue={paymentStatus} className="rounded-md border px-3 py-2">
+        <select aria-label="Payment status" name="paymentStatus" defaultValue={paymentStatus} className="rounded-md border px-3 py-2">
           {paymentStatuses.map((value) => <option key={value} value={value}>{value === "all" ? "All payment states" : value.replaceAll("_", " ")}</option>)}
         </select>
-        <select name="fulfillmentStatus" defaultValue={fulfillmentStatus} className="rounded-md border px-3 py-2">
+        <select aria-label="Fulfillment status" name="fulfillmentStatus" defaultValue={fulfillmentStatus} className="rounded-md border px-3 py-2">
           {fulfillmentStatuses.map((value) => <option key={value} value={value}>{value === "all" ? "All fulfillment states" : value}</option>)}
         </select>
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">Search</button>
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">Search</button>
       </form>
 
       {ordersError ? (
