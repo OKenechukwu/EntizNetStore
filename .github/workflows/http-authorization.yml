@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  deployment_status:
 
 permissions:
   contents: read
@@ -15,6 +16,10 @@ concurrency:
 
 jobs:
   http-authorization:
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+      startsWith(github.event.deployment.ref, 'codex/'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

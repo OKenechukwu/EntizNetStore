@@ -65,29 +65,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const getInitialSession = async () => {
+    let active = true;
+
+    // The explicit initial hydration owns the initial `loading` lifecycle.
+    // Supabase also emits INITIAL_SESSION when the auth listener is registered.
+    // That event must not independently set `loading` to false: it can arrive
+    // before the profile/capability queries below finish and briefly expose
+    // `user === null` to protected client routes, causing valid sessions to be
+    // redirected to sign-in. This race was reproduced by the authenticated
+    // Chromium release gate on /dashboard/profile.
+    const hydrateInitialUser = async () => {
       setLoading(true);
       try {
         await refreshProfile();
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
-    void getInitialSession();
+    void hydrateInitialUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+
       if (event === 'SIGNED_OUT' || !session) {
-        setUser(null);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await refreshProfile();
+        // Ignore INITIAL_SESSION here. The explicit initial hydration above is
+        // authoritative for both authenticated and anonymous first load.
+        if (event !== 'INITIAL_SESSION') {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
       }
-      setLoading(false);
+
+      // INITIAL_SESSION with a session is deliberately ignored for the same
+      // reason: initial hydration already owns it. Subsequent auth changes are
+      // re-hydrated and keep the route guarded until capability state is ready.
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        setLoading(true);
+        void refreshProfile().finally(() => {
+          if (active) setLoading(false);
+        });
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignOut = async () => {

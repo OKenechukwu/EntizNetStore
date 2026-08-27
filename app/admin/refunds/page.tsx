@@ -91,11 +91,11 @@ export default async function AdminRefundsPage({ searchParams }: { searchParams:
       </div>
 
       <form method="get" className="mb-6 grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_220px_auto]">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="Order, refund, user, storefront or provider reference" className="rounded-md border px-3 py-2" />
-        <select name="status" defaultValue={status} className="rounded-md border px-3 py-2">
+        <input aria-label="Search refunds" name="query" defaultValue={query} maxLength={200} placeholder="Order, refund, user, storefront or provider reference" className="rounded-md border px-3 py-2" />
+        <select aria-label="Refund status" name="status" defaultValue={status} className="rounded-md border px-3 py-2">
           {statuses.map((value) => <option key={value} value={value}>{value === "all" ? "All refund states" : value.replaceAll("_", " ")}</option>)}
         </select>
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
       </form>
 
       {loadError ? (
