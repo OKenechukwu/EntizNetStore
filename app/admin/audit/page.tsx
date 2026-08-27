@@ -60,9 +60,9 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: S
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4"><div><Link href="/admin" className="text-sm text-sky-700 hover:underline">← Admin dashboard</Link><h1 className="mt-2 text-3xl font-bold">Operational audit log</h1><p className="mt-1 max-w-3xl text-sm opacity-70">Search immutable Admin actions across account suspensions, KYC, moderation, disputes, refunds, payouts and other trusted operations.</p></div><div className="text-sm opacity-70">{total.toLocaleString()} audit event{total === 1 ? "" : "s"}</div></div>
 
       <form method="get" className="mb-6 grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_240px_auto]">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="Admin, action, target type or target ID" className="rounded-md border px-3 py-2" />
-        <input name="action" defaultValue={action === "all" ? "" : action} maxLength={100} placeholder="Exact action (optional)" className="rounded-md border px-3 py-2" />
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
+        <input aria-label="Search audit events" name="query" defaultValue={query} maxLength={200} placeholder="Admin, action, target type or target ID" className="rounded-md border px-3 py-2" />
+        <input aria-label="Audit action" name="action" defaultValue={action === "all" ? "" : action} maxLength={100} placeholder="Exact action (optional)" className="rounded-md border px-3 py-2" />
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
       </form>
 
       {loadError ? <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800">Unable to load audit history.</div> : rows.length === 0 ? <div className="rounded-xl border p-10 text-center"><h2 className="font-semibold">No audit events match these filters</h2></div> : (
