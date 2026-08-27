@@ -133,10 +133,10 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
 
       <h2 className="mb-3 text-xl font-semibold">Global transaction search</h2>
       <form method="get" className="mb-6 grid gap-3 rounded-xl border p-4 lg:grid-cols-[1fr_180px_180px_auto]">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="ID, order, email, provider reference" className="rounded-md border px-3 py-2" />
-        <select name="type" defaultValue={type} className="rounded-md border px-3 py-2">{types.map((value) => <option key={value} value={value}>{value === "all" ? "All transaction types" : value}</option>)}</select>
-        <input name="status" defaultValue={status === "all" ? "" : status} maxLength={50} placeholder="Status (optional)" className="rounded-md border px-3 py-2" />
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
+        <input aria-label="Search financial transactions" name="query" defaultValue={query} maxLength={200} placeholder="ID, order, email, provider reference" className="rounded-md border px-3 py-2" />
+        <select aria-label="Transaction type" name="type" defaultValue={type} className="rounded-md border px-3 py-2">{types.map((value) => <option key={value} value={value}>{value === "all" ? "All transaction types" : value}</option>)}</select>
+        <input aria-label="Transaction status" name="status" defaultValue={status === "all" ? "" : status} maxLength={50} placeholder="Status (optional)" className="rounded-md border px-3 py-2" />
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
       </form>
 
       {transactionError ? <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800">Unable to load transaction search. No marketplace state was changed.</div> : transactions.length === 0 ? <div className="rounded-xl border p-10 text-center"><h3 className="font-semibold">No transactions match these filters</h3></div> : (
