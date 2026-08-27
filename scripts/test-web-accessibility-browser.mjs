@@ -340,10 +340,19 @@ async function assertAuthValidationAndKeyboard(page) {
   assert.equal(await formError.innerText(), "Please enter your address.");
   await assertFocusedInViewport(page, address, "signup address validation with compact visual viewport");
 
+  // Keep this section keyboard-only. A Playwright click earlier in the form can
+  // leave the virtual pointer over the listbox when it appears, legitimately
+  // triggering an option's onMouseEnter and contaminating keyboard state.
+  await page.mouse.move(0, 0);
   await address.fill("Bag");
   const listbox = page.getByRole("listbox", { name: "Address suggestions" });
   await listbox.waitFor({ state: "visible" });
   assert.equal(await address.getAttribute("aria-expanded"), "true");
+  assert.equal(
+    await address.getAttribute("aria-activedescendant"),
+    null,
+    "fresh keyboard-only address suggestions should open without a preselected option",
+  );
   await page.keyboard.press("ArrowDown");
   assert.equal(
     await address.getAttribute("aria-activedescendant"),
