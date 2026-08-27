@@ -95,14 +95,14 @@ export default async function AdminDisputesPage({ searchParams }: { searchParams
       </div>
 
       <form method="get" className="mb-6 grid gap-3 rounded-xl border p-4 lg:grid-cols-[1fr_200px_180px_auto]">
-        <input name="query" defaultValue={query} maxLength={200} placeholder="Order, dispute, Buyer, Seller or storefront" className="rounded-md border px-3 py-2" />
-        <select name="status" defaultValue={status} className="rounded-md border px-3 py-2">
+        <input aria-label="Search disputes" name="query" defaultValue={query} maxLength={200} placeholder="Order, dispute, Buyer, Seller or storefront" className="rounded-md border px-3 py-2" />
+        <select aria-label="Dispute status" name="status" defaultValue={status} className="rounded-md border px-3 py-2">
           {statuses.map((value) => <option key={value} value={value}>{value === "all" ? "All dispute states" : value.replaceAll("_", " ")}</option>)}
         </select>
-        <select name="priority" defaultValue={priority} className="rounded-md border px-3 py-2">
+        <select aria-label="Dispute priority" name="priority" defaultValue={priority} className="rounded-md border px-3 py-2">
           {priorities.map((value) => <option key={value} value={value}>{value === "all" ? "All priorities" : value}</option>)}
         </select>
-        <button className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
+        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white">Search</button>
       </form>
 
       {loadError ? (
