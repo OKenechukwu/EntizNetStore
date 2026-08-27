@@ -322,8 +322,10 @@ async function assertAuthValidationAndKeyboard(page) {
   await showPassword.focus();
   await page.keyboard.press("Enter");
   assert.equal(await passwordInput.getAttribute("type"), "text", "password reveal must be keyboard operable");
+  const hidePassword = page.getByRole("button", { name: "Hide password" });
+  await hidePassword.waitFor({ state: "visible" });
   assert.equal(
-    await showPassword.evaluate((element) => document.activeElement === element),
+    await hidePassword.evaluate((element) => document.activeElement === element),
     true,
     "password reveal should retain focus after keyboard activation",
   );
