@@ -66,12 +66,17 @@ jobs:
           EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
+          mkdir -p tmp
           for attempt in $(seq 1 60); do
-            payload="$(curl --silent --show-error \
+            http_code="$(curl --silent --show-error \
+              --output tmp/health-wait.json \
+              --write-out '%{http_code}' \
               --header "x-vercel-protection-bypass: ${BYPASS}" \
               --header 'x-vercel-set-bypass-cookie: true' \
-              "${BASE_URL}/api/health" || true)"
-            if printf '%s' "$payload" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const x=JSON.parse(s);process.exit(x.status==='ok'&&x.version===process.env.EXPECTED_COMMIT.slice(0,12)&&x.checks?.database==='ok'&&x.checks?.storage==='ok'&&x.checks?.operations==='ok'?0:1)}catch{process.exit(1)}})"; then
+              "${BASE_URL}/api/health?x-vercel-protection-bypass=${BYPASS}" || true)"
+            summary="$(node -e "const fs=require('fs');try{const x=JSON.parse(fs.readFileSync('tmp/health-wait.json','utf8'));process.stdout.write('status='+(x.status||'unknown')+' version='+(x.version||'unknown')+' checks='+JSON.stringify(x.checks||{}))}catch{process.stdout.write('non-json-response')}" 2>/dev/null || true)"
+            echo "Health attempt ${attempt}: HTTP ${http_code} ${summary}"
+            if node -e "const fs=require('fs');try{const x=JSON.parse(fs.readFileSync('tmp/health-wait.json','utf8'));process.exit(x.status==='ok'&&x.version===process.env.EXPECTED_COMMIT.slice(0,12)&&x.checks?.database==='ok'&&x.checks?.storage==='ok'&&x.checks?.operations==='ok'?0:1)}catch{process.exit(1)}"; then
               echo "Exact isolated deployment is healthy at ${EXPECTED_COMMIT:0:12}."
               exit 0
             fi
