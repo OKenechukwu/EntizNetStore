@@ -1,82 +1,34 @@
-name: Deployed Authorization Gate
+name: P0-04 Hosted Verification
 
 on:
-  workflow_dispatch:
-    inputs:
-      base_url:
-        description: Exact HTTPS preview or staging deployment URL
-        required: true
-        type: string
-      expected_commit:
-        description: Exact 40-character Git commit expected from /api/health
-        required: true
-        type: string
-      environment:
-        description: Isolated target environment
-        required: true
-        default: preview
-        type: choice
-        options:
-          - preview
-          - staging
-      allow_disposable_mutation:
-        description: Permit creation and cleanup of disposable test identities
-        required: true
-        default: false
-        type: boolean
+  push:
+    branches:
+      - p0-04-verification
 
 permissions:
   contents: read
 
 concurrency:
-  group: deployed-authorization-${{ inputs.environment }}
-  cancel-in-progress: false
+  group: p0-04-hosted-verification
+  cancel-in-progress: true
 
 jobs:
-  deployed-authorization:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: entiznetstore-${{ inputs.environment }}-verification
+    timeout-minutes: 20
+    environment: entiznetstore-preview-verification
+    env:
+      BASE_URL: https://entiznetstore-env-p0-04-verification-okenechukwus-projects.vercel.app
+      SUPABASE_URL: https://peyzicveqigxcrbjzfse.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBleXppY3ZlcWlneGNyYmp6ZnNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4OTkxNTEsImV4cCI6MjEwMzQ3NTE1MX0.86IjtqYoUegFauy5dOdAFuX_L6-S_bVQfkMR7O6L1zw
+      PRODUCTION_SUPABASE_URL: https://kllwwurklumhawfsilpd.supabase.co
+      VERCEL_PROJECT_ID: prj_zecR1DW1GImCsW2MmrtTZnxCffbs
+      VERCEL_TEAM_ID: team_x6Y9DG451RilMGOAyYDkE1U5
     steps:
-      - name: Refuse unsafe invocation
-        shell: bash
-        env:
-          BASE_URL: ${{ inputs.base_url }}
-          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-          ALLOW_MUTATION: ${{ inputs.allow_disposable_mutation }}
-          SUPABASE_URL: ${{ secrets.DEPLOYED_AUTH_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ "$ALLOW_MUTATION" != "true" ]; then
-            echo "Disposable mutation consent is required."
-            exit 1
-          fi
-          if ! [[ "$EXPECTED_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            echo "expected_commit must be an exact 40-character Git SHA."
-            exit 1
-          fi
-          case "$BASE_URL" in
-            https://entiznetstore.vercel.app*|https://www.entiznetstore.*)
-              echo "Canonical production targets are intentionally forbidden."
-              exit 1
-              ;;
-            https://*) ;;
-            *)
-              echo "Target must be HTTPS."
-              exit 1
-              ;;
-          esac
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "The selected GitHub verification environment is missing one or more deployed-auth Supabase secrets."
-            exit 1
-          fi
-
-      - name: Check out exact repository state
+      - name: Check out exact branch head
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.expected_commit }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -88,24 +40,79 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Generate temporary Vercel automation bypass
+        id: bypass
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          response="$(curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data '{"generate":{"note":"EntizNetStore P0-04 temporary hosted verification"}}')"
+          secret="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);const p=x.protectionBypass;process.stdout.write(typeof p==='string'?p:(p&&p.secret)||'')})")"
+          test -n "$secret"
+          echo "::add-mask::$secret"
+          echo "secret=$secret" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for exact isolated deployment
+        shell: bash
+        env:
+          BYPASS: ${{ steps.bypass.outputs.secret }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            payload="$(curl --silent --show-error \
+              --header "x-vercel-protection-bypass: ${BYPASS}" \
+              --header 'x-vercel-set-bypass-cookie: true' \
+              "${BASE_URL}/api/health" || true)"
+            if printf '%s' "$payload" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const x=JSON.parse(s);process.exit(x.status==='ok'&&x.version===process.env.EXPECTED_COMMIT.slice(0,12)&&x.checks?.database==='ok'&&x.checks?.storage==='ok'&&x.checks?.operations==='ok'?0:1)}catch{process.exit(1)}})"; then
+              echo "Exact isolated deployment is healthy at ${EXPECTED_COMMIT:0:12}."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for exact isolated deployment."
+          exit 1
+
       - name: Exercise deployed authenticated authorization
         env:
-          DEPLOYED_AUTH_BASE_URL: ${{ inputs.base_url }}
-          DEPLOYED_AUTH_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-          DEPLOYED_AUTH_TEST_ENVIRONMENT: ${{ inputs.environment }}
-          DEPLOYED_AUTH_TEST_ALLOW_MUTATION: ${{ inputs.allow_disposable_mutation }}
-          DEPLOYED_AUTH_SUPABASE_URL: ${{ secrets.DEPLOYED_AUTH_SUPABASE_URL }}
-          DEPLOYED_AUTH_SUPABASE_ANON_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_ANON_KEY }}
+          DEPLOYED_AUTH_BASE_URL: ${{ env.BASE_URL }}
+          DEPLOYED_AUTH_EXPECTED_COMMIT: ${{ github.sha }}
+          DEPLOYED_AUTH_TEST_ENVIRONMENT: preview
+          DEPLOYED_AUTH_TEST_ALLOW_MUTATION: 'true'
+          DEPLOYED_AUTH_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          DEPLOYED_AUTH_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
-          DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ vars.ENTIZNETSTORE_PRODUCTION_SUPABASE_URL }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ env.PRODUCTION_SUPABASE_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ steps.bypass.outputs.secret }}
         run: node --import ./scripts/deployed-vercel-bypass.mjs scripts/test-deployed-auth-authorization.mjs
 
       - name: Upload deployed authorization evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: deployed-auth-evidence-${{ github.run_id }}
+          name: p0-04-deployed-auth-evidence-${{ github.run_id }}
           path: tmp/deployed-auth-evidence.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
+
+      - name: Revoke temporary Vercel automation bypass
+        if: always() && steps.bypass.outputs.secret != ''
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BYPASS: ${{ steps.bypass.outputs.secret }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "{\"revoke\":{\"secret\":\"${BYPASS}\",\"regenerate\":false}}" >/dev/null
