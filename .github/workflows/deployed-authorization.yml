@@ -52,12 +52,14 @@ jobs:
           test "${#secret}" -eq 32
           echo "::add-mask::$secret"
           body="$(SECRET="$secret" node -e "process.stdout.write(JSON.stringify({generate:{secret:process.env.SECRET,note:'EntizNetStore P0-04 temporary hosted verification'}}))")"
-          curl --fail-with-body --silent --show-error \
+          response="$(curl --fail-with-body --silent --show-error \
             --request PATCH \
             --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header 'Content-Type: application/json' \
-            --data "$body" >/dev/null
+            --data "$body")"
+          diagnostic="$(SECRET="$secret" printf '%s' "$response" | SECRET="$secret" node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const x=JSON.parse(s);const m=x.protectionBypass&&x.protectionBypass[process.env.SECRET];process.stdout.write('registered='+(m?'yes':'no')+' scope='+(m?.scope||'unknown')+' hasConfigurationId='+(m?.configurationId?'yes':'no'))}catch{process.stdout.write('unparseable-registration-response')}})")"
+          echo "Bypass registration: $diagnostic"
           echo "secret=$secret" >> "$GITHUB_OUTPUT"
 
       - name: Wait for exact isolated deployment
@@ -70,13 +72,19 @@ jobs:
           mkdir -p tmp
           for attempt in $(seq 1 8); do
             http_code="$(curl --silent --show-error \
+              --dump-header tmp/health-wait.headers \
               --output tmp/health-wait.json \
               --write-out '%{http_code}' \
               --header "x-vercel-protection-bypass: ${BYPASS}" \
               --header 'x-vercel-set-bypass-cookie: true' \
               "${BASE_URL}/api/health?x-vercel-protection-bypass=${BYPASS}" || true)"
             summary="$(node -e "const fs=require('fs');try{const x=JSON.parse(fs.readFileSync('tmp/health-wait.json','utf8'));process.stdout.write('status='+(x.status||'unknown')+' version='+(x.version||'unknown')+' checks='+JSON.stringify(x.checks||{}))}catch{process.stdout.write('non-json-response')}" 2>/dev/null || true)"
-            echo "Health attempt ${attempt}: HTTP ${http_code} ${summary}"
+            redirect="$(BASE_URL="$BASE_URL" node -e "const fs=require('fs');try{const h=fs.readFileSync('tmp/health-wait.headers','utf8').split(/\r?\n/).filter(Boolean);const line=[...h].reverse().find(v=>/^location:/i.test(v));if(!line)return;const raw=line.replace(/^location:\s*/i,'').trim();const u=new URL(raw,process.env.BASE_URL);process.stdout.write(u.origin+u.pathname)}catch{}" 2>/dev/null || true)"
+            if [ -n "$redirect" ]; then
+              echo "Health attempt ${attempt}: HTTP ${http_code} ${summary} redirect=${redirect}"
+            else
+              echo "Health attempt ${attempt}: HTTP ${http_code} ${summary}"
+            fi
             if node -e "const fs=require('fs');try{const x=JSON.parse(fs.readFileSync('tmp/health-wait.json','utf8'));process.exit(x.status==='ok'&&x.version===process.env.EXPECTED_COMMIT.slice(0,12)&&x.checks?.database==='ok'&&x.checks?.storage==='ok'&&x.checks?.operations==='ok'?0:1)}catch{process.exit(1)}"; then
               echo "Exact isolated deployment is healthy at ${EXPECTED_COMMIT:0:12}."
               exit 0
