@@ -48,15 +48,17 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$VERCEL_TOKEN"
-          response="$(curl --fail-with-body --silent --show-error \
+          secret="$(node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))")"
+          test "${#secret}" -eq 32
+          echo "::add-mask::$secret"
+          body="$(node -e "process.stdout.write(JSON.stringify({generate:{secret:process.env.SECRET,note:'EntizNetStore P0-04 temporary hosted verification'}}))" SECRET="$secret")"
+          SECRET="$secret" body="$(SECRET="$secret" node -e "process.stdout.write(JSON.stringify({generate:{secret:process.env.SECRET,note:'EntizNetStore P0-04 temporary hosted verification'}}))")"
+          curl --fail-with-body --silent --show-error \
             --request PATCH \
             --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header 'Content-Type: application/json' \
-            --data '{"generate":{"note":"EntizNetStore P0-04 temporary hosted verification"}}')"
-          secret="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);const p=x.protectionBypass;let secret='';if(typeof p==='string'){secret=p}else if(p&&typeof p==='object'){if(typeof p.secret==='string'){secret=p.secret}else{secret=Object.keys(p).find(k=>/^[A-Za-z0-9]{32}$/.test(k))||''}}process.stdout.write(secret)})")"
-          test -n "$secret"
-          echo "::add-mask::$secret"
+            --data "$body" >/dev/null
           echo "secret=$secret" >> "$GITHUB_OUTPUT"
 
       - name: Wait for exact isolated deployment
