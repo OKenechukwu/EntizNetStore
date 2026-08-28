@@ -1,0 +1,2 @@
+Temporary deployment trigger for isolated P0-04 hosted authorization verification.
+Do not merge. Remove when verification is complete.
