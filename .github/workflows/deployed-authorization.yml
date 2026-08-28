@@ -54,7 +54,7 @@ jobs:
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header 'Content-Type: application/json' \
             --data '{"generate":{"note":"EntizNetStore P0-04 temporary hosted verification"}}')"
-          secret="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);const p=x.protectionBypass;process.stdout.write(typeof p==='string'?p:(p&&p.secret)||'')})")"
+          secret="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);const p=x.protectionBypass;let secret='';if(typeof p==='string'){secret=p}else if(p&&typeof p==='object'){if(typeof p.secret==='string'){secret=p.secret}else{secret=Object.keys(p).find(k=>/^[A-Za-z0-9]{32}$/.test(k))||''}}process.stdout.write(secret)})")"
           test -n "$secret"
           echo "::add-mask::$secret"
           echo "secret=$secret" >> "$GITHUB_OUTPUT"
