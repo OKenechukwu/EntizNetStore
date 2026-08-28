@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       expected_commit:
-        description: Exact Git commit expected from /api/health
+        description: Exact 40-character Git commit expected from /api/health
         required: true
         type: string
       environment:
@@ -42,11 +42,19 @@ jobs:
         shell: bash
         env:
           BASE_URL: ${{ inputs.base_url }}
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
           ALLOW_MUTATION: ${{ inputs.allow_disposable_mutation }}
+          SUPABASE_URL: ${{ secrets.DEPLOYED_AUTH_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
           if [ "$ALLOW_MUTATION" != "true" ]; then
             echo "Disposable mutation consent is required."
+            exit 1
+          fi
+          if ! [[ "$EXPECTED_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "expected_commit must be an exact 40-character Git SHA."
             exit 1
           fi
           case "$BASE_URL" in
@@ -60,9 +68,16 @@ jobs:
               exit 1
               ;;
           esac
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "The selected GitHub verification environment is missing one or more deployed-auth Supabase secrets."
+            exit 1
+          fi
 
       - name: Check out exact repository state
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.expected_commit }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -85,3 +100,12 @@ jobs:
           DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ vars.ENTIZNETSTORE_PRODUCTION_SUPABASE_URL }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node --import ./scripts/deployed-vercel-bypass.mjs scripts/test-deployed-auth-authorization.mjs
+
+      - name: Upload deployed authorization evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployed-auth-evidence-${{ github.run_id }}
+          path: tmp/deployed-auth-evidence.json
+          if-no-files-found: error
+          retention-days: 30
