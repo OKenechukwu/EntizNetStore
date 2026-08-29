@@ -155,13 +155,21 @@ async function expectStatus(label, response, expected) {
   return text ? JSON.parse(text) : null
 }
 
-async function expectPage(label, pathname, cookie) {
+async function expectPage(label, pathname, cookie, expectedMarker) {
   const response = await appFetch(pathname, { cookie })
   assert.equal(response.status, 200, `${label}: expected HTTP 200, received ${response.status}`)
   const body = await response.text()
-  assert.doesNotMatch(body, /Internal Server Error|Application error|This page could not be found/i)
-  recordCheck(label, { type: 'protected-page', pathname, observedStatus: response.status })
-  process.stdout.write(`ok - ${label} protected page -> 200\n`)
+  assert.ok(
+    body.includes(expectedMarker),
+    `${label}: expected deployed page marker ${JSON.stringify(expectedMarker)} was not rendered`,
+  )
+  recordCheck(label, {
+    type: 'protected-page',
+    pathname,
+    observedStatus: response.status,
+    expectedMarker,
+  })
+  process.stdout.write(`ok - ${label} protected page -> 200 with route marker\n`)
 }
 
 async function removeRows(table, column, userId) {
@@ -370,10 +378,14 @@ try {
     200,
   )
 
-  await expectPage('Buyer dashboard', '/dashboard/buyer', buyer.cookie)
-  await expectPage('Seller dashboard', '/seller/dashboard', seller.cookie)
-  await expectPage('Business/BSM dashboard', '/dashboard/bsm', business.cookie)
-  await expectPage('Admin dashboard', '/admin', adminUser.cookie)
+  // Client-authenticated dashboards intentionally server-render a loading shell
+  // before AuthProvider hydration. Server-authenticated BSM/Admin dashboards
+  // must render their trusted role-specific content immediately. Route-specific
+  // markers avoid false positives from generic Next.js framework/RSC payloads.
+  await expectPage('Buyer dashboard', '/dashboard/buyer', buyer.cookie, 'Loading profile...')
+  await expectPage('Seller dashboard', '/dashboard/seller', seller.cookie, 'Loading your dashboard...')
+  await expectPage('Business/BSM dashboard', '/dashboard/bsm', business.cookie, 'Business / BSM')
+  await expectPage('Admin dashboard', '/admin', adminUser.cookie, 'EntizNetStore Operations')
 
   evidence.result = 'passed'
   process.stdout.write(`Deployed authenticated authorization regression passed for ${origin.origin}\n`)
