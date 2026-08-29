@@ -1,4 +1,4 @@
-name: P0-04 Credential Sync
+name: P0-04 Hosted Verification
 
 on:
   push:
@@ -13,16 +13,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sync:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: entiznetstore-preview-verification
     env:
       SUPABASE_URL: https://peyzicveqigxcrbjzfse.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBleXppY3ZlcWlneGNyYmp6ZnNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4OTkxNTEsImV4cCI6MjEwMzQ3NTE1MX0.86IjtqYoUegFauy5dOdAFuX_L6-S_bVQfkMR7O6L1zw
+      PRODUCTION_SUPABASE_URL: https://kllwwurklumhawfsilpd.supabase.co
       VERCEL_PROJECT_ID: prj_zecR1DW1GImCsW2MmrtTZnxCffbs
       VERCEL_TEAM_ID: team_x6Y9DG451RilMGOAyYDkE1U5
-      CUSTOM_ENV_SLUG: p0-04-verification
     steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
       - name: Validate isolated Supabase service role secret
         shell: bash
         env:
@@ -36,42 +52,106 @@ jobs:
             --url "${SUPABASE_URL}/rest/v1/profiles_buyer?select=id&limit=1" \
             --header "apikey: ${SERVICE_KEY}" \
             --header "Authorization: Bearer ${SERVICE_KEY}")"
-          if [ "$status" != "200" ]; then
-            echo "Isolated Supabase service-role validation failed with HTTP ${status}."
-            exit 1
-          fi
+          test "$status" = "200"
           echo "Isolated Supabase service-role credential validated successfully."
 
-      - name: Resolve Vercel custom environment
-        id: custom_env
+      - name: Generate temporary Vercel automation bypass
+        id: bypass
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          secret="$(node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))")"
+          test "${#secret}" -eq 32
+          echo "::add-mask::$secret"
+          body="$(SECRET="$secret" node -e "process.stdout.write(JSON.stringify({generate:{secret:process.env.SECRET,note:'EntizNetStore P0-04 temporary hosted verification'}}))")"
           response="$(curl --fail-with-body --silent --show-error \
-            --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/custom-environments?teamId=${VERCEL_TEAM_ID}" \
-            --header "Authorization: Bearer ${VERCEL_TOKEN}")"
-          environment_id="$(printf '%s' "$response" | CUSTOM_ENV_SLUG="$CUSTOM_ENV_SLUG" node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);const e=x.environments?.find(v=>v.slug===process.env.CUSTOM_ENV_SLUG);if(e?.id)process.stdout.write(e.id)})")"
-          test -n "$environment_id"
-          echo "Resolved isolated Vercel custom environment."
-          echo "environment_id=$environment_id" >> "$GITHUB_OUTPUT"
-
-      - name: Upsert branch service role into isolated Vercel environment
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          SERVICE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
-          CUSTOM_ENV_ID: ${{ steps.custom_env.outputs.environment_id }}
-        run: |
-          set -euo pipefail
-          body="$(SERVICE_KEY="$SERVICE_KEY" CUSTOM_ENV_ID="$CUSTOM_ENV_ID" node -e "process.stdout.write(JSON.stringify({key:'SUPABASE_SERVICE_ROLE_KEY',value:process.env.SERVICE_KEY,type:'sensitive',customEnvironmentIds:[process.env.CUSTOM_ENV_ID],comment:'EntizNetStore P0-04 isolated Supabase branch service role'}))")"
-          response="$(curl --fail-with-body --silent --show-error \
-            --request POST \
-            --url "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?upsert=true&teamId=${VERCEL_TEAM_ID}" \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header 'Content-Type: application/json' \
             --data "$body")"
-          failed_count="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);process.stdout.write(String(Array.isArray(x.failed)?x.failed.length:0))})")"
-          test "$failed_count" = "0"
-          echo "Vercel isolated service-role variable synchronized successfully."
+          diagnostic="$(printf '%s' "$response" | SECRET="$secret" node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const x=JSON.parse(s);const m=x.protectionBypass&&x.protectionBypass[process.env.SECRET];process.stdout.write('registered='+(m?'yes':'no')+' scope='+(m?.scope||'unknown'))}catch{process.stdout.write('unparseable-registration-response')}})")"
+          echo "Bypass registration: $diagnostic"
+          echo "secret=$secret" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve exact immutable Vercel deployment
+        id: deployment
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            response="$(curl --fail-with-body --silent --show-error \
+              --url "https://api.vercel.com/v7/deployments?projectId=${VERCEL_PROJECT_ID}&sha=${EXPECTED_COMMIT}&state=READY&limit=1&teamId=${VERCEL_TEAM_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+            deployment_url="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const x=JSON.parse(s);const d=x.deployments?.[0];if(d?.state==='READY'&&d?.url)process.stdout.write('https://'+d.url)}catch{}})")"
+            if [ -n "$deployment_url" ]; then
+              echo "Exact deployment READY for ${EXPECTED_COMMIT:0:12}."
+              echo "base_url=$deployment_url" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for exact immutable Vercel deployment."
+          exit 1
+
+      - name: Verify isolated deployment health
+        shell: bash
+        env:
+          BYPASS: ${{ steps.bypass.outputs.secret }}
+          BASE_URL: ${{ steps.deployment.outputs.base_url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp
+          http_code="$(curl --silent --show-error \
+            --output tmp/health.json \
+            --write-out '%{http_code}' \
+            --header "x-vercel-protection-bypass: ${BYPASS}" \
+            "${BASE_URL}/api/health?x-vercel-protection-bypass=${BYPASS}")"
+          summary="$(node -e "const fs=require('fs');try{const x=JSON.parse(fs.readFileSync('tmp/health.json','utf8'));process.stdout.write('status='+(x.status||'unknown')+' version='+(x.version||'unknown')+' checks='+JSON.stringify(x.checks||{}))}catch{process.stdout.write('non-json-response')}" 2>/dev/null || true)"
+          echo "Exact deployment health: HTTP ${http_code} ${summary}"
+          test "$http_code" = "200"
+          EXPECTED_COMMIT="$EXPECTED_COMMIT" node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('tmp/health.json','utf8'));if(!(x.status==='ok'&&x.version===process.env.EXPECTED_COMMIT.slice(0,12)&&x.checks?.database==='ok'&&x.checks?.storage==='ok'&&x.checks?.operations==='ok'))process.exit(1)"
+
+      - name: Exercise deployed authenticated authorization
+        env:
+          DEPLOYED_AUTH_BASE_URL: ${{ steps.deployment.outputs.base_url }}
+          DEPLOYED_AUTH_EXPECTED_COMMIT: ${{ github.sha }}
+          DEPLOYED_AUTH_TEST_ENVIRONMENT: preview
+          DEPLOYED_AUTH_TEST_ALLOW_MUTATION: 'true'
+          DEPLOYED_AUTH_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          DEPLOYED_AUTH_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+          DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ env.PRODUCTION_SUPABASE_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ steps.bypass.outputs.secret }}
+        run: node --import ./scripts/deployed-vercel-bypass.mjs scripts/test-deployed-auth-authorization.mjs
+
+      - name: Upload deployed authorization evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p0-04-deployed-auth-evidence-${{ github.run_id }}
+          path: tmp/deployed-auth-evidence.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Revoke temporary Vercel automation bypass
+        if: always() && steps.bypass.outputs.secret != ''
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BYPASS: ${{ steps.bypass.outputs.secret }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "{\"revoke\":{\"secret\":\"${BYPASS}\",\"regenerate\":false}}" >/dev/null
