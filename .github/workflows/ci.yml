@@ -136,6 +136,9 @@ jobs:
       - name: Run M4A BSM wholesale marketplace regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m4a-wholesale-marketplace.sql
 
+      - name: Run M4A wholesale fail-closed state regression suite
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m4a-wholesale-fail-closed.sql
+
       - name: Run M3 identity and operations regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m3-identity-operations.sql
 
