@@ -107,7 +107,9 @@ export default function WholesaleOfferManager({ variants }: { variants: VariantO
     }
   }, []);
 
-  useEffect(() => { void loadOffers(); }, [loadOffers]);
+  useEffect(() => {
+    queueMicrotask(() => { void loadOffers(); });
+  }, [loadOffers]);
 
   const reset = () => {
     setForm(emptyForm(variants));
