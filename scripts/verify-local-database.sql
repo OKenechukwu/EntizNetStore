@@ -17,15 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-  if v_public_tables <> 46 then
-    raise exception 'Expected 46 public tables, found %', v_public_tables;
+  if v_public_tables <> 49 then
+    raise exception 'Expected 49 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-  if v_rls_tables <> 46 then
-    raise exception 'Expected RLS on all 46 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 49 then
+    raise exception 'Expected RLS on all 49 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -50,8 +50,8 @@ $$;
 
 with expected(name) as (
   values
-    ('addresses'), ('admin_audit_logs'), ('brands'), ('cart_items'),
-    ('cart_quotes'), ('carts'), ('categories'), ('content_pages'),
+    ('addresses'), ('admin_audit_logs'), ('brands'), ('business_trading_roles'),
+    ('cart_items'), ('cart_quotes'), ('carts'), ('categories'), ('content_pages'),
     ('conversation_keys'), ('conversations'), ('entiznet_handoff_events'),
     ('entiznet_identity_links'), ('escrow_transactions'), ('featured_products'),
     ('inventory_reservations'), ('kyc_documents'), ('kyc_verification_requests'),
@@ -63,7 +63,8 @@ with expected(name) as (
     ('product_media'), ('product_moderation_events'), ('product_variants'),
     ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
     ('profiles_seller_private'), ('prohibited_product_rules'),
-    ('refund_provider_events'), ('refund_requests'), ('reviews'), ('upload_scan_jobs')
+    ('refund_provider_events'), ('refund_requests'), ('reviews'), ('upload_scan_jobs'),
+    ('wholesale_offer_tiers'), ('wholesale_offers')
 ), actual(name) as (
   select c.relname::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -81,7 +82,7 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical 46-table marketplace baseline';
+    raise exception 'Public table set differs from canonical 49-table M4A marketplace baseline';
   end if;
 
   if not exists (
@@ -175,7 +176,8 @@ begin
     'kyc_documents','kyc_verification_requests','message_attachments',
     'product_moderation_events','addresses','carts','cart_items','cart_quotes',
     'marketplace_capability_states','entiznet_identity_links','marketplace_reports',
-    'content_pages','notifications'
+    'content_pages','notifications','business_trading_roles','wholesale_offers',
+    'wholesale_offer_tiers'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
       raise exception 'authenticated missing scoped SELECT on %', v_table;
@@ -238,7 +240,7 @@ declare
 begin
   foreach v_idx in array array[
     'idx_addresses_user_id','addresses_one_default_per_user_type','idx_addresses_user_created',
-    'carts_one_active_per_buyer','idx_carts_buyer_updated','cart_items_cart_variant_key',
+    'carts_one_active_per_buyer','idx_carts_buyer_updated','cart_items_cart_variant_mode_key',
     'idx_cart_items_cart','idx_cart_items_variant','idx_cart_items_product_id','idx_cart_quotes_cart_created',
     'idx_cart_quotes_buyer_created','idx_cart_quotes_expiry',
     'idx_categories_parent_id','idx_categories_active_parent_sort','idx_brands_active_name',
@@ -272,7 +274,10 @@ begin
     'idx_marketplace_reports_assigned_admin','idx_prohibited_product_rules_active_severity',
     'idx_prohibited_product_rules_created_by','idx_prohibited_product_rules_updated_by',
     'idx_upload_scan_jobs_actor_created','idx_upload_scan_jobs_status_created',
-    'idx_upload_scan_jobs_purpose_created','idx_kyc_documents_upload_scan_job_id'
+    'idx_upload_scan_jobs_purpose_created','idx_kyc_documents_upload_scan_job_id',
+    'business_trading_roles_one_primary','idx_wholesale_offers_active_variant',
+    'idx_wholesale_offers_seller_status','idx_wholesale_offer_tiers_lookup',
+    'idx_cart_items_wholesale_offer'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -371,7 +376,9 @@ begin
     'public.guard_buyer_capability_for_checkout_insert()',
     'public.guard_active_product_category()',
     'public.guard_active_product_brand()',
-    'public.touch_conversation_after_message()'
+    'public.touch_conversation_after_message()',
+    'public.guard_wholesale_offer_integrity()',
+    'public.guard_wholesale_cart_item_integrity()'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or has_function_privilege('authenticated', v_fn, 'EXECUTE') then
@@ -408,7 +415,10 @@ begin
     'public.buyer_get_or_create_cart()',
     'public.buyer_set_cart_item(uuid,uuid,integer)',
     'public.buyer_remove_cart_item(uuid)',
-    'public.buyer_clear_cart()'
+    'public.buyer_clear_cart()',
+    'public.business_set_trading_roles(text[])',
+    'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)',
+    'public.buyer_set_wholesale_cart_item(uuid,integer)'
   ] loop
     if has_function_privilege('anon', v_fn, 'EXECUTE')
        or not has_function_privilege('authenticated', v_fn, 'EXECUTE') then
@@ -444,11 +454,16 @@ begin
       'guard_seller_capability_for_product_mutation','guard_buyer_capability_for_cart_mutation',
       'guard_capabilities_for_cart_item_mutation','guard_buyer_capability_for_checkout_insert',
       'guard_active_product_category','guard_active_product_brand',
-      'open_order_dispute','buyer_request_order_refund','attach_refund_provider_reference','finalize_refund_v1'
+      'open_order_dispute','buyer_request_order_refund','attach_refund_provider_reference','finalize_refund_v1',
+      'business_set_trading_roles','business_save_wholesale_offer','buyer_set_wholesale_cart_item',
+      'guard_wholesale_offer_integrity','guard_wholesale_cart_item_integrity'
     )
-    and not ('search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[])));
+    and not (
+      'search_path=pg_catalog, public' = any(coalesce(p.proconfig, array[]::text[]))
+      or 'search_path=pg_catalog, public, app_private' = any(coalesce(p.proconfig, array[]::text[]))
+    );
   if v_bad <> 0 then
-    raise exception '% privileged marketplace/integration functions lack hardened pg_catalog,public search_path', v_bad;
+    raise exception '% privileged marketplace/integration functions lack an approved hardened search_path', v_bad;
   end if;
 
   select count(*) into v_bad
