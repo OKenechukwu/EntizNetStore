@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
   const shippingProvider = (process.env.SHIPPING_QUOTE_PROVIDER || "unconfigured").trim().toLowerCase();
   const taxProvider = (process.env.TAX_QUOTE_PROVIDER || "unconfigured").trim().toLowerCase();
 
-  let shippingCents = 0;
-  let taxCents = 0;
+  const shippingCents = 0;
+  const taxCents = 0;
 
   const shippingQuote = requiresShipping
     ? shippingProvider === "unconfigured"
@@ -142,6 +142,9 @@ export async function POST(request: NextRequest) {
     variantTitle: item.variantTitle,
     sku: item.sku,
     quantity: item.quantity,
+    purchaseMode: item.purchaseMode,
+    wholesaleOfferId: item.wholesaleTerms?.offerId || null,
+    wholesaleTerms: item.wholesaleTerms,
     unitPriceCents: item.unitPriceCents,
     lineTotalCents: item.lineTotalCents,
     requiresShipping: item.requiresShipping,
