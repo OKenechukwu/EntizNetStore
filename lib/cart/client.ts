@@ -88,6 +88,21 @@ export async function setCanonicalCartItem(input: {
   return (payload.cart as CanonicalCart | null | undefined) ?? null;
 }
 
+export async function setCanonicalWholesaleCartItem(input: {
+  offerId: string;
+  quantity: number;
+}): Promise<CanonicalCart | null> {
+  const response = await fetch("/api/cart/wholesale", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = await readJson(response);
+  if (!response.ok) throw responseError(payload, "Unable to update wholesale cart");
+  dispatchCartUpdate();
+  return (payload.cart as CanonicalCart | null | undefined) ?? null;
+}
+
 export async function removeCanonicalCartItem(itemId: string): Promise<CanonicalCart | null> {
   const response = await fetch("/api/cart", {
     method: "DELETE",
