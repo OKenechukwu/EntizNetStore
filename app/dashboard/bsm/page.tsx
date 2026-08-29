@@ -27,7 +27,7 @@ export default async function BusinessDashboardPage() {
     business.verification_status === "verified" && seller?.verification_status === "verified";
 
   return (
-    <main className="container mx-auto space-y-8 px-4 py-10">
+    <div className="container mx-auto space-y-8 px-4 py-10">
       <header className="glass-card p-6 md:p-8">
         <p className="mb-2 text-sm uppercase tracking-wide text-accent-gold">Business / BSM</p>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -128,6 +128,6 @@ export default async function BusinessDashboardPage() {
           Browse retail marketplace
         </Link>
       </section>
-    </main>
+    </div>
   );
 }
