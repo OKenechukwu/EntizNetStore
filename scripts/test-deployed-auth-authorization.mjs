@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import path from 'node:path'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 
@@ -14,11 +16,19 @@ const configuredProductionSupabaseUrl = process.env.DEPLOYED_PRODUCTION_SUPABASE
 const expectedCommit = process.env.DEPLOYED_AUTH_EXPECTED_COMMIT || ''
 const environment = process.env.DEPLOYED_AUTH_TEST_ENVIRONMENT
 const mutationConsent = process.env.DEPLOYED_AUTH_TEST_ALLOW_MUTATION
+const playwrightNodeModules = process.env.PLAYWRIGHT_NODE_MODULES
+const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
 
 if (!rawOrigin || !supabaseUrl || !anonKey || !serviceRoleKey) {
   throw new Error(
     'DEPLOYED_AUTH_BASE_URL, DEPLOYED_AUTH_SUPABASE_URL, DEPLOYED_AUTH_SUPABASE_ANON_KEY and DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY are required',
   )
+}
+if (!playwrightNodeModules) {
+  throw new Error('PLAYWRIGHT_NODE_MODULES is required for deployed protected-page browser verification')
+}
+if (!vercelBypassSecret && new URL(rawOrigin).hostname.endsWith('.vercel.app')) {
+  throw new Error('VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel browser verification')
 }
 if (!/^[0-9a-f]{40}$/i.test(expectedCommit)) {
   throw new Error('DEPLOYED_AUTH_EXPECTED_COMMIT must be an exact 40-character Git SHA')
@@ -56,6 +66,8 @@ if (forbiddenSupabaseOrigins.has(targetSupabase.origin)) {
   throw new Error('deployed authorization fixtures must use an isolated non-production Supabase project or branch')
 }
 
+const require = createRequire(import.meta.url)
+const { chromium } = require(path.join(playwrightNodeModules, 'playwright'))
 const admin = createClient(targetSupabase.origin, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
@@ -92,6 +104,21 @@ function recordCheck(label, details = {}) {
 
 function cookieHeader(cookieJar) {
   return [...cookieJar.entries()].map(([name, entry]) => `${name}=${entry.value}`).join('; ')
+}
+
+function playwrightCookies(cookie) {
+  return cookie
+    .split(/;\s*/)
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.indexOf('=')
+      assert.ok(separator > 0, `invalid cookie entry for browser fixture: ${entry.slice(0, 40)}`)
+      return {
+        name: entry.slice(0, separator),
+        value: entry.slice(separator + 1),
+        url: origin.origin,
+      }
+    })
 }
 
 async function createIdentity(label, appMetadata = {}) {
@@ -155,13 +182,90 @@ async function expectStatus(label, response, expected) {
   return text ? JSON.parse(text) : null
 }
 
-async function expectPage(label, pathname, cookie) {
-  const response = await appFetch(pathname, { cookie })
-  assert.equal(response.status, 200, `${label}: expected HTTP 200, received ${response.status}`)
-  const body = await response.text()
-  assert.doesNotMatch(body, /Internal Server Error|Application error|This page could not be found/i)
-  recordCheck(label, { type: 'protected-page', pathname, observedStatus: response.status })
-  process.stdout.write(`ok - ${label} protected page -> 200\n`)
+async function completeAgeGate(page, label) {
+  const confirm = page.getByRole('button', { name: 'Yes, I am 18+' })
+  const gateVisible = await confirm
+    .waitFor({ state: 'visible', timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (!gateVisible) return
+
+  await page.getByRole('dialog', { name: 'Age Verification Required' }).waitFor()
+  await confirm.click()
+  await page
+    .getByRole('dialog', { name: 'Age Verification Required' })
+    .waitFor({ state: 'detached', timeout: 5_000 })
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('entiznet-age-verified')),
+    'true',
+    `${label}: age verification was not persisted`,
+  )
+  recordCheck(`${label} age gate`, { type: 'age-verification', verified: true })
+}
+
+async function expectBrowserPage(browser, label, pathname, cookie, expectedMarker) {
+  const context = await browser.newContext()
+  const pageErrors = []
+  try {
+    await context.addCookies(playwrightCookies(cookie))
+    const page = await context.newPage()
+
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const requestUrl = new URL(request.url())
+      if (requestUrl.origin !== origin.origin || !vercelBypassSecret) {
+        await route.continue()
+        return
+      }
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          'x-vercel-protection-bypass': vercelBypassSecret,
+        },
+      })
+    })
+
+    const response = await page.goto(new URL(pathname, origin).toString(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    })
+    assert.ok(response, `${label}: navigation produced no main-resource response`)
+    assert.equal(response.status(), 200, `${label}: expected browser HTTP 200, received ${response.status()}`)
+
+    await completeAgeGate(page, label)
+
+    const marker = page.getByText(expectedMarker, { exact: false }).first()
+    await marker.waitFor({ state: 'visible', timeout: 20_000 })
+
+    const finalUrl = new URL(page.url())
+    assert.equal(finalUrl.origin, origin.origin, `${label}: browser left the isolated deployment origin`)
+    assert.equal(finalUrl.pathname, pathname, `${label}: browser redirected away from protected route to ${finalUrl.pathname}`)
+
+    const bodyText = await page.locator('body').innerText()
+    assert.doesNotMatch(
+      bodyText,
+      /Application error: a client-side exception has occurred|Internal Server Error|This page could not be found/i,
+      `${label}: visible framework error content rendered`,
+    )
+    const nextErrorOverlayCount = await page
+      .locator('[data-nextjs-dialog-overlay], [data-next-badge-root="true"]')
+      .count()
+    assert.equal(nextErrorOverlayCount, 0, `${label}: Next.js error overlay rendered`)
+    assert.deepEqual(pageErrors, [], `${label}: browser pageerror events: ${pageErrors.join(' | ')}`)
+
+    recordCheck(label, {
+      type: 'protected-browser-page',
+      pathname,
+      observedStatus: response.status(),
+      expectedMarker,
+      finalPathname: finalUrl.pathname,
+    })
+    process.stdout.write(`ok - ${label} browser render -> 200, hydrated, authorized\n`)
+  } finally {
+    await context.close()
+  }
 }
 
 async function removeRows(table, column, userId) {
@@ -187,9 +291,6 @@ async function verifyNoRows(table, column, userId) {
 }
 
 async function cleanupIdentity(userId) {
-  // These are exact disposable-user ownership/actor keys. The current gate only
-  // creates onboarding/profile rows, but the extra user-scoped cleanup keeps the
-  // fixture safe if a protected page later gains an audit/state side effect.
   await removeRows('marketplace_capability_state_events', 'actor_id', userId)
   await removeRows('marketplace_capability_state_events', 'user_id', userId)
   await removeRows('marketplace_capability_states', 'user_id', userId)
@@ -322,10 +423,6 @@ try {
   assert.equal(adminCaps.userId, adminUser.id)
   assert.equal(adminCaps.isAdmin, true)
 
-  // The identities and cookies above are minted directly against the isolated
-  // Supabase target. These successful deployed-session checks therefore prove
-  // that the application deployment is wired to that same target rather than
-  // to production or to a different project.
   recordCheck('deployed app and fixture Supabase target are session-compatible', {
     type: 'environment-binding',
     targetSupabaseOrigin: targetSupabase.origin,
@@ -370,10 +467,21 @@ try {
     200,
   )
 
-  await expectPage('Buyer dashboard', '/dashboard/buyer', buyer.cookie)
-  await expectPage('Seller dashboard', '/seller/dashboard', seller.cookie)
-  await expectPage('Business/BSM dashboard', '/dashboard/bsm', business.cookie)
-  await expectPage('Admin dashboard', '/admin', adminUser.cookie)
+  const browser = await chromium.launch({ headless: true })
+  try {
+    await expectBrowserPage(browser, 'Buyer dashboard', '/dashboard/buyer', buyer.cookie, 'My Profile')
+    await expectBrowserPage(
+      browser,
+      'Seller dashboard',
+      '/dashboard/seller',
+      seller.cookie,
+      'Manage your store and products',
+    )
+    await expectBrowserPage(browser, 'Business/BSM dashboard', '/dashboard/bsm', business.cookie, 'Business / BSM')
+    await expectBrowserPage(browser, 'Admin dashboard', '/admin', adminUser.cookie, 'EntizNetStore Operations')
+  } finally {
+    await browser.close()
+  }
 
   evidence.result = 'passed'
   process.stdout.write(`Deployed authenticated authorization regression passed for ${origin.origin}\n`)
