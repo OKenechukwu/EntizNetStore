@@ -93,7 +93,9 @@ export default function WholesaleCatalogue() {
     }
   }, []);
 
-  useEffect(() => { void load(""); }, [load]);
+  useEffect(() => {
+    queueMicrotask(() => { void load(""); });
+  }, [load]);
 
   const visibleOfferCount = useMemo(() => offers.length, [offers]);
 
