@@ -27,8 +27,8 @@ insert into public.profiles_seller(
   return_policy, shipping_policy
 )
 values
-  ('b1000000-0000-0000-0000-000000000001', 'M4A Supplier Store', 'company', 'verified', 'Test returns.', 'Test shipping.'),
-  ('b4000000-0000-0000-0000-000000000004', 'M4A Other Store', 'company', 'verified', 'Test returns.', 'Test shipping.');
+  ('b1000000-0000-0000-0000-000000000001', 'M4A Supplier Store', 'business', 'verified', 'Test returns.', 'Test shipping.'),
+  ('b4000000-0000-0000-0000-000000000004', 'M4A Other Store', 'business', 'verified', 'Test returns.', 'Test shipping.');
 
 insert into public.profiles_business(id, display_name, business_kind, country, verification_status)
 values
