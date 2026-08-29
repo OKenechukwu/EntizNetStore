@@ -35,6 +35,21 @@ const saveOfferSchema = z.object({
   })).min(1).max(20),
 });
 
+type ProductRow = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  moderation_status: string | null;
+};
+
+type VariantRow = {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  is_active: boolean | null;
+  inventory_quantity: number | null;
+};
+
 async function authBusiness() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -96,8 +111,15 @@ export async function GET() {
     });
     tiersByOffer.set(tier.offer_id, current);
   }
-  const productMap = new Map((productsResult.data || []).map((product) => [product.id, product]));
-  const variantMap = new Map((variantsResult.data || []).map((variant) => [variant.id, variant]));
+
+  const productRows = (productsResult.data || []) as ProductRow[];
+  const variantRows = (variantsResult.data || []) as VariantRow[];
+  const productMap = new Map<string, ProductRow>(
+    productRows.map((product): [string, ProductRow] => [product.id, product]),
+  );
+  const variantMap = new Map<string, VariantRow>(
+    variantRows.map((variant): [string, VariantRow] => [variant.id, variant]),
+  );
 
   return NextResponse.json({
     offers: (offers || []).map((offer) => ({
