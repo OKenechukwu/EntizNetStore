@@ -2,11 +2,12 @@
 
 -- P0 regression: browser-callable SECURITY DEFINER functions are a reviewed
 -- privilege surface. Any expansion must fail CI until it is explicitly audited.
-
 do $$
 declare
   expected_authenticated text[] := array[
     'attach_checkout_payment_reference(uuid,text,text)',
+    'business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)',
+    'business_set_trading_roles(text[])',
     'buyer_clear_cart()',
     'buyer_delete_address(uuid)',
     'buyer_get_or_create_cart()',
@@ -14,6 +15,7 @@ declare
     'buyer_request_order_refund(uuid,bigint,text,uuid)',
     'buyer_save_address(uuid,text,boolean,text,text,text,text,text,text,text,text,text,text,text)',
     'buyer_set_cart_item(uuid,uuid,integer)',
+    'buyer_set_wholesale_cart_item(uuid,integer)',
     'buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
     'cancel_checkout_session(uuid)',
     'create_checkout_session_v2(uuid,uuid,uuid)',
@@ -85,7 +87,7 @@ begin
   ) unsafe;
 
   if cardinality(unscoped) > 0 then
-    raise exception 'authenticated SECURITY DEFINER RPC(s) lost auth.uid() scoping: %', unscoped;
+    raise exception 'authenticated SECURITY DEFININER RPC(s) lost auth.uid() scoping: %', unscoped;
   end if;
 end;
 $$;
