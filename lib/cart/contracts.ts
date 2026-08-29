@@ -1,3 +1,16 @@
+export type PurchaseMode = "retail" | "wholesale";
+
+export type WholesaleCartTerms = {
+  offerId: string;
+  tierMinimumQuantity: number;
+  minimumOrderQuantity: number;
+  orderMultiple: number;
+  unitLabel: string;
+  casePackSize: number | null;
+  leadTimeDays: number;
+  incoterm: string | null;
+};
+
 export type CanonicalCartItem = {
   id: string;
   productId: string;
@@ -8,6 +21,8 @@ export type CanonicalCartItem = {
   sku: string | null;
   image: string | null;
   quantity: number;
+  purchaseMode: PurchaseMode;
+  wholesaleTerms: WholesaleCartTerms | null;
   unitPriceCents: number;
   lineTotalCents: number;
   requiresShipping: boolean;
