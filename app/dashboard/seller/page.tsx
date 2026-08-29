@@ -146,7 +146,7 @@ function SellerDashboardCards({ profile }: { profile: unknown }) {
             </div>
             <Link
               href="/dashboard/verification"
-              className="block text-center luxury-button-outline py-3"
+              className="block rounded-lg border border-amber-700 bg-amber-950 px-6 py-3 text-center font-medium text-amber-50 transition-all duration-300 hover:-translate-y-0.5 hover:bg-amber-900 hover:text-white"
             >
               Complete Verification
             </Link>
