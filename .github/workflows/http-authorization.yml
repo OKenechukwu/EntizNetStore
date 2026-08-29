@@ -138,6 +138,15 @@ jobs:
 
           PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
             APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-m4a-browser.mjs || {
+              status=$?
+              echo "M4A authenticated browser regression failed; server log follows"
+              cat /tmp/entiznetstore-http.log
+              exit "$status"
+            }
+
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
             node scripts/test-web-responsive-browser.mjs || {
               status=$?
               echo "Responsive browser regression failed; server log follows"
