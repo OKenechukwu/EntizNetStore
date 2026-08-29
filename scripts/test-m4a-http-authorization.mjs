@@ -340,20 +340,27 @@ try {
   assert.equal(pausedLine.availabilityReason, 'wholesale_offer_unavailable')
   assert.equal(pausedLine.unitPriceCents, 0)
 
-  await expectStatus(
+  const pausedCatalogue = await expectStatus(
     'paused offer disappears from Business sourcing catalogue',
     await appFetch('/api/bsm/wholesale/catalog', { cookie: businessBuyer.cookie }),
     200,
-  ).then((payload) => {
-    assert.equal(payload.offers.some((offer) => offer.id === created.offerId), false)
-  })
+  )
+  assert.equal(pausedCatalogue.offers.some((offer) => offer.id === created.offerId), false)
 
   process.stdout.write('M4A HTTP authorization regression passed\n')
 } finally {
   if (productId) {
-    await admin.from('products').delete().eq('id', productId).catch(() => {})
+    try {
+      await admin.from('products').delete().eq('id', productId)
+    } catch {
+      // The local database is disposable; cleanup is best-effort after assertions.
+    }
   }
   for (const id of createdUserIds.reverse()) {
-    await admin.auth.admin.deleteUser(id).catch(() => {})
+    try {
+      await admin.auth.admin.deleteUser(id)
+    } catch {
+      // Keep teardown from masking the security assertion that actually failed.
+    }
   }
 }
