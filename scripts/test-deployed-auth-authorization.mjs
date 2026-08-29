@@ -182,6 +182,28 @@ async function expectStatus(label, response, expected) {
   return text ? JSON.parse(text) : null
 }
 
+async function completeAgeGate(page, label) {
+  const confirm = page.getByRole('button', { name: 'Yes, I am 18+' })
+  const gateVisible = await confirm
+    .waitFor({ state: 'visible', timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (!gateVisible) return
+
+  await page.getByRole('dialog', { name: 'Age Verification Required' }).waitFor()
+  await confirm.click()
+  await page
+    .getByRole('dialog', { name: 'Age Verification Required' })
+    .waitFor({ state: 'detached', timeout: 5_000 })
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('entiznet-age-verified')),
+    'true',
+    `${label}: age verification was not persisted`,
+  )
+  recordCheck(`${label} age gate`, { type: 'age-verification', verified: true })
+}
+
 async function expectBrowserPage(browser, label, pathname, cookie, expectedMarker) {
   const context = await browser.newContext()
   const pageErrors = []
@@ -211,6 +233,8 @@ async function expectBrowserPage(browser, label, pathname, cookie, expectedMarke
     })
     assert.ok(response, `${label}: navigation produced no main-resource response`)
     assert.equal(response.status(), 200, `${label}: expected browser HTTP 200, received ${response.status()}`)
+
+    await completeAgeGate(page, label)
 
     const marker = page.getByText(expectedMarker, { exact: false }).first()
     await marker.waitFor({ state: 'visible', timeout: 20_000 })
