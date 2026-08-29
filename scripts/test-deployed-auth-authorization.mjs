@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import path from 'node:path'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 
@@ -14,11 +16,19 @@ const configuredProductionSupabaseUrl = process.env.DEPLOYED_PRODUCTION_SUPABASE
 const expectedCommit = process.env.DEPLOYED_AUTH_EXPECTED_COMMIT || ''
 const environment = process.env.DEPLOYED_AUTH_TEST_ENVIRONMENT
 const mutationConsent = process.env.DEPLOYED_AUTH_TEST_ALLOW_MUTATION
+const playwrightNodeModules = process.env.PLAYWRIGHT_NODE_MODULES
+const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
 
 if (!rawOrigin || !supabaseUrl || !anonKey || !serviceRoleKey) {
   throw new Error(
     'DEPLOYED_AUTH_BASE_URL, DEPLOYED_AUTH_SUPABASE_URL, DEPLOYED_AUTH_SUPABASE_ANON_KEY and DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY are required',
   )
+}
+if (!playwrightNodeModules) {
+  throw new Error('PLAYWRIGHT_NODE_MODULES is required for deployed protected-page browser verification')
+}
+if (!vercelBypassSecret && new URL(rawOrigin).hostname.endsWith('.vercel.app')) {
+  throw new Error('VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel browser verification')
 }
 if (!/^[0-9a-f]{40}$/i.test(expectedCommit)) {
   throw new Error('DEPLOYED_AUTH_EXPECTED_COMMIT must be an exact 40-character Git SHA')
@@ -56,6 +66,8 @@ if (forbiddenSupabaseOrigins.has(targetSupabase.origin)) {
   throw new Error('deployed authorization fixtures must use an isolated non-production Supabase project or branch')
 }
 
+const require = createRequire(import.meta.url)
+const { chromium } = require(path.join(playwrightNodeModules, 'playwright'))
 const admin = createClient(targetSupabase.origin, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
@@ -92,6 +104,21 @@ function recordCheck(label, details = {}) {
 
 function cookieHeader(cookieJar) {
   return [...cookieJar.entries()].map(([name, entry]) => `${name}=${entry.value}`).join('; ')
+}
+
+function playwrightCookies(cookie) {
+  return cookie
+    .split(/;\s*/)
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.indexOf('=')
+      assert.ok(separator > 0, `invalid cookie entry for browser fixture: ${entry.slice(0, 40)}`)
+      return {
+        name: entry.slice(0, separator),
+        value: entry.slice(separator + 1),
+        url: origin.origin,
+      }
+    })
 }
 
 async function createIdentity(label, appMetadata = {}) {
@@ -155,21 +182,66 @@ async function expectStatus(label, response, expected) {
   return text ? JSON.parse(text) : null
 }
 
-async function expectPage(label, pathname, cookie, expectedMarker) {
-  const response = await appFetch(pathname, { cookie })
-  assert.equal(response.status, 200, `${label}: expected HTTP 200, received ${response.status}`)
-  const body = await response.text()
-  assert.ok(
-    body.includes(expectedMarker),
-    `${label}: expected deployed page marker ${JSON.stringify(expectedMarker)} was not rendered`,
-  )
-  recordCheck(label, {
-    type: 'protected-page',
-    pathname,
-    observedStatus: response.status,
-    expectedMarker,
-  })
-  process.stdout.write(`ok - ${label} protected page -> 200 with route marker\n`)
+async function expectBrowserPage(browser, label, pathname, cookie, expectedMarker) {
+  const context = await browser.newContext()
+  const pageErrors = []
+  try {
+    await context.addCookies(playwrightCookies(cookie))
+    const page = await context.newPage()
+
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const requestUrl = new URL(request.url())
+      if (requestUrl.origin !== origin.origin || !vercelBypassSecret) {
+        await route.continue()
+        return
+      }
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          'x-vercel-protection-bypass': vercelBypassSecret,
+        },
+      })
+    })
+
+    const response = await page.goto(new URL(pathname, origin).toString(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    })
+    assert.ok(response, `${label}: navigation produced no main-resource response`)
+    assert.equal(response.status(), 200, `${label}: expected browser HTTP 200, received ${response.status()}`)
+
+    const marker = page.getByText(expectedMarker, { exact: false }).first()
+    await marker.waitFor({ state: 'visible', timeout: 20_000 })
+
+    const finalUrl = new URL(page.url())
+    assert.equal(finalUrl.origin, origin.origin, `${label}: browser left the isolated deployment origin`)
+    assert.equal(finalUrl.pathname, pathname, `${label}: browser redirected away from protected route to ${finalUrl.pathname}`)
+
+    const bodyText = await page.locator('body').innerText()
+    assert.doesNotMatch(
+      bodyText,
+      /Application error: a client-side exception has occurred|Internal Server Error|This page could not be found/i,
+      `${label}: visible framework error content rendered`,
+    )
+    const nextErrorOverlayCount = await page
+      .locator('[data-nextjs-dialog-overlay], [data-next-badge-root="true"]')
+      .count()
+    assert.equal(nextErrorOverlayCount, 0, `${label}: Next.js error overlay rendered`)
+    assert.deepEqual(pageErrors, [], `${label}: browser pageerror events: ${pageErrors.join(' | ')}`)
+
+    recordCheck(label, {
+      type: 'protected-browser-page',
+      pathname,
+      observedStatus: response.status(),
+      expectedMarker,
+      finalPathname: finalUrl.pathname,
+    })
+    process.stdout.write(`ok - ${label} browser render -> 200, hydrated, authorized\n`)
+  } finally {
+    await context.close()
+  }
 }
 
 async function removeRows(table, column, userId) {
@@ -378,14 +450,21 @@ try {
     200,
   )
 
-  // Client-authenticated dashboards intentionally server-render a loading shell
-  // before AuthProvider hydration. Server-authenticated BSM/Admin dashboards
-  // must render their trusted role-specific content immediately. Route-specific
-  // markers avoid false positives from generic Next.js framework/RSC payloads.
-  await expectPage('Buyer dashboard', '/dashboard/buyer', buyer.cookie, 'Loading profile...')
-  await expectPage('Seller dashboard', '/dashboard/seller', seller.cookie, 'Loading your dashboard...')
-  await expectPage('Business/BSM dashboard', '/dashboard/bsm', business.cookie, 'Business / BSM')
-  await expectPage('Admin dashboard', '/admin', adminUser.cookie, 'EntizNetStore Operations')
+  const browser = await chromium.launch({ headless: true })
+  try {
+    await expectBrowserPage(browser, 'Buyer dashboard', '/dashboard/buyer', buyer.cookie, 'My Profile')
+    await expectBrowserPage(
+      browser,
+      'Seller dashboard',
+      '/dashboard/seller',
+      seller.cookie,
+      'Manage your store and products',
+    )
+    await expectBrowserPage(browser, 'Business/BSM dashboard', '/dashboard/bsm', business.cookie, 'Business / BSM')
+    await expectBrowserPage(browser, 'Admin dashboard', '/admin', adminUser.cookie, 'EntizNetStore Operations')
+  } finally {
+    await browser.close()
+  }
 
   evidence.result = 'passed'
   process.stdout.write(`Deployed authenticated authorization regression passed for ${origin.origin}\n`)
