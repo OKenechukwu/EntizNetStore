@@ -18,15 +18,15 @@ if (bypassSecret) {
     if (requestUrl.origin !== appOrigin) return nativeFetch(input, init)
 
     // Vercel supports automation bypass via both header and query parameter.
-    // Custom pre-production environments can be intercepted by SSO before the
-    // application runtime sees the request, so include the documented query
-    // parameter as well as the header. The secret is masked by GitHub Actions.
+    // Include both on every application request so the runner never depends on
+    // a bypass cookie. Requesting x-vercel-set-bypass-cookie can intentionally
+    // produce a redirect while Vercel establishes that cookie, which conflicts
+    // with this security gate's redirect:'manual' assertions.
     requestUrl.searchParams.set('x-vercel-protection-bypass', bypassSecret)
 
     const headers = new Headers(input instanceof Request ? input.headers : undefined)
     new Headers(init.headers).forEach((value, key) => headers.set(key, value))
     headers.set('x-vercel-protection-bypass', bypassSecret)
-    headers.set('x-vercel-set-bypass-cookie', 'true')
 
     return nativeFetch(requestUrl, { ...init, headers })
   }
