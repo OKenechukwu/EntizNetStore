@@ -64,6 +64,19 @@ values (
   'b9ec6994-3765-4a06-a072-6bcf6b619645'
 );
 
+-- Preserve the canonical publication invariant: an active product must have
+-- at least one product image. This fixture intentionally looks like a valid
+-- publishable catalogue product rather than bypassing the M2 guard.
+insert into public.product_media(product_id, variant_id, type, url, alt_text, position)
+values (
+  'b5000000-0000-0000-0000-000000000005',
+  'b6000000-0000-0000-0000-000000000006',
+  'image',
+  'https://example.invalid/m4a-wholesale-product.jpg',
+  'M4A wholesale regression product',
+  0
+);
+
 update public.products
 set moderation_status = 'approved', status = 'active', moderated_at = now(), updated_at = now()
 where id = 'b5000000-0000-0000-0000-000000000005';
