@@ -8,6 +8,31 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(24),
 });
 
+type ProductRow = {
+  id: string;
+  title: string | null;
+  slug: string | null;
+  seller_id: string | null;
+  requires_shipping: boolean | null;
+};
+
+type VariantRow = {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  inventory_quantity: number | null;
+  track_inventory: boolean | null;
+  inventory_policy: string | null;
+};
+
+type BusinessRow = {
+  id: string;
+  display_name: string | null;
+  business_kind: string | null;
+  logo_url: string | null;
+  country: string | null;
+};
+
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -99,9 +124,20 @@ export async function GET(request: NextRequest) {
     });
     tiersByOffer.set(tier.offer_id, current);
   }
-  const productMap = new Map((productsResult.data || []).map((product) => [product.id, product]));
-  const variantMap = new Map((variantsResult.data || []).map((variant) => [variant.id, variant]));
-  const businessMap = new Map((businessesResult.data || []).map((business) => [business.id, business]));
+
+  const productMap = new Map<string, ProductRow>();
+  for (const product of (productsResult.data || []) as ProductRow[]) {
+    productMap.set(product.id, product);
+  }
+  const variantMap = new Map<string, VariantRow>();
+  for (const variant of (variantsResult.data || []) as VariantRow[]) {
+    variantMap.set(variant.id, variant);
+  }
+  const businessMap = new Map<string, BusinessRow>();
+  for (const business of (businessesResult.data || []) as BusinessRow[]) {
+    businessMap.set(business.id, business);
+  }
+
   const imageMap = new Map<string, string>();
   for (const media of mediaResult.data || []) {
     if (!imageMap.has(media.product_id)) imageMap.set(media.product_id, media.url);
