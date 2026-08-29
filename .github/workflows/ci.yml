@@ -100,6 +100,9 @@ jobs:
       - name: Verify M3 structural database invariants
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-m3-database-invariants.sql
 
+      - name: Verify M4A wholesale structural database invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/verify-m4a-database-invariants.sql
+
       - name: Run M1 identity, KYC and storage regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m1-identity-kyc-storage.sql
 
