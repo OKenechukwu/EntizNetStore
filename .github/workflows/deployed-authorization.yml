@@ -35,8 +35,10 @@ concurrency:
 jobs:
   deployed-authorization:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment: entiznetstore-${{ inputs.environment }}-verification
+    env:
+      PLAYWRIGHT_NODE_MODULES: /tmp/entiznetstore-playwright/node_modules
     steps:
       - name: Refuse unsafe invocation
         shell: bash
@@ -88,6 +90,15 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install isolated Chromium browser tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX=/tmp/entiznetstore-playwright
+          rm -rf "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
+
       - name: Exercise deployed authenticated authorization
         env:
           DEPLOYED_AUTH_BASE_URL: ${{ inputs.base_url }}
@@ -99,6 +110,7 @@ jobs:
           DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
           DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ vars.ENTIZNETSTORE_PRODUCTION_SUPABASE_URL }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PLAYWRIGHT_NODE_MODULES: ${{ env.PLAYWRIGHT_NODE_MODULES }}
         run: node --import ./scripts/deployed-vercel-bypass.mjs scripts/test-deployed-auth-authorization.mjs
 
       - name: Upload deployed authorization evidence
