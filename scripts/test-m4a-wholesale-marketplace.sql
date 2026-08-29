@@ -370,10 +370,24 @@ $$;
 
 -- A Business capability suspension after quote creation must also fail closed.
 reset role;
-insert into public.marketplace_capability_states(user_id, capability, status, reason, suspended_at)
-values ('b2000000-0000-0000-0000-000000000002', 'business', 'suspended', 'M4A regression', now())
+insert into public.marketplace_capability_states(
+  user_id, capability, status, reason, suspended_at, suspended_by
+)
+values (
+  'b2000000-0000-0000-0000-000000000002',
+  'business',
+  'suspended',
+  'M4A regression',
+  now(),
+  'b4000000-0000-0000-0000-000000000004'
+)
 on conflict (user_id, capability)
-do update set status = excluded.status, reason = excluded.reason, suspended_at = excluded.suspended_at, updated_at = now();
+do update set
+  status = excluded.status,
+  reason = excluded.reason,
+  suspended_at = excluded.suspended_at,
+  suspended_by = excluded.suspended_by,
+  updated_at = now();
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'b2000000-0000-0000-0000-000000000002', true);
@@ -395,7 +409,13 @@ $$;
 
 reset role;
 update public.marketplace_capability_states
-set status = 'active', reason = null, suspended_at = null, restored_at = now(), updated_at = now()
+set status = 'active',
+    reason = null,
+    suspended_at = null,
+    suspended_by = null,
+    restored_at = now(),
+    restored_by = 'b4000000-0000-0000-0000-000000000004',
+    updated_at = now()
 where user_id = 'b2000000-0000-0000-0000-000000000002' and capability = 'business';
 
 -- Fresh trusted quote at the new 50+ tier (1,700 cents).
