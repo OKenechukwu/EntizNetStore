@@ -25,7 +25,7 @@ export default async function BsmWholesaleMarketplacePage() {
   const verified = business.verification_status === "verified";
 
   return (
-    <main className="container mx-auto space-y-8 px-4 py-10">
+    <div className="container mx-auto space-y-8 px-4 py-10">
       <header className="glass-card p-6 md:p-8">
         <p className="text-sm uppercase tracking-wide text-accent-gold">Business sourcing</p>
         <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -59,6 +59,6 @@ export default async function BsmWholesaleMarketplacePage() {
       ) : (
         <WholesaleCatalogue />
       )}
-    </main>
+    </div>
   );
 }
