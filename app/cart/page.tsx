@@ -39,8 +39,12 @@ function availabilityMessage(reason: string | null): string {
       return "The requested quantity is no longer available.";
     case "wholesale_offer_unavailable":
       return "This wholesale offer is no longer available.";
-    case "wholesale_buyer_ineligible":
-      return "Your Business capability is not currently eligible for this wholesale offer.";
+    case "verified_business_buyer_required":
+      return "A verified, active Business capability is required for this wholesale offer.";
+    case "wholesale_quantity_does_not_meet_offer_terms":
+      return "This wholesale quantity no longer meets the offer's MOQ or order-multiple terms.";
+    case "wholesale_pricing_tier_unavailable":
+      return "A valid wholesale pricing tier is no longer available for this quantity.";
     default:
       return "This item needs review before checkout.";
   }
@@ -51,13 +55,13 @@ function wholesaleQuantityBounds(item: CanonicalCartItem): {
   step: number;
   maximum: number;
 } {
-  if (item.purchaseMode !== "wholesale" || !item.wholesale) {
+  if (item.purchaseMode !== "wholesale" || !item.wholesaleTerms) {
     return { minimum: 1, step: 1, maximum: 100 };
   }
 
   return {
-    minimum: Math.max(1, item.wholesale.minimumOrderQuantity),
-    step: Math.max(1, item.wholesale.orderMultiple),
+    minimum: Math.max(1, item.wholesaleTerms.minimumOrderQuantity),
+    step: Math.max(1, item.wholesaleTerms.orderMultiple),
     maximum: 100000,
   };
 }
@@ -141,13 +145,13 @@ export default function CartPage() {
     setError(null);
     try {
       if (item.purchaseMode === "wholesale") {
-        if (!item.wholesaleOfferId || !item.wholesale) {
+        if (!item.wholesaleTerms?.offerId) {
           throw new Error("Wholesale pricing context is unavailable. Remove this line and add the offer again.");
         }
 
         setCanonicalCart(
           await setCanonicalWholesaleCartItem({
-            offerId: item.wholesaleOfferId,
+            offerId: item.wholesaleTerms.offerId,
             quantity,
           }),
         );
@@ -345,24 +349,24 @@ export default function CartPage() {
                         </div>
                         {variantTitle && <p className="mt-1 text-xs" style={{ color: theme.colors.text.secondary }}>{variantTitle}</p>}
                         <p className="mt-1 text-sm" style={{ color: theme.colors.text.secondary }}>
-                          <Price amount={unitPrice} /> {isWholesale && canonicalItem?.wholesale?.unitLabel
-                            ? `per ${canonicalItem.wholesale.unitLabel}`
+                          <Price amount={unitPrice} /> {isWholesale && canonicalItem?.wholesaleTerms?.unitLabel
+                            ? `per ${canonicalItem.wholesaleTerms.unitLabel}`
                             : <T k="cart.each" />}
                         </p>
 
-                        {isWholesale && canonicalItem?.wholesale && (
+                        {isWholesale && canonicalItem?.wholesaleTerms && (
                           <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-500/5 p-3 text-xs" style={{ color: theme.colors.text.secondary }}>
                             <div className="flex flex-wrap gap-x-4 gap-y-1">
-                              <span><strong style={{ color: theme.colors.text.primary }}>MOQ:</strong> {canonicalItem.wholesale.minimumOrderQuantity}</span>
-                              <span><strong style={{ color: theme.colors.text.primary }}>Order multiple:</strong> {canonicalItem.wholesale.orderMultiple}</span>
-                              {canonicalItem.wholesale.casePackSize ? (
-                                <span><strong style={{ color: theme.colors.text.primary }}>Case pack:</strong> {canonicalItem.wholesale.casePackSize}</span>
+                              <span><strong style={{ color: theme.colors.text.primary }}>MOQ:</strong> {canonicalItem.wholesaleTerms.minimumOrderQuantity}</span>
+                              <span><strong style={{ color: theme.colors.text.primary }}>Order multiple:</strong> {canonicalItem.wholesaleTerms.orderMultiple}</span>
+                              {canonicalItem.wholesaleTerms.casePackSize ? (
+                                <span><strong style={{ color: theme.colors.text.primary }}>Case pack:</strong> {canonicalItem.wholesaleTerms.casePackSize}</span>
                               ) : null}
-                              <span><strong style={{ color: theme.colors.text.primary }}>Lead time:</strong> {canonicalItem.wholesale.leadTimeDays} day{canonicalItem.wholesale.leadTimeDays === 1 ? "" : "s"}</span>
-                              {canonicalItem.wholesale.incoterm ? (
-                                <span><strong style={{ color: theme.colors.text.primary }}>Incoterm:</strong> {canonicalItem.wholesale.incoterm}</span>
+                              <span><strong style={{ color: theme.colors.text.primary }}>Lead time:</strong> {canonicalItem.wholesaleTerms.leadTimeDays} day{canonicalItem.wholesaleTerms.leadTimeDays === 1 ? "" : "s"}</span>
+                              {canonicalItem.wholesaleTerms.incoterm ? (
+                                <span><strong style={{ color: theme.colors.text.primary }}>Incoterm:</strong> {canonicalItem.wholesaleTerms.incoterm}</span>
                               ) : null}
-                              <span><strong style={{ color: theme.colors.text.primary }}>Applied tier:</strong> {canonicalItem.wholesale.tierMinimumQuantity}+</span>
+                              <span><strong style={{ color: theme.colors.text.primary }}>Applied tier:</strong> {canonicalItem.wholesaleTerms.tierMinimumQuantity}+</span>
                             </div>
                             <p className="mt-2">Wholesale eligibility and tier price are checked again on the server before checkout.</p>
                           </div>
