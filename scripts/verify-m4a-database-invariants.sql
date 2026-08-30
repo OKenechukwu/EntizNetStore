@@ -231,7 +231,7 @@ begin
   select pg_get_functiondef(
     'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
   ) into v_save_definition;
-  if v_save_definition like '%p_minimum_order_quantity % p_order_multiple%' then
+  if position('p_minimum_order_quantity % p_order_multiple' in v_save_definition) > 0 then
     raise exception 'Wholesale save RPC reintroduced invalid MOQ divisibility coupling';
   end if;
 
