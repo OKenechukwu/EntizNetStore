@@ -89,7 +89,6 @@ export function createHostedAppFetch(target, nativeFetch = globalThis.fetch.bind
       new Headers(init.headers).forEach((value, key) => headers.set(key, value))
     }
     headers.set('x-vercel-protection-bypass', target.vercelBypassSecret)
-    headers.set('x-vercel-set-bypass-cookie', 'true')
     headers.set('user-agent', 'EntizNetStore-M4A-hosted-verification/1.0')
 
     return nativeFetch(input, { ...init, headers })
