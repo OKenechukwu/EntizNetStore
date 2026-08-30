@@ -19,6 +19,7 @@ const password = 'M4A-Http-Regression-2026!'
 const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
 const createdUserIds = []
 let productId = null
+let checkoutSessionId = null
 
 function cookieHeader(cookieJar) {
   return [...cookieJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
@@ -312,6 +313,148 @@ try {
   assert.equal(wholesaleLine.wholesaleTerms.tierMinimumQuantity, 52)
   assert.equal(wholesaleLine.unitPriceCents, 1800)
   assert.equal(wholesaleLine.quantity, 52)
+  assert.equal(wholesaleLine.lineTotalCents, 93600)
+
+  const quotePayload = await expectStatus(
+    'verified Business buyer receives authoritative ready wholesale quote',
+    await appFetch('/api/cart/quote', {
+      cookie: businessBuyer.cookie,
+      method: 'POST',
+      json: { addressId: null },
+    }),
+    200,
+  )
+  const quote = quotePayload.quote
+  assert.equal(quote.status, 'ready')
+  assert.deepEqual(quote.block_reasons, [])
+  assert.equal(Number(quote.subtotal_cents), 93600)
+  assert.equal(Number(quote.total_cents), 93600)
+  const quotedLine = quote.items_snapshot.find((item) => item.cartItemId === wholesaleCart.itemId)
+  assert.ok(quotedLine, 'wholesale line missing from persisted quote snapshot')
+  assert.equal(quotedLine.purchaseMode, 'wholesale')
+  assert.equal(quotedLine.wholesaleOfferId, created.offerId)
+  assert.equal(quotedLine.wholesaleTerms.minimumOrderQuantity, 12)
+  assert.equal(quotedLine.wholesaleTerms.orderMultiple, 5)
+  assert.equal(quotedLine.wholesaleTerms.tierMinimumQuantity, 52)
+  assert.equal(quotedLine.unitPriceCents, 1800)
+  assert.equal(quotedLine.lineTotalCents, 93600)
+
+  // Mutate the live price after the quote without changing the cart version.
+  // Checkout must re-resolve the tier and reject the stale quote; this proves
+  // the browser/quote price never becomes final payment authority.
+  const changedPriceOffer = offerPayload(fixture.productId, fixture.variantId, created.offerId)
+  changedPriceOffer.tiers = [
+    { minimumQuantity: 12, unitPriceCents: 2000 },
+    { minimumQuantity: 52, unitPriceCents: 1700 },
+    { minimumQuantity: 102, unitPriceCents: 1600 },
+  ]
+  await expectStatus(
+    'supplier can change live wholesale tier after quote',
+    await appFetch('/api/bsm/wholesale/offers', {
+      cookie: seller.cookie,
+      method: 'POST',
+      json: changedPriceOffer,
+    }),
+    200,
+  )
+
+  const idempotencyKey = crypto.randomUUID()
+  const staleCheckout = await expectStatus(
+    'checkout rejects stale quoted wholesale price',
+    await appFetch('/api/checkout/session', {
+      cookie: businessBuyer.cookie,
+      method: 'POST',
+      json: { cartId: quote.cart_id, quoteId: quote.id, idempotencyKey },
+    }),
+    400,
+  )
+  assert.match(staleCheckout.error, /cart_quote_price_changed/i)
+
+  // Restore the quoted live tier and retry with the SAME key. The failed
+  // transaction must not have consumed the key or left a partial session/order.
+  await expectStatus(
+    'supplier restores quoted wholesale tier',
+    await appFetch('/api/bsm/wholesale/offers', {
+      cookie: seller.cookie,
+      method: 'POST',
+      json: offerPayload(fixture.productId, fixture.variantId, created.offerId),
+    }),
+    200,
+  )
+
+  const checkout = await expectStatus(
+    'authoritative wholesale checkout succeeds after live price restoration',
+    await appFetch('/api/checkout/session', {
+      cookie: businessBuyer.cookie,
+      method: 'POST',
+      json: { cartId: quote.cart_id, quoteId: quote.id, idempotencyKey },
+    }),
+    200,
+  )
+  checkoutSessionId = checkout.checkoutSessionId
+  assert.match(checkoutSessionId, /^[0-9a-f-]{36}$/i)
+  assert.equal(checkout.amountCents, 93600)
+
+  const checkoutRetry = await expectStatus(
+    'wholesale checkout idempotency returns the same frozen session',
+    await appFetch('/api/checkout/session', {
+      cookie: businessBuyer.cookie,
+      method: 'POST',
+      json: { cartId: quote.cart_id, quoteId: quote.id, idempotencyKey },
+    }),
+    200,
+  )
+  assert.equal(checkoutRetry.checkoutSessionId, checkoutSessionId)
+  assert.equal(checkoutRetry.amountCents, 93600)
+
+  const { data: orders, error: ordersError } = await admin
+    .from('orders')
+    .select('id, buyer_id, seller_id, subtotal_cents, total_cents, payment_session_id')
+    .eq('payment_session_id', checkoutSessionId)
+  if (ordersError) throw ordersError
+  assert.equal(orders.length, 1, 'wholesale checkout did not create exactly one Seller order')
+  const order = orders[0]
+  assert.equal(order.buyer_id, businessBuyer.id)
+  assert.equal(order.seller_id, seller.id)
+  assert.equal(Number(order.subtotal_cents), 93600)
+  assert.equal(Number(order.total_cents), 93600)
+
+  const { data: orderItems, error: orderItemsError } = await admin
+    .from('order_items')
+    .select('id, order_id, product_id, variant_id, quantity, price_cents, total_cents, purchase_mode, wholesale_offer_id, pricing_snapshot')
+    .eq('order_id', order.id)
+  if (orderItemsError) throw orderItemsError
+  assert.equal(orderItems.length, 1, 'wholesale checkout did not create exactly one immutable order item')
+  const orderItem = orderItems[0]
+  assert.equal(orderItem.product_id, fixture.productId)
+  assert.equal(orderItem.variant_id, fixture.variantId)
+  assert.equal(Number(orderItem.quantity), 52)
+  assert.equal(Number(orderItem.price_cents), 1800)
+  assert.equal(Number(orderItem.total_cents), 93600)
+  assert.equal(orderItem.purchase_mode, 'wholesale')
+  assert.equal(orderItem.wholesale_offer_id, created.offerId)
+  assert.equal(orderItem.pricing_snapshot.offerId, created.offerId)
+  assert.equal(Number(orderItem.pricing_snapshot.minimumOrderQuantity), 12)
+  assert.equal(Number(orderItem.pricing_snapshot.orderMultiple), 5)
+  assert.equal(Number(orderItem.pricing_snapshot.tierMinimumQuantity), 52)
+  assert.equal(Number(orderItem.pricing_snapshot.unitPriceCents), 1800)
+  assert.equal(orderItem.pricing_snapshot.unitLabel, 'unit')
+  assert.equal(Number(orderItem.pricing_snapshot.casePackSize), 10)
+  assert.equal(Number(orderItem.pricing_snapshot.leadTimeDays), 7)
+  assert.equal(orderItem.pricing_snapshot.incoterm, 'FOB')
+
+  const { data: reservations, error: reservationsError } = await admin
+    .from('inventory_reservations')
+    .select('payment_session_id, product_id, variant_id, quantity, status')
+    .eq('payment_session_id', checkoutSessionId)
+  if (reservationsError) throw reservationsError
+  assert.equal(reservations.length, 1, 'wholesale checkout did not create exactly one inventory reservation')
+  assert.equal(reservations[0].product_id, fixture.productId)
+  assert.equal(reservations[0].variant_id, fixture.variantId)
+  assert.equal(Number(reservations[0].quantity), 52)
+  assert.equal(reservations[0].status, 'pending')
+
+  process.stdout.write('ok - wholesale quote, stale-price rejection, idempotent checkout, immutable pricing snapshot and inventory reservation\n')
 
   await expectStatus(
     'cross-BSM wholesale offer edit denied',
@@ -356,6 +499,20 @@ try {
 
   process.stdout.write('M4A HTTP authorization regression passed\n')
 } finally {
+  // Local CI uses a disposable Supabase instance. Still attempt dependency-order
+  // cleanup so this script also behaves well when run repeatedly by engineers.
+  if (checkoutSessionId) {
+    try { await admin.from('inventory_reservations').delete().eq('payment_session_id', checkoutSessionId) } catch {}
+    try {
+      const { data: cleanupOrders } = await admin.from('orders').select('id').eq('payment_session_id', checkoutSessionId)
+      const cleanupOrderIds = (cleanupOrders || []).map((order) => order.id)
+      if (cleanupOrderIds.length) {
+        await admin.from('order_items').delete().in('order_id', cleanupOrderIds)
+        await admin.from('orders').delete().in('id', cleanupOrderIds)
+      }
+    } catch {}
+    try { await admin.from('payment_sessions').delete().eq('id', checkoutSessionId) } catch {}
+  }
   if (productId) {
     try {
       await admin.from('products').delete().eq('id', productId)
