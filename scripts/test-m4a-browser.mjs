@@ -367,7 +367,7 @@ const createdOffer = await expectStatus(
       productId: fixture.productId,
       variantId: fixture.variantId,
       status: "active",
-      minimumOrderQuantity: 10,
+      minimumOrderQuantity: 12,
       orderMultiple: 5,
       unitLabel: "unit",
       casePackSize: 10,
@@ -376,9 +376,9 @@ const createdOffer = await expectStatus(
       startsAt: null,
       endsAt: null,
       tiers: [
-        { minimumQuantity: 10, unitPriceCents: 2000 },
-        { minimumQuantity: 50, unitPriceCents: 1800 },
-        { minimumQuantity: 100, unitPriceCents: 1600 },
+        { minimumQuantity: 12, unitPriceCents: 2000 },
+        { minimumQuantity: 52, unitPriceCents: 1800 },
+        { minimumQuantity: 102, unitPriceCents: 1600 },
       ],
     },
   }),
@@ -430,9 +430,11 @@ try {
 
   await auditPage(supplierPage, "/dashboard/bsm/wholesale", "supplier wholesale offer manager");
   await supplierPage.getByRole("heading", { name: "Create wholesale offer" }).waitFor();
-  await supplierPage.getByText(productTitle, { exact: false }).first().waitFor();
+  const supplierOfferCard = supplierPage.locator("article").filter({ hasText: productTitle }).first();
+  await supplierOfferCard.waitFor();
   await supplierPage.getByRole("heading", { name: "Current wholesale offers" }).waitFor();
-  assert.ok(await supplierPage.getByText("MOQ 10", { exact: false }).first().isVisible());
+  assert.ok(await supplierOfferCard.getByText("MOQ 12", { exact: false }).isVisible());
+  assert.ok(await supplierOfferCard.getByText("multiple 5", { exact: false }).isVisible());
   await supplierPage.screenshot({ path: path.join(outputDir, "supplier-wholesale-offers.png"), fullPage: true });
   await supplierContext.close();
 
@@ -440,23 +442,27 @@ try {
   const retailerPage = await retailerContext.newPage();
   watchBrowserErrors(retailerPage, "m4a retailer");
   await auditPage(retailerPage, "/dashboard/bsm/marketplace", "retailer wholesale marketplace");
-  await retailerPage.getByText(productTitle, { exact: true }).waitFor();
-  await retailerPage.getByText("Quantity pricing", { exact: true }).waitFor();
-  assert.ok(await retailerPage.getByText("10+", { exact: false }).first().isVisible());
+  const retailerOfferCard = retailerPage.locator("article").filter({ hasText: productTitle }).first();
+  await retailerOfferCard.waitFor();
+  await retailerOfferCard.getByText("Quantity pricing", { exact: true }).waitFor();
+  assert.ok(await retailerOfferCard.getByText("12+", { exact: false }).first().isVisible());
+  assert.match(await retailerOfferCard.innerText(), /MOQ\s+12/i, "retailer card did not show MOQ 12");
+  assert.match(await retailerOfferCard.innerText(), /Multiple\s+5/i, "retailer card did not show order multiple 5");
 
-  const quantityInput = retailerPage.getByLabel("Order quantity");
-  await quantityInput.fill("50");
+  const quantityInput = retailerOfferCard.getByLabel("Order quantity");
+  await quantityInput.fill("52");
   await quantityInput.blur();
-  await retailerPage.getByText("50+", { exact: false }).first().waitFor();
+  await retailerOfferCard.getByText("52+", { exact: false }).first().waitFor();
 
-  const increase = retailerPage.getByRole("button", { name: new RegExp(`Increase ${productTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} quantity by 5`) });
-  const decrease = retailerPage.getByRole("button", { name: new RegExp(`Decrease ${productTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} quantity by 5`) });
+  const escapedTitle = productTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const increase = retailerOfferCard.getByRole("button", { name: new RegExp(`Increase ${escapedTitle} quantity by 5`) });
+  const decrease = retailerOfferCard.getByRole("button", { name: new RegExp(`Decrease ${escapedTitle} quantity by 5`) });
   for (const [control, label] of [[increase, "increase"], [decrease, "decrease"]]) {
     const box = await control.boundingBox();
     assert.ok(box && box.width >= 44 && box.height >= 44, `retailer ${label} quantity control is smaller than 44px`);
   }
 
-  await retailerPage.getByRole("button", { name: "Add wholesale" }).click();
+  await retailerOfferCard.getByRole("button", { name: "Add wholesale" }).click();
   await retailerPage.getByRole("status").filter({ hasText: productTitle }).waitFor();
   await assertNoHorizontalOverflow(retailerPage, "retailer marketplace after cart mutation");
   await assertAxe(retailerPage, "retailer marketplace after cart mutation");
@@ -468,7 +474,8 @@ try {
   await retailerPage.getByText("MOQ:", { exact: false }).waitFor();
   await retailerPage.getByText("Applied tier:", { exact: false }).waitFor();
   const cartText = await retailerPage.locator("body").innerText();
-  assert.match(cartText, /Applied tier:\s*50\+/i, "wholesale cart did not preserve the applied 50+ tier");
+  assert.match(cartText, /MOQ:\s*12/i, "wholesale cart did not preserve MOQ 12");
+  assert.match(cartText, /Applied tier:\s*52\+/i, "wholesale cart did not preserve the applied 52+ tier");
   assert.match(cartText, /Order multiple:\s*5/i, "wholesale cart did not preserve the order multiple");
   await retailerPage.screenshot({ path: path.join(outputDir, "retailer-wholesale-cart.png"), fullPage: true });
   await retailerContext.close();
