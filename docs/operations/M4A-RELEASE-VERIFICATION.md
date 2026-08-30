@@ -16,6 +16,8 @@ Production verification happens only after merge/deploy and must not be used as 
 
 - `20260829174000_m4a_bsm_wholesale_foundation.sql`
 - `20260830063500_m4a_moq_relative_multiple_alignment.sql`
+- `20260830165500_m4a_hosted_privilege_hardening.sql`
+- `20260830170500_m4a_hosted_fk_index_hardening.sql`
 
 The second migration is a forward correction aligning persistence with the canonical quantity rule:
 
@@ -23,7 +25,18 @@ The second migration is a forward correction aligning persistence with the canon
 quantity = MOQ + n × orderMultiple
 ```
 
-Never rewrite an applied migration to perform this correction.
+The third migration makes M4A browser-table privileges explicit across Supabase runtimes. Hosted Supabase may grant `SELECT` and `MAINTAIN` to browser roles on newly created public tables. M4A requires:
+
+- `anon`: no table-level privileges on the three M4A tables;
+- `authenticated`: `SELECT` only;
+- `service_role`: full operational table privileges.
+
+The fourth migration adds covering indexes for the M4A foreign keys identified by the hosted Supabase performance advisor:
+
+- `wholesale_offers.product_id`;
+- `order_items.wholesale_offer_id`.
+
+Never rewrite an applied migration to perform these corrections. Use forward migrations and preservation tests.
 
 ## Mandatory local/CI gates
 
@@ -58,10 +71,10 @@ Required structural checks include:
 The M4A structural gate must prove:
 
 - RLS on all new M4A tables;
-- no anonymous table access;
-- no authenticated direct writes;
-- expected service-role access;
-- required RLS policies/indexes;
+- no anonymous table privileges, including `SELECT` and `MAINTAIN`;
+- authenticated M4A table access is `SELECT` only, with no DML, `TRIGGER`, `REFERENCES`, `TRUNCATE` or `MAINTAIN` privilege;
+- full expected service-role operational privileges;
+- required RLS policies and indexes, including hosted-advisor FK indexes;
 - RPC execution grants;
 - hardened SECURITY DEFINER search paths;
 - offer/cart integrity triggers;
@@ -177,12 +190,20 @@ Required isolation:
 
 Before exercising the app:
 
-1. verify the hosted branch is healthy;
-2. apply/replay the intended M4A migrations only on the isolated branch;
-3. verify all new tables/functions/policies/constraints exist;
-4. verify RLS remains enabled;
-5. verify the obsolete MOQ-divisibility constraint is absent;
-6. run non-production-safe structural and behavioral verification as available.
+1. verify the hosted branch is healthy and starts from the same pre-M4A migration boundary as production;
+2. apply/replay every intended M4A forward migration only on the isolated branch;
+3. verify all new tables/functions/policies/constraints exist and all public tables retain RLS;
+4. verify the obsolete MOQ-divisibility constraint is absent;
+5. verify `anon` has no table-level M4A privileges and `authenticated` has `SELECT` only;
+6. verify the service role retains the required operational privileges;
+7. run the core and fail-closed M4A behavior matrices using disposable data and transaction rollback;
+8. prove rollback leaves no disposable M4A users/categories/products/offers/tiers/roles;
+9. run Supabase security and performance advisors after DDL changes;
+10. treat advisor-reported missing FK indexes as release defects; newly created indexes may remain listed as unused on a fresh no-traffic branch and that informational state is expected.
+
+The hosted Supabase advisor may warn that intentionally authenticated, self-scoped `SECURITY DEFINER` browser RPCs are executable. Do not silence those warnings by revoking required API authority. Instead, verify each reviewed RPC against the repository SECURITY DEFINER allowlist, explicit hardened `search_path`, owner/capability checks and adversarial tests.
+
+Hosted development branches do not necessarily contain repository seed data. Hosted test fixtures must therefore discover an active category dynamically or create disposable prerequisite data inside their rollback/cleanup boundary; never weaken product-publication guards to accommodate a test fixture.
 
 ### Hosted safety preflight
 
@@ -282,6 +303,8 @@ Record in the PR/release history:
 - Chromium/WCAG artifact reference;
 - isolated Supabase branch/project reference used for staging verification;
 - isolated Vercel deployment/environment and exact SHA;
+- hosted structural/core/fail-closed database results;
+- hosted advisor review and any forward hardening migrations produced from it;
 - hosted health/runtime result including the expected server backend-binding fingerprint match;
 - cleanup confirmation for disposable users/data/branches/environments.
 
