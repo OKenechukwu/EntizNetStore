@@ -20,6 +20,8 @@ const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
 const createdUserIds = []
 let productId = null
 let checkoutSessionId = null
+let wholesaleOfferId = null
+let businessBuyerId = null
 
 function cookieHeader(cookieJar) {
   return [...cookieJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
@@ -159,7 +161,7 @@ async function seedMarketplace({ seller, businessBuyer, retailBuyer, otherBusine
       product_id: product.id,
       variant_id: variant.id,
       type: 'image',
-      url: 'https://example.invalid/m4a-http-wholesale.jpg',
+      url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=',
       alt_text: 'M4A HTTP wholesale fixture',
       position: 0,
     }),
@@ -203,6 +205,7 @@ function offerPayload(productIdValue, variantIdValue, offerId = null, status = '
 try {
   const seller = await createUser('seller')
   const businessBuyer = await createUser('business-buyer')
+  businessBuyerId = businessBuyer.id
   const retailBuyer = await createUser('retail-buyer')
   const otherBusiness = await createUser('other-business')
   const fixture = await seedMarketplace({ seller, businessBuyer, retailBuyer, otherBusiness })
@@ -247,6 +250,7 @@ try {
     201,
   )
   assert.match(created.offerId, /^[0-9a-f-]{36}$/i)
+  wholesaleOfferId = created.offerId
 
   const ordinaryCatalogue = await expectStatus(
     'ordinary Buyer wholesale catalogue request does not leak B2B offers',
@@ -499,8 +503,8 @@ try {
 
   process.stdout.write('M4A HTTP authorization regression passed\n')
 } finally {
-  // Local CI uses a disposable Supabase instance. Still attempt dependency-order
-  // cleanup so this script also behaves well when run repeatedly by engineers.
+  // Keep the shared local regression database clean for the browser suite that
+  // runs immediately afterwards. Teardown mirrors checkout ownership/FK order.
   if (checkoutSessionId) {
     try { await admin.from('inventory_reservations').delete().eq('payment_session_id', checkoutSessionId) } catch {}
     try {
@@ -513,6 +517,24 @@ try {
     } catch {}
     try { await admin.from('payment_sessions').delete().eq('id', checkoutSessionId) } catch {}
   }
+
+  if (businessBuyerId) {
+    try {
+      const { data: cleanupCarts } = await admin.from('carts').select('id').eq('buyer_id', businessBuyerId)
+      const cleanupCartIds = (cleanupCarts || []).map((cart) => cart.id)
+      if (cleanupCartIds.length) {
+        await admin.from('cart_quotes').delete().in('cart_id', cleanupCartIds)
+        await admin.from('cart_items').delete().in('cart_id', cleanupCartIds)
+        await admin.from('carts').delete().in('id', cleanupCartIds)
+      }
+    } catch {}
+  }
+
+  if (wholesaleOfferId) {
+    try { await admin.from('wholesale_offer_tiers').delete().eq('offer_id', wholesaleOfferId) } catch {}
+    try { await admin.from('wholesale_offers').delete().eq('id', wholesaleOfferId) } catch {}
+  }
+
   if (productId) {
     try {
       await admin.from('products').delete().eq('id', productId)
