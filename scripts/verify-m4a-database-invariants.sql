@@ -40,21 +40,33 @@ begin
 
     if has_table_privilege('authenticated', format('public.%I', v_table), 'INSERT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'UPDATE')
-       or has_table_privilege('authenticated', format('public.%I', v_table), 'DELETE') then
-      raise exception 'M4A direct browser mutation leaked: %', v_table;
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'DELETE')
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'TRUNCATE')
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'REFERENCES')
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'TRIGGER')
+       or has_table_privilege('authenticated', format('public.%I', v_table), 'MAINTAIN') then
+      raise exception 'M4A authenticated privilege exceeds SELECT-only contract: %', v_table;
     end if;
 
     if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
        or has_table_privilege('anon', format('public.%I', v_table), 'INSERT')
        or has_table_privilege('anon', format('public.%I', v_table), 'UPDATE')
-       or has_table_privilege('anon', format('public.%I', v_table), 'DELETE') then
+       or has_table_privilege('anon', format('public.%I', v_table), 'DELETE')
+       or has_table_privilege('anon', format('public.%I', v_table), 'TRUNCATE')
+       or has_table_privilege('anon', format('public.%I', v_table), 'REFERENCES')
+       or has_table_privilege('anon', format('public.%I', v_table), 'TRIGGER')
+       or has_table_privilege('anon', format('public.%I', v_table), 'MAINTAIN') then
       raise exception 'Anonymous M4A table privilege leaked: %', v_table;
     end if;
 
     if not has_table_privilege('service_role', format('public.%I', v_table), 'SELECT')
        or not has_table_privilege('service_role', format('public.%I', v_table), 'INSERT')
        or not has_table_privilege('service_role', format('public.%I', v_table), 'UPDATE')
-       or not has_table_privilege('service_role', format('public.%I', v_table), 'DELETE') then
+       or not has_table_privilege('service_role', format('public.%I', v_table), 'DELETE')
+       or not has_table_privilege('service_role', format('public.%I', v_table), 'TRUNCATE')
+       or not has_table_privilege('service_role', format('public.%I', v_table), 'REFERENCES')
+       or not has_table_privilege('service_role', format('public.%I', v_table), 'TRIGGER')
+       or not has_table_privilege('service_role', format('public.%I', v_table), 'MAINTAIN') then
       raise exception 'service_role M4A privilege set incomplete: %', v_table;
     end if;
   end loop;
