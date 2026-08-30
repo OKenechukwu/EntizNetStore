@@ -35,6 +35,7 @@ await mkdir(outputDir, { recursive: true });
 const password = "M4A-Browser-Regression-2026!";
 const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const productTitle = `M4A Browser Wholesale ${runId.slice(-8)}`;
+const productSlug = `m4a-browser-wholesale-${runId}`.slice(0, 190);
 const createdUserIds = [];
 const browserErrors = [];
 let productId = null;
@@ -179,7 +180,7 @@ async function seedMarketplace(supplier, retailer, ordinaryBuyer) {
     .insert({
       seller_id: supplier.id,
       title: productTitle,
-      slug: `m4a-browser-wholesale-${runId}`.slice(0, 190),
+      slug: productSlug,
       description: "Disposable M4A authenticated browser regression product.",
       type: "physical",
       status: "draft",
@@ -442,12 +443,29 @@ try {
   const retailerPage = await retailerContext.newPage();
   watchBrowserErrors(retailerPage, "m4a retailer");
   await auditPage(retailerPage, "/dashboard/bsm/marketplace", "retailer wholesale marketplace");
-  const retailerOfferCard = retailerPage.locator("article").filter({ hasText: productTitle }).first();
+  let retailerOfferCard = retailerPage.locator("article").filter({ hasText: productTitle }).first();
   await retailerOfferCard.waitFor();
   await retailerOfferCard.getByText("Quantity pricing", { exact: true }).waitFor();
   assert.ok(await retailerOfferCard.getByText("12+", { exact: false }).first().isVisible());
   assert.match(await retailerOfferCard.innerText(), /MOQ\s+12/i, "retailer card did not show MOQ 12");
   assert.match(await retailerOfferCard.innerText(), /Multiple\s+5/i, "retailer card did not show order multiple 5");
+
+  const productLink = retailerOfferCard.getByRole("link", { name: productTitle, exact: true });
+  assert.equal(await productLink.getAttribute("href"), `/products/${productSlug}`, "wholesale card did not use canonical product route");
+  await Promise.all([
+    retailerPage.waitForURL((url) => url.pathname === `/products/${productSlug}`, { timeout: 10_000 }),
+    productLink.click(),
+  ]);
+  await retailerPage.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+  await assertNoFrameworkFailure(retailerPage, "retailer canonical product navigation");
+  await assertNoHorizontalOverflow(retailerPage, "retailer canonical product navigation");
+  await assertSingleMain(retailerPage, "retailer canonical product navigation");
+  assert.ok(await retailerPage.getByText(productTitle, { exact: true }).first().isVisible(), "canonical product page did not render sourced product");
+  process.stdout.write("ok - retailer wholesale product link resolves canonical product route\n");
+
+  await auditPage(retailerPage, "/dashboard/bsm/marketplace", "retailer wholesale marketplace after product navigation");
+  retailerOfferCard = retailerPage.locator("article").filter({ hasText: productTitle }).first();
+  await retailerOfferCard.waitFor();
 
   const quantityInput = retailerOfferCard.getByLabel("Order quantity");
   await quantityInput.fill("52");
