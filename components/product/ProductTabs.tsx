@@ -67,7 +67,11 @@ function ReviewsTab({ product }: { product: Product }) {
           <div className="text-5xl font-bold text-brand-secondary">
             {product.rating?.toFixed(1) || "0.0"}
           </div>
-          <div className="mt-1 flex justify-center" aria-label={`${product.rating?.toFixed(1) || "0.0"} out of 5 stars`}>
+          <div
+            className="mt-1 flex justify-center"
+            role="img"
+            aria-label={`${product.rating?.toFixed(1) || "0.0"} out of 5 stars`}
+          >
             {[1, 2, 3, 4, 5].map((i) => (
               <Star
                 key={i}
