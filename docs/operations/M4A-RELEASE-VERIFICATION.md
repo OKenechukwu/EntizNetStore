@@ -204,9 +204,12 @@ Before any disposable commerce fixture is created, the preflight must prove:
 - `/api/health` returns HTTP 200 and `status=ok`;
 - database, storage and operations readiness checks are all `ok`;
 - reported deployment version equals the expected SHA prefix;
-- Content Security Policy explicitly contains the isolated Supabase origin and does not reference canonical production Supabase.
+- `/api/health.backendBinding` equals the versioned SHA-256 fingerprint of the requested isolated Supabase origin, proving the server-side `SUPABASE_URL` binding without exposing the raw server URL or service key;
+- Content Security Policy explicitly contains the isolated Supabase origin and does not reference canonical production Supabase, independently proving the browser/build binding;
+- the Vercel bypass header is injected only for the approved application origin, never Supabase/other origins;
+- hosted verification does not request a persistent Vercel bypass cookie.
 
-The fail-closed refusal cases are part of `npm run verify:foundation` and require no network or credentials.
+The fail-closed refusal and credential-scoping cases are part of `npm run verify:foundation` and require no network or credentials.
 
 ### Hosted application checks
 
@@ -239,7 +242,15 @@ PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
   node scripts/test-m4a-hosted-browser.mjs
 ```
 
-The hosted browser wrapper does **not** fork the browser assertions. It preflights the exact remote target, then exposes that approved deployment through a loopback proxy that injects the Vercel bypass only on the server-side upstream hop. The unchanged `test-m4a-browser.mjs` suite performs the real Supplier/Retailer/ordinary-Buyer, product, cart, responsive and axe checks. The bypass credential must never enter page URLs, page JavaScript, screenshots or evidence artifacts.
+The hosted browser wrapper does **not** fork the browser assertions. It preflights the exact remote target, then exposes that approved deployment through a loopback-only proxy that injects the Vercel bypass only on the Node upstream hop. The unchanged `test-m4a-browser.mjs` suite performs the real Supplier/Retailer/ordinary-Buyer, product, cart, responsive and axe checks.
+
+The proxy must remain fail-closed:
+
+- unexpected browser `Origin`/`Referer` origins are rejected;
+- absolute request targets outside the approved deployment origin are rejected;
+- malformed or cross-origin upstream redirects are rejected rather than followed;
+- hop-by-hop proxy headers are stripped;
+- the Vercel bypass credential must never enter page URLs, page JavaScript, screenshots or evidence artifacts.
 
 Exercise real deployed sessions for:
 
@@ -271,7 +282,7 @@ Record in the PR/release history:
 - Chromium/WCAG artifact reference;
 - isolated Supabase branch/project reference used for staging verification;
 - isolated Vercel deployment/environment and exact SHA;
-- hosted health/runtime result;
+- hosted health/runtime result including the expected server backend-binding fingerprint match;
 - cleanup confirmation for disposable users/data/branches/environments.
 
 Do not store service-role keys, Vercel bypass secrets, bearer tokens or other credentials in evidence artifacts.
@@ -308,7 +319,7 @@ If an M4A database correction is necessary after production application, create 
 Only after all pre-production gates are green and the approved PR is merged:
 
 1. confirm the exact production deployment SHA;
-2. confirm `/api/health` is healthy;
+2. confirm `/api/health` is healthy and the production backend-binding fingerprint matches the canonical production Supabase origin;
 3. inspect runtime logs for database/auth/server errors;
 4. verify anonymous/ordinary-Buyer B2B price isolation with non-mutating checks;
 5. verify authenticated BSM routes with designated safe accounts if available;
