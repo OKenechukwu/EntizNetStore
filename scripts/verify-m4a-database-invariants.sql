@@ -157,6 +157,7 @@ $$;
 do $$
 declare
   v_bad integer;
+  v_save_definition text;
 begin
   if not exists (
     select 1 from information_schema.columns
@@ -211,12 +212,27 @@ begin
     raise exception 'Canonical order M4A constraints incomplete: found % of 3', v_bad;
   end if;
 
-  if not exists (
+  select count(*) into v_bad
+  from pg_constraint
+  where conrelid = 'public.wholesale_offers'::regclass
+    and conname in ('wholesale_offers_moq_check', 'wholesale_offers_order_multiple_check');
+  if v_bad <> 2 then
+    raise exception 'Wholesale MOQ/order-multiple independent bounds are incomplete: found % of 2', v_bad;
+  end if;
+
+  if exists (
     select 1 from pg_constraint
     where conrelid = 'public.wholesale_offers'::regclass
       and conname = 'wholesale_offers_moq_multiple_check'
   ) then
-    raise exception 'Wholesale MOQ/order-multiple invariant missing';
+    raise exception 'Legacy MOQ divisibility constraint returned; order multiple must be relative to MOQ';
+  end if;
+
+  select pg_get_functiondef(
+    'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+  ) into v_save_definition;
+  if v_save_definition like '%p_minimum_order_quantity % p_order_multiple%' then
+    raise exception 'Wholesale save RPC reintroduced invalid MOQ divisibility coupling';
   end if;
 
   if not exists (
