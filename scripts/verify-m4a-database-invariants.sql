@@ -88,9 +88,11 @@ begin
     'business_trading_roles_one_primary',
     'idx_wholesale_offers_active_variant',
     'idx_wholesale_offers_seller_status',
+    'idx_wholesale_offers_product_id',
     'idx_wholesale_offer_tiers_lookup',
     'cart_items_cart_variant_mode_key',
-    'idx_cart_items_wholesale_offer'
+    'idx_cart_items_wholesale_offer',
+    'idx_order_items_wholesale_offer_id'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required M4A index/unique contract missing: %', v_idx;
