@@ -32,6 +32,7 @@ Never rewrite an applied migration to perform this correction.
 Required:
 
 - production foundation verification;
+- hosted-M4A fail-closed guard contract;
 - ESLint;
 - TypeScript;
 - production Next.js build;
@@ -137,6 +138,7 @@ Required pages:
 - `/dashboard/bsm`;
 - `/dashboard/bsm/wholesale`;
 - `/dashboard/bsm/marketplace`;
+- the canonical sourced `/products/[slug]` page;
 - `/cart`.
 
 Required checks:
@@ -147,6 +149,7 @@ Required checks:
 - Supplier offer manager renders the owned offer;
 - Retailer marketplace renders eligible B2B inventory;
 - the deliberate MOQ 12 / increment 5 fixture is shown correctly;
+- sourced product navigation resolves the canonical product route;
 - quantity 52 selects the 52+ tier;
 - increment/decrement controls are at least 44px;
 - add-to-cart succeeds through the canonical API;
@@ -181,7 +184,62 @@ Before exercising the app:
 5. verify the obsolete MOQ-divisibility constraint is absent;
 6. run non-production-safe structural and behavioral verification as available.
 
+### Hosted safety preflight
+
+Hosted mutation/browser tests use the repository-owned safety module and wrappers:
+
+- `scripts/m4a-hosted-safety.mjs`;
+- `scripts/test-m4a-hosted-http.mjs`;
+- `scripts/test-m4a-hosted-browser.mjs`.
+
+Before any disposable commerce fixture is created, the preflight must prove:
+
+- application and Supabase targets are clean HTTPS origins;
+- `M4A_HTTP_TEST_ENVIRONMENT` is `preview` or `staging`, never production;
+- `M4A_HTTP_ALLOW_REMOTE_MUTATION=true` is explicit;
+- `M4A_EXPECTED_COMMIT_SHA` is an exact 40-character Git SHA;
+- canonical production EntizNetStore is refused;
+- canonical/configured production Supabase is refused;
+- protected `.vercel.app` targets have a temporary automation-bypass secret;
+- `/api/health` returns HTTP 200 and `status=ok`;
+- database, storage and operations readiness checks are all `ok`;
+- reported deployment version equals the expected SHA prefix;
+- Content Security Policy explicitly contains the isolated Supabase origin and does not reference canonical production Supabase.
+
+The fail-closed refusal cases are part of `npm run verify:foundation` and require no network or credentials.
+
 ### Hosted application checks
+
+Set the isolated environment values only in the protected verification runner. Never commit or print secrets. Required inputs are:
+
+```text
+APP_ORIGIN=https://<isolated-deployment>.vercel.app
+SUPABASE_URL=https://<isolated-supabase-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://<isolated-supabase-ref>.supabase.co
+SUPABASE_ANON_KEY=<isolated public anon key>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<isolated public anon key>
+SUPABASE_SERVICE_ROLE_KEY=<isolated secret service-role key>
+M4A_EXPECTED_COMMIT_SHA=<exact 40-char release SHA>
+M4A_HTTP_TEST_ENVIRONMENT=staging
+M4A_HTTP_ALLOW_REMOTE_MUTATION=true
+VERCEL_AUTOMATION_BYPASS_SECRET=<short-lived bypass>
+DEPLOYED_PRODUCTION_SUPABASE_URL=https://kllwwurklumhawfsilpd.supabase.co
+```
+
+Then run the canonical M4A authority suite through the hosted guard:
+
+```bash
+node scripts/test-m4a-hosted-http.mjs
+```
+
+For hosted Chromium, install the same isolated Playwright/axe tooling used by the normal HTTP workflow and run:
+
+```bash
+PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+  node scripts/test-m4a-hosted-browser.mjs
+```
+
+The hosted browser wrapper does **not** fork the browser assertions. It preflights the exact remote target, then exposes that approved deployment through a loopback proxy that injects the Vercel bypass only on the server-side upstream hop. The unchanged `test-m4a-browser.mjs` suite performs the real Supplier/Retailer/ordinary-Buyer, product, cart, responsive and axe checks. The bypass credential must never enter page URLs, page JavaScript, screenshots or evidence artifacts.
 
 Exercise real deployed sessions for:
 
@@ -236,6 +294,7 @@ If verification fails:
 - keep production untouched;
 - preserve enough logs/artifacts to diagnose the failure;
 - remove disposable identities/data after evidence collection;
+- revoke the temporary Vercel automation bypass;
 - delete temporary hosted branches/environments when no longer required.
 
 ### After production promotion
