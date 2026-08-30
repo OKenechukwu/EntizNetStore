@@ -24,10 +24,23 @@ function readRequestBody(request) {
 
 function copyRequestHeaders(request, proxyOrigin) {
   const headers = new Headers()
+  const hopByHop = new Set([
+    'host',
+    'connection',
+    'content-length',
+    'accept-encoding',
+    'proxy-connection',
+    'keep-alive',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade',
+  ])
+
   for (const [name, rawValue] of Object.entries(request.headers)) {
     if (rawValue === undefined) continue
     const lower = name.toLowerCase()
-    if (['host', 'connection', 'content-length', 'accept-encoding'].includes(lower)) continue
+    if (hopByHop.has(lower)) continue
     const value = Array.isArray(rawValue) ? rawValue.join(', ') : rawValue
     headers.set(name, value)
   }
@@ -35,22 +48,45 @@ function copyRequestHeaders(request, proxyOrigin) {
   // Preserve browser same-origin semantics from the isolated deployment's
   // perspective without ever exposing the Vercel bypass credential client-side.
   const originHeader = headers.get('origin')
-  if (originHeader === proxyOrigin) headers.set('origin', target.appOrigin.origin)
-  const refererHeader = headers.get('referer')
-  if (refererHeader?.startsWith(`${proxyOrigin}/`)) {
-    headers.set('referer', `${target.appOrigin.origin}${refererHeader.slice(proxyOrigin.length)}`)
+  if (originHeader) {
+    if (originHeader !== proxyOrigin) {
+      throw new Error('Hosted verification proxy refused an unexpected browser Origin header')
+    }
+    headers.set('origin', target.appOrigin.origin)
   }
+
+  const refererHeader = headers.get('referer')
+  if (refererHeader) {
+    const referer = new URL(refererHeader)
+    if (referer.origin !== proxyOrigin) {
+      throw new Error('Hosted verification proxy refused an unexpected browser Referer header')
+    }
+    headers.set('referer', `${target.appOrigin.origin}${referer.pathname}${referer.search}${referer.hash}`)
+  }
+
   headers.set('accept-encoding', 'identity')
   headers.set('user-agent', 'EntizNetStore-M4A-hosted-browser-proxy/1.0')
   return headers
 }
 
 function setResponseHeaders(response, serverResponse, proxyOrigin) {
+  const hopByHop = new Set([
+    'content-encoding',
+    'content-length',
+    'transfer-encoding',
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'upgrade',
+    'set-cookie',
+    'location',
+  ])
+
   for (const [name, value] of response.headers.entries()) {
-    const lower = name.toLowerCase()
-    if (['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'set-cookie', 'location'].includes(lower)) {
-      continue
-    }
+    if (hopByHop.has(name.toLowerCase())) continue
     serverResponse.setHeader(name, value)
   }
 
@@ -59,17 +95,21 @@ function setResponseHeaders(response, serverResponse, proxyOrigin) {
 
   const location = response.headers.get('location')
   if (location) {
-    let rewritten = location
+    let resolved
     try {
-      const resolved = new URL(location, target.appOrigin)
-      if (resolved.origin === target.appOrigin.origin) {
-        rewritten = `${proxyOrigin}${resolved.pathname}${resolved.search}${resolved.hash}`
-      }
+      resolved = new URL(location, target.appOrigin)
     } catch {
-      // Preserve malformed/relative Location exactly; the browser regression
-      // will fail visibly rather than this proxy guessing a redirect target.
+      throw new Error('Hosted verification proxy refused a malformed upstream redirect')
     }
-    serverResponse.setHeader('location', rewritten)
+
+    if (resolved.origin !== target.appOrigin.origin) {
+      throw new Error('Hosted verification proxy refused a cross-origin upstream redirect')
+    }
+
+    serverResponse.setHeader(
+      'location',
+      `${proxyOrigin}${resolved.pathname}${resolved.search}${resolved.hash}`,
+    )
   }
 }
 
