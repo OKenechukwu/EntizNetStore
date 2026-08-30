@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   CANONICAL_PRODUCTION_SUPABASE_ORIGIN,
+  createHostedAppFetch,
   fingerprintSupabaseOrigin,
   preflightHostedM4A,
 } from './m4a-hosted-safety.mjs'
@@ -133,5 +134,32 @@ await preflightHostedM4A(
   async () => healthResponse(preflightTarget.expectedBackendBinding),
 )
 process.stdout.write('ok - hosted M4A preflight accepts matching isolated browser + server binding\n')
+
+const forwarded = []
+const secretScopedTarget = { ...preflightTarget, vercelBypassSecret: 'guard-contract-bypass-secret' }
+const guardedFetch = createHostedAppFetch(secretScopedTarget, async (input, init) => {
+  forwarded.push({ url: String(input), headers: new Headers(init?.headers) })
+  return new Response(null, { status: 204 })
+})
+
+await guardedFetch(`${isolatedApp}/api/health`)
+await guardedFetch(`${isolatedSupabase}/rest/v1/profiles_buyer`)
+
+assert.equal(
+  forwarded[0].headers.get('x-vercel-protection-bypass'),
+  'guard-contract-bypass-secret',
+  'hosted app request did not receive the Vercel protection bypass header',
+)
+assert.equal(
+  forwarded[0].headers.has('x-vercel-set-bypass-cookie'),
+  false,
+  'hosted verification unnecessarily requested a persistent Vercel bypass cookie',
+)
+assert.equal(
+  forwarded[1].headers.has('x-vercel-protection-bypass'),
+  false,
+  'Vercel bypass credential leaked to the isolated Supabase origin',
+)
+process.stdout.write('ok - hosted M4A bypass stays origin-scoped and cookie-free\n')
 
 process.stdout.write('Hosted M4A fail-closed guard contract passed\n')
