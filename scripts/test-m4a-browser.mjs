@@ -424,7 +424,7 @@ try {
   await supplierPage.getByRole("heading", { name: "Trading roles" }).waitFor();
   assert.equal(await supplierPage.getByRole("link", { name: "Source inventory" }).isVisible(), true);
   assert.equal(await supplierPage.getByRole("link", { name: "Manage offers" }).isVisible(), true);
-  const manufacturerCheckbox = supplierPage.getByRole("checkbox").filter({ has: undefined }).first();
+  const manufacturerCheckbox = supplierPage.getByRole("checkbox").first();
   assert.ok(await supplierPage.getByText("Manufacturer", { exact: true }).isVisible());
   assert.ok(await manufacturerCheckbox.count());
   await supplierPage.screenshot({ path: path.join(outputDir, "supplier-dashboard.png"), fullPage: true });
@@ -460,8 +460,9 @@ try {
   await assertNoFrameworkFailure(retailerPage, "retailer canonical product navigation");
   await assertNoHorizontalOverflow(retailerPage, "retailer canonical product navigation");
   await assertSingleMain(retailerPage, "retailer canonical product navigation");
+  await assertAxe(retailerPage, "retailer canonical product navigation");
   assert.ok(await retailerPage.getByText(productTitle, { exact: true }).first().isVisible(), "canonical product page did not render sourced product");
-  process.stdout.write("ok - retailer wholesale product link resolves canonical product route\n");
+  process.stdout.write("ok - retailer wholesale product link resolves canonical product route + WCAG\n");
 
   await auditPage(retailerPage, "/dashboard/bsm/marketplace", "retailer wholesale marketplace after product navigation");
   retailerOfferCard = retailerPage.locator("article").filter({ hasText: productTitle }).first();
