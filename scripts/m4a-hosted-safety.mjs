@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 
 export const CANONICAL_PRODUCTION_APP_ORIGIN = 'https://entiznetstore.vercel.app'
 export const CANONICAL_PRODUCTION_SUPABASE_ORIGIN = 'https://kllwwurklumhawfsilpd.supabase.co'
@@ -13,6 +14,14 @@ function cleanHttpsOrigin(raw, label) {
     throw new Error(`${label} must be an origin URL, not a path-scoped URL`)
   }
   return new URL(requested.origin)
+}
+
+export function fingerprintSupabaseOrigin(raw) {
+  const origin = new URL(raw).origin
+  return createHash('sha256')
+    .update(`entiznetstore:supabase-origin:v1:${origin}`)
+    .digest('hex')
+    .slice(0, 24)
 }
 
 export function resolveHostedM4ATarget() {
@@ -64,6 +73,7 @@ export function resolveHostedM4ATarget() {
     expectedCommit,
     environment,
     vercelBypassSecret,
+    expectedBackendBinding: fingerprintSupabaseOrigin(supabaseOrigin.origin),
   }
 }
 
@@ -116,6 +126,11 @@ export async function preflightHostedM4A(target, fetchImpl) {
   assert.equal(health.checks?.database, 'ok', 'isolated hosted database readiness is not healthy')
   assert.equal(health.checks?.storage, 'ok', 'isolated hosted storage readiness is not healthy')
   assert.equal(health.checks?.operations, 'ok', 'isolated hosted operational-event readiness is not healthy')
+  assert.equal(
+    health.backendBinding,
+    target.expectedBackendBinding,
+    'isolated hosted server backend binding does not match the requested non-production Supabase origin',
+  )
 
   const csp = response.headers.get('content-security-policy') || ''
   assert.ok(csp, 'isolated hosted deployment did not return the expected Content-Security-Policy header')
@@ -130,7 +145,7 @@ export async function preflightHostedM4A(target, fetchImpl) {
   )
 
   process.stdout.write(
-    `ok - hosted M4A preflight -> ${target.environment}, exact ${target.expectedCommit.slice(0, 12)}, isolated Supabase binding confirmed\n`,
+    `ok - hosted M4A preflight -> ${target.environment}, exact ${target.expectedCommit.slice(0, 12)}, isolated browser + server Supabase binding confirmed\n`,
   )
   return health
 }
