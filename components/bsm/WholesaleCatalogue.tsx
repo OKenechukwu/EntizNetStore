@@ -196,7 +196,7 @@ export default function WholesaleCatalogue() {
           const tier = activeTier(offer, quantity);
           const unitPrice = (tier?.unitPriceCents || 0) / 100;
           const lineTotal = unitPrice * quantity;
-          const productHref = offer.product?.slug ? `/product/${offer.product.slug}` : null;
+          const productHref = offer.product?.slug ? `/products/${offer.product.slug}` : null;
           const nextDecrease = quantity - offer.orderMultiple;
           const nextIncrease = quantity + offer.orderMultiple;
           const cannotDecrease = nextDecrease < offer.minimumOrderQuantity;
