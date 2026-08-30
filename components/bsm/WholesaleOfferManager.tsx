@@ -183,10 +183,6 @@ export default function WholesaleOfferManager({ variants }: { variants: VariantO
       setError("Order multiple must be a whole number between 1 and 100,000.");
       return;
     }
-    if (minimumOrderQuantity % orderMultiple !== 0) {
-      setError("MOQ must be divisible by the order multiple.");
-      return;
-    }
     if (!Number.isInteger(leadTimeDays) || leadTimeDays < 0 || leadTimeDays > 365) {
       setError("Lead time must be between 0 and 365 days.");
       return;
@@ -329,6 +325,7 @@ export default function WholesaleOfferManager({ variants }: { variants: VariantO
             <label className="space-y-2">
               <span className="text-sm font-medium">Order multiple</span>
               <input type="number" min={1} max={100000} value={form.orderMultiple} onChange={(event) => setForm((current) => ({ ...current, orderMultiple: event.target.value }))} className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-3" />
+              <span className="block text-xs opacity-60">Valid quantities start at the MOQ, then increase by this amount.</span>
             </label>
 
             <label className="space-y-2">
