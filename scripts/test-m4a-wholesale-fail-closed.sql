@@ -138,6 +138,56 @@ begin
 end
 $$;
 
+-- MOQ and order multiple are relative, not divisibility-coupled. MOQ 12 with a
+-- multiple of 5 means 12, 17, 22, 27, ... are valid quantities. Prove the
+-- database and cart authority accept that model and reject off-sequence values.
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'c1000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"c1000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.business_save_wholesale_offer(
+  current_setting('m4a_negative.offer_id')::uuid,
+  'c5000000-0000-0000-0000-000000000005',
+  'c6000000-0000-0000-0000-000000000006',
+  'active', 12, 5, 'unit', 10, 3, 'FOB', null, null,
+  '[
+    {"minimumQuantity":12,"unitPriceCents":2000},
+    {"minimumQuantity":17,"unitPriceCents":1900},
+    {"minimumQuantity":22,"unitPriceCents":1800}
+  ]'::jsonb
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'c2000000-0000-0000-0000-000000000002', true);
+select set_config('request.jwt.claims', '{"sub":"c2000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+select public.buyer_set_wholesale_cart_item(current_setting('m4a_negative.offer_id')::uuid, 12);
+select public.buyer_set_wholesale_cart_item(current_setting('m4a_negative.offer_id')::uuid, 17);
+do $$
+begin
+  begin
+    perform public.buyer_set_wholesale_cart_item(current_setting('m4a_negative.offer_id')::uuid, 15);
+    raise exception 'off-sequence MOQ-relative quantity unexpectedly succeeded';
+  exception when sqlstate '22023' then null;
+  end;
+end
+$$;
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'c1000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"c1000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.business_save_wholesale_offer(
+  current_setting('m4a_negative.offer_id')::uuid,
+  'c5000000-0000-0000-0000-000000000005',
+  'c6000000-0000-0000-0000-000000000006',
+  'active', 10, 5, 'unit', 10, 3, 'FOB', null, null,
+  '[
+    {"minimumQuantity":10,"unitPriceCents":2000},
+    {"minimumQuantity":50,"unitPriceCents":1800},
+    {"minimumQuantity":100,"unitPriceCents":1600}
+  ]'::jsonb
+);
+reset role;
+
 -- A future-dated active offer is operationally unavailable: the verified
 -- Business buyer cannot see its price or create/update a wholesale line.
 update public.wholesale_offers
@@ -202,7 +252,7 @@ begin
   begin
     perform public.buyer_set_wholesale_cart_item(current_setting('m4a_negative.offer_id')::uuid, 50);
     raise exception 'Seller-suspended supplier accepted wholesale cart mutation';
-  exception when insufficient_privilege then null;
+  exception when sqlstate '22023' then null;
   end;
 end
 $$;
@@ -237,7 +287,7 @@ begin
   begin
     perform public.buyer_set_wholesale_cart_item(current_setting('m4a_negative.offer_id')::uuid, 50);
     raise exception 'Business-suspended supplier accepted wholesale cart mutation';
-  exception when insufficient_privilege then null;
+  exception when sqlstate '22023' then null;
   end;
 end
 $$;
