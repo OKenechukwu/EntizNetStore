@@ -252,7 +252,7 @@ export default function WholesaleCatalogue() {
                       aria-label={`Decrease ${offer.product?.title || "wholesale product"} quantity by ${offer.orderMultiple}`}
                       onClick={() => setQuantity(offer, nextDecrease)}
                       disabled={cannotDecrease || busyOffer === offer.id}
-                      className="min-h-11 min-w-11 rounded-lg border border-white/15 disabled:opacity-40"
+                      className="h-[44px] w-[44px] shrink-0 rounded-lg border border-white/15 disabled:opacity-40"
                     >−</button>
                     <input
                       id={`wholesale-quantity-${offer.id}`}
@@ -269,7 +269,7 @@ export default function WholesaleCatalogue() {
                       aria-label={`Increase ${offer.product?.title || "wholesale product"} quantity by ${offer.orderMultiple}`}
                       onClick={() => setQuantity(offer, nextIncrease)}
                       disabled={cannotIncrease || busyOffer === offer.id}
-                      className="min-h-11 min-w-11 rounded-lg border border-white/15 disabled:opacity-40"
+                      className="h-[44px] w-[44px] shrink-0 rounded-lg border border-white/15 disabled:opacity-40"
                     >+</button>
                   </div>
                 </div>
