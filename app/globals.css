@@ -289,8 +289,8 @@ html, body {
 }
 
 /* Semantic status text also needs darker light-theme variants. Tailwind's
-   pale 200/300 status shades are designed for dark surfaces and otherwise
-   collapse against translucent success/error/warning backgrounds on ivory. */
+   pale status shades are designed for dark surfaces and otherwise collapse
+   against translucent success/error/warning backgrounds on ivory. */
 [data-theme="light"] .text-emerald-200 {
   color: #065f46;
 }
@@ -299,8 +299,18 @@ html, body {
   color: #991b1b;
 }
 
+[data-theme="light"] .text-red-400 {
+  color: #b91c1c;
+}
+
 [data-theme="light"] .text-orange-500 {
   color: #9a3412;
+}
+
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400 {
+  color: #92400e;
 }
 
 .auth-page-card .text-accent-gold,
