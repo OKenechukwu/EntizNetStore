@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  CANONICAL_PRODUCTION_SUPABASE_ORIGIN,
+  fingerprintSupabaseOrigin,
+  preflightHostedM4A,
+} from './m4a-hosted-safety.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const target = path.join(root, 'scripts', 'test-m4a-hosted-http.mjs')
@@ -83,5 +88,50 @@ runRefusal(
   { APP_ORIGIN: 'https://m4a-isolated-preview.vercel.app', VERCEL_AUTOMATION_BYPASS_SECRET: null },
   /VERCEL_AUTOMATION_BYPASS_SECRET is required/i,
 )
+
+const preflightTarget = {
+  appOrigin: new URL(isolatedApp),
+  supabaseOrigin: new URL(isolatedSupabase),
+  expectedCommit: exactSha,
+  environment: 'preview',
+  vercelBypassSecret: '',
+  expectedBackendBinding: fingerprintSupabaseOrigin(isolatedSupabase),
+}
+
+function healthResponse(backendBinding) {
+  return new Response(
+    JSON.stringify({
+      status: 'ok',
+      service: 'entiznetstore',
+      version: exactSha.slice(0, 12),
+      backendBinding,
+      checks: { database: 'ok', storage: 'ok', operations: 'ok' },
+    }),
+    {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'content-security-policy': `default-src 'self'; connect-src 'self' ${isolatedSupabase}`,
+      },
+    },
+  )
+}
+
+await assert.rejects(
+  () =>
+    preflightHostedM4A(
+      preflightTarget,
+      async () => healthResponse(fingerprintSupabaseOrigin(CANONICAL_PRODUCTION_SUPABASE_ORIGIN)),
+    ),
+  /server backend binding does not match/i,
+  'hosted M4A preflight accepted a healthy-looking deployment bound server-side to the wrong Supabase origin',
+)
+process.stdout.write('ok - hosted M4A preflight refuses server/client Supabase binding confusion\n')
+
+await preflightHostedM4A(
+  preflightTarget,
+  async () => healthResponse(preflightTarget.expectedBackendBinding),
+)
+process.stdout.write('ok - hosted M4A preflight accepts matching isolated browser + server binding\n')
 
 process.stdout.write('Hosted M4A fail-closed guard contract passed\n')
