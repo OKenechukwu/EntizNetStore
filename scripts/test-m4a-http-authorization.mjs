@@ -175,13 +175,15 @@ async function seedMarketplace({ seller, businessBuyer, retailBuyer, otherBusine
   return { productId: product.id, variantId: variant.id }
 }
 
+// MOQ and order multiple intentionally do not divide evenly. The contract is
+// MOQ + n*multiple, so 12, 17, 22, ... are valid quantities while 15 is not.
 function offerPayload(productIdValue, variantIdValue, offerId = null, status = 'active') {
   return {
     offerId,
     productId: productIdValue,
     variantId: variantIdValue,
     status,
-    minimumOrderQuantity: 10,
+    minimumOrderQuantity: 12,
     orderMultiple: 5,
     unitLabel: 'unit',
     casePackSize: 10,
@@ -190,9 +192,9 @@ function offerPayload(productIdValue, variantIdValue, offerId = null, status = '
     startsAt: null,
     endsAt: null,
     tiers: [
-      { minimumQuantity: 10, unitPriceCents: 2000 },
-      { minimumQuantity: 50, unitPriceCents: 1800 },
-      { minimumQuantity: 100, unitPriceCents: 1600 },
+      { minimumQuantity: 12, unitPriceCents: 2000 },
+      { minimumQuantity: 52, unitPriceCents: 1800 },
+      { minimumQuantity: 102, unitPriceCents: 1600 },
     ],
   }
 }
@@ -209,7 +211,7 @@ try {
   await expectStatus('anonymous wholesale catalogue denied', await appFetch('/api/bsm/wholesale/catalog'), 401)
   await expectStatus(
     'anonymous wholesale cart mutation denied',
-    await appFetch('/api/cart/wholesale', { method: 'POST', json: { offerId: crypto.randomUUID(), quantity: 50 } }),
+    await appFetch('/api/cart/wholesale', { method: 'POST', json: { offerId: crypto.randomUUID(), quantity: 52 } }),
     401,
   )
 
@@ -260,7 +262,7 @@ try {
   )
   const visibleOffer = businessCatalogue.offers.find((offer) => offer.id === created.offerId)
   assert.ok(visibleOffer, 'verified Business buyer could not see the published wholesale offer')
-  assert.equal(visibleOffer.minimumOrderQuantity, 10)
+  assert.equal(visibleOffer.minimumOrderQuantity, 12)
   assert.equal(visibleOffer.orderMultiple, 5)
   assert.deepEqual(visibleOffer.tiers.map((tier) => tier.unitPriceCents), [2000, 1800, 1600])
 
@@ -269,7 +271,7 @@ try {
     await appFetch('/api/cart/wholesale', {
       cookie: retailBuyer.cookie,
       method: 'POST',
-      json: { offerId: created.offerId, quantity: 50 },
+      json: { offerId: created.offerId, quantity: 52 },
     }),
     403,
   )
@@ -278,26 +280,26 @@ try {
     await appFetch('/api/cart/wholesale', {
       cookie: businessBuyer.cookie,
       method: 'POST',
-      json: { offerId: created.offerId, quantity: 5 },
+      json: { offerId: created.offerId, quantity: 7 },
     }),
     400,
   )
   await expectStatus(
-    'verified Business buyer cannot bypass order multiple',
+    'verified Business buyer cannot bypass MOQ-relative order multiple',
     await appFetch('/api/cart/wholesale', {
       cookie: businessBuyer.cookie,
       method: 'POST',
-      json: { offerId: created.offerId, quantity: 12 },
+      json: { offerId: created.offerId, quantity: 15 },
     }),
     400,
   )
 
   const wholesaleCart = await expectStatus(
-    'verified Business buyer can add valid wholesale line',
+    'verified Business buyer can add MOQ-relative wholesale line',
     await appFetch('/api/cart/wholesale', {
       cookie: businessBuyer.cookie,
       method: 'POST',
-      json: { offerId: created.offerId, quantity: 50 },
+      json: { offerId: created.offerId, quantity: 52 },
     }),
     200,
   )
@@ -305,9 +307,11 @@ try {
   assert.ok(wholesaleLine, 'wholesale line missing from canonical cart response')
   assert.equal(wholesaleLine.purchaseMode, 'wholesale')
   assert.equal(wholesaleLine.wholesaleTerms.offerId, created.offerId)
-  assert.equal(wholesaleLine.wholesaleTerms.tierMinimumQuantity, 50)
+  assert.equal(wholesaleLine.wholesaleTerms.minimumOrderQuantity, 12)
+  assert.equal(wholesaleLine.wholesaleTerms.orderMultiple, 5)
+  assert.equal(wholesaleLine.wholesaleTerms.tierMinimumQuantity, 52)
   assert.equal(wholesaleLine.unitPriceCents, 1800)
-  assert.equal(wholesaleLine.quantity, 50)
+  assert.equal(wholesaleLine.quantity, 52)
 
   await expectStatus(
     'cross-BSM wholesale offer edit denied',
@@ -334,11 +338,14 @@ try {
     await appFetch('/api/cart', { cookie: businessBuyer.cookie }),
     200,
   )
-  const pausedLine = pausedCart.cart.items.find((item) => item.wholesaleTerms?.offerId === created.offerId)
+  const pausedLine = pausedCart.cart.items.find((item) => item.id === wholesaleCart.itemId)
   assert.ok(pausedLine, 'paused wholesale line disappeared instead of remaining explainably unavailable')
+  assert.equal(pausedLine.purchaseMode, 'wholesale')
   assert.equal(pausedLine.available, false)
   assert.equal(pausedLine.availabilityReason, 'wholesale_offer_unavailable')
+  assert.equal(pausedLine.wholesaleTerms, null)
   assert.equal(pausedLine.unitPriceCents, 0)
+  assert.equal(pausedLine.lineTotalCents, 0)
 
   const pausedCatalogue = await expectStatus(
     'paused offer disappears from Business sourcing catalogue',
