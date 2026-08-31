@@ -1,6 +1,6 @@
 # EntizNetStore Production Capacity Verification
 
-Last reviewed: **2026-08-31**
+Last reviewed: **2026-09-01**
 
 This runbook defines the bounded production read-capacity gate used by P0-06. It is deliberately conservative. It is not a general-purpose load-testing harness and must not be expanded into write traffic or high-volume stress testing without an explicit operational review.
 
@@ -53,6 +53,32 @@ Use the default inputs first:
 These defaults are intentionally a release-safety baseline, not a claim about final marketplace peak capacity.
 
 If the expected launch traffic model requires higher concurrency, define the target before the rehearsal and increase only within the hard caps. If substantially higher load is required, use an approved isolated or vendor load-testing environment instead of weakening these production safety limits.
+
+## Verified production rehearsal — 2026-09-01
+
+A bounded read-only rehearsal was executed against the exact production release `81e31752dc777d12d01a1a6388b69508dfe80df9` (`/api/health.version = 81e31752dc77`). The evidence run used a temporary GitHub Actions branch/workflow that was removed/reset after the result was collected; no product code or temporary workflow was promoted to `main`.
+
+Observed result:
+
+| Metric | Result |
+| --- | ---: |
+| Paths | `GET /`, `GET /api/health` |
+| Concurrency | 10 |
+| Requests per path | 100 |
+| Total requests | 200 |
+| Failures | 0 |
+| Failure rate | 0% |
+| Throughput | 27.5 requests/sec |
+| p50 | 192 ms |
+| p95 | 1,597 ms |
+| p99 | 1,912 ms |
+| Maximum | 1,950 ms |
+| Declared maximum p95 | 2,500 ms |
+| Result | PASS |
+
+Vercel production deployment for the same release was `READY`, `/api/health` returned HTTP 200 with database, Storage and operations readiness `ok`, and production runtime error telemetry was reviewed with no release-specific error cluster found in the validation window.
+
+This evidence proves the bounded anonymous read path at the tested envelope. It does **not** claim final peak marketplace capacity and does not replace authenticated commerce, payment-provider, storage-upload or seller/admin workload verification.
 
 ## Execution
 
@@ -109,4 +135,4 @@ Record:
 - operator/reviewer;
 - pass/fail decision and follow-up.
 
-P0-06 remains `IN PROGRESS` until this rehearsal is performed at the approved launch envelope, the owned production domain is configured and verified, repository protection is enabled, final provider-aware environment/CSP review is complete, and rollback is rehearsed on the final launch configuration.
+The bounded production read-capacity evidence is now complete at the 10-concurrency/200-request envelope above. P0-06 as a whole remains `IN PROGRESS` until the owned production domain is configured and verified, repository protection is enabled, final provider-aware environment/CSP review is complete, and rollback is rehearsed on the final launch configuration.
