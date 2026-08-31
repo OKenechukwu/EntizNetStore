@@ -23,6 +23,7 @@ const requiredWorkflows = [
   ".github/workflows/production-monitor.yml",
   ".github/workflows/production-backup.yml",
   ".github/workflows/restore-rehearsal.yml",
+  ".github/workflows/production-capacity.yml",
 ];
 
 for (const workflow of requiredWorkflows) {
@@ -68,6 +69,7 @@ for (const workflow of [
   ".github/workflows/http-authorization.yml",
   ".github/workflows/production-backup.yml",
   ".github/workflows/restore-rehearsal.yml",
+  ".github/workflows/production-capacity.yml",
 ]) {
   if (!exists(workflow)) continue;
   const source = read(workflow);
@@ -94,6 +96,24 @@ if (exists(".github/workflows/production-monitor.yml")) {
     if (!monitor.includes(fragment)) {
       fail(`Production monitor lost required Actions/runtime control: ${fragment}`);
     }
+  }
+}
+
+if (exists(".github/workflows/production-capacity.yml")) {
+  const capacity = read(".github/workflows/production-capacity.yml");
+  for (const fragment of [
+    "workflow_dispatch:",
+    "RUN_READ_ONLY_CAPACITY_GATE",
+    "persist-credentials: false",
+    "CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app",
+    "node scripts/test-production-read-capacity.mjs",
+  ]) {
+    if (!capacity.includes(fragment)) {
+      fail(`Production capacity workflow lost safety control: ${fragment}`);
+    }
+  }
+  if (/\bschedule\s*:/.test(capacity) || /\bpush\s*:/.test(capacity) || /\bpull_request\s*:/.test(capacity)) {
+    fail("Production capacity workflow must remain manual-only");
   }
 }
 
