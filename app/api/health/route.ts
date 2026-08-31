@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { publicIndexingLaunchStatus } from '@/lib/launch/publicIndexing'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { validateUploadScannerConfiguration } from '@/lib/storage/uploadScanner'
@@ -130,6 +131,7 @@ export async function GET() {
       checks,
       launchGates: {
         uploadSafety: uploadScannerConfiguration.ok ? 'configured' : 'blocked',
+        indexing: publicIndexingLaunchStatus(),
       },
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
       backendBinding: serverSupabaseBinding(),
