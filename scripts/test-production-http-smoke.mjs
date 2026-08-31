@@ -71,6 +71,9 @@ await request('/api/health', 200, (body) => {
   ) {
     throw new Error('readiness response did not report database=ok, storage=ok and operations=ok')
   }
+  if (!['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)) {
+    throw new Error('readiness response did not report the bounded upload-safety launch gate')
+  }
 })
 await request('/api/messages/conversations', 401, (body) => {
   if (body?.error !== 'Unauthorized') throw new Error('anonymous messaging route did not fail closed')
