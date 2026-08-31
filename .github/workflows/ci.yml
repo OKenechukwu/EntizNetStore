@@ -190,6 +190,11 @@ jobs:
           psql "$DB" -v ON_ERROR_STOP=1 -f scripts/prepare-legacy-commerce-security-test.sql
           psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-payment-provider-abstraction.sql
 
+      - name: Run concurrent payment initialization authority regression
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: bash scripts/test-payment-initialization-concurrency.sh
+
       - name: Run terminal payment-state regression suite
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-payment-terminal-state.sql
 
