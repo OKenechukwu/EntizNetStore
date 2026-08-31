@@ -37,6 +37,45 @@ requireFragments('.github/workflows/http-authorization.yml', [
   'scripts/test-web-accessibility-browser.mjs',
 ])
 
+requireFragments('.env.example', [
+  'UPLOAD_SCANNER_MODE=remote',
+  'UPLOAD_SCANNER_URL=https://YOUR_PRIVATE_SCANNER.example.com/scan',
+  'UPLOAD_SCANNER_ALLOWED_ORIGINS=https://YOUR_PRIVATE_SCANNER.example.com',
+  'UPLOAD_SCANNER_TOKEN=YOUR_SCANNER_BEARER_TOKEN',
+])
+
+requireFragments('lib/storage/uploadScanner.ts', [
+  'UPLOAD_SCANNER_ALLOWED_ORIGINS',
+  'scanner_allowed_origins_missing',
+  'scanner_origin_not_allowed',
+  'scanner_endpoint_private_host_forbidden',
+  'scanner_endpoint_unsafe',
+  'scanner_token_invalid',
+  'scanner_sha256_mismatch',
+  "'X-EntizNetStore-Scanner-Protocol': '1'",
+  "redirect: 'error'",
+  'scanner_response_content_type_invalid',
+  'scanner_response_too_large',
+  'readBoundedResponseText',
+  'MAX_SCANNABLE_BYTES',
+])
+
+requireFragments('tests/upload-scanner.test.mts', [
+  'production scanner requires HTTPS, explicit origin allowlist, and bearer authentication',
+  'production scanner refuses endpoint drift, private/IP hosts, query credentials, and malformed allowlists',
+  'production scanner sends only bounded protocol metadata and accepts clean JSON verdict',
+  'remote scanner blocks malicious verdicts without accepting provider free-form metadata',
+  'remote scanner fails closed on wrong content type, malformed JSON, oversized responses, timeout, and digest mismatch',
+  "assert.equal(headers.has('x-entiznetstore-filename'), false)",
+])
+
+requireFragments('docs/operations/UPLOAD_SCANNER_SECURITY.md', [
+  'explicit comma-separated allowlist of exact HTTPS origins',
+  'does **not** send the user\'s filename',
+  '16 KiB response ceiling',
+  'engineering contract alone does not clear P0-05',
+])
+
 requireFragments('scripts/test-upload-safety-http.mjs', [
   'clean scan job registers KYC evidence',
   'registered KYC evidence cannot be discarded by upload cleanup',
