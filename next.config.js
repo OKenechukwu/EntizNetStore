@@ -1,8 +1,44 @@
 /** @type {import('next').NextConfig} */
 const isProduction = process.env.NODE_ENV === 'production'
+const PUBLIC_IMAGE_BUCKETS = ['product-media', 'seller-branding']
+
+function trustedSupabaseStorageBinding() {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  if (!rawUrl) return null
+
+  try {
+    const url = new URL(rawUrl)
+    if (url.username || url.password) return null
+
+    const isManagedSupabase =
+      url.protocol === 'https:' && /^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname)
+    const isLoopbackSupabase =
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname.toLowerCase())
+
+    if (!isManagedSupabase && !isLoopbackSupabase) return null
+
+    return {
+      origin: url.origin,
+      remotePatterns: PUBLIC_IMAGE_BUCKETS.map((bucket) => ({
+        protocol: url.protocol.slice(0, -1),
+        hostname: url.hostname,
+        port: url.port,
+        pathname: `/storage/v1/object/public/${bucket}/**`,
+      })),
+    }
+  } catch {
+    return null
+  }
+}
+
+const supabaseStorageBinding = trustedSupabaseStorageBinding()
 
 const scriptSources = ["'self'", "'unsafe-inline'"]
 if (!isProduction) scriptSources.push("'unsafe-eval'")
+
+const imageSources = ["'self'", 'data:', 'blob:']
+if (supabaseStorageBinding?.origin) imageSources.push(supabaseStorageBinding.origin)
 
 const connectSources = ["'self'", 'wss:', 'https:']
 try {
@@ -22,7 +58,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src ${scriptSources.join(' ')}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https:",
+  `img-src ${Array.from(new Set(imageSources)).join(' ')}`,
   "font-src 'self' https://fonts.gstatic.com",
   `connect-src ${Array.from(new Set(connectSources)).join(' ')}`,
   "media-src 'self' blob:",
@@ -43,12 +79,11 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
+    remotePatterns: supabaseStorageBinding?.remotePatterns ?? [],
+    maximumRedirects: 0,
+    dangerouslyAllowLocalIP: false,
+    dangerouslyAllowSVG: false,
+    contentDispositionType: 'attachment',
   },
   async redirects() {
     return [
