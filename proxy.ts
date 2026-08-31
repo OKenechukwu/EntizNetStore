@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { shouldSendNoIndex } from "@/lib/launch/publicIndexing";
 import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
@@ -20,6 +21,10 @@ export async function proxy(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 365,
       sameSite: "lax",
     });
+  }
+
+  if (shouldSendNoIndex(request.nextUrl.pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   }
 
   return response;
