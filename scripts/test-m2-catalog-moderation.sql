@@ -132,7 +132,7 @@ $$;
 -- Seller one creates a rich draft through the canonical RPC.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 select public.seller_save_product_v3(
   null,
@@ -145,7 +145,7 @@ select public.seller_save_product_v3(
   40.00,
   null,
   array['b9ec6994-3765-4a06-a072-6bcf6b619645']::uuid[],
-  array['http://127.0.0.1:54321/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
+  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
   '[{"title":"Default","sku":"M2-ONE","price":129.99,"compareAtPrice":159.99,"costPerItem":40,"trackInventory":true,"inventoryQuantity":12,"inventoryPolicy":"deny","weightGrams":250,"requiresShipping":true,"isActive":true}]'::jsonb,
   true,
   false,
@@ -213,7 +213,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002', true);
-select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 do $$
 declare
@@ -237,7 +237,7 @@ $$;
 
 -- Seller one submits the complete product for moderation.
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_submit_product_for_review(:'product_id'::uuid);
 
 reset role;
@@ -328,7 +328,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_set_product_publication(:'product_id'::uuid, false);
 
 reset role;
@@ -346,7 +346,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_set_product_publication(:'product_id'::uuid, true);
 
 -- Any Seller edit invalidates approval and unpublishes immediately.
@@ -361,7 +361,7 @@ select public.seller_save_product_v3(
   42.00,
   null,
   array['b9ec6994-3765-4a06-a072-6bcf6b619645']::uuid[],
-  array['http://127.0.0.1:54321/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
+  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
   '[{"title":"Default","sku":"M2-ONE-EDIT","price":139.99,"inventoryQuantity":10,"inventoryPolicy":"deny","trackInventory":true,"requiresShipping":true,"isActive":true}]'::jsonb,
   true, false, true, true, 250, 'silicone', 18,
   array['premium','edited'], array['moderated','edited']
@@ -400,7 +400,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002', true);
-select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"http://127.0.0.1:54321/auth/v1"}', true);
+select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 do $$
 declare
