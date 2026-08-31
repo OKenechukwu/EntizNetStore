@@ -80,14 +80,15 @@ requireFragments('package.json', [
   'test:image-optimizer-egress',
   'verify-image-egress-foundation.mjs',
 ])
-requireFragments('.github/workflows/ci.yml', [
+requireFragments('.github/workflows/image-egress.yml', [
+  'name: Image Egress Security',
+  'permissions:',
+  'contents: read',
   'Run public media source regression',
   'npm run test:public-media-source',
   'Run image egress configuration regression',
   'npm run test:image-egress-config',
-])
-requireFragments('.github/workflows/http-authorization.yml', [
-  'Image optimizer egress regression failed; server log follows',
+  'Exercise live image optimizer SSRF boundary',
   'npm run test:image-optimizer-egress',
 ])
 requireFragments('docs/operations/IMAGE_EGRESS_SECURITY.md', [
