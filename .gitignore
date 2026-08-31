@@ -17,5 +17,10 @@ pnpm-debug.log*
 .DS_Store
 supabase/.temp/
 
-# Database backups — never commit dumps
-backups/*.dump
+# Database / recovery backups — never commit dumps or encrypted customer archives
+backups/
+.backups/
+*.dump
+*.sql.gz
+*.tar.gz.age
+storage-export/

@@ -1,0 +1,198 @@
+name: Production Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Operator reason / release or rehearsal reference"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entiznetstore-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production-backup
+    env:
+      EXPECTED_SUPABASE_PROJECT_REF: kllwwurklumhawfsilpd
+      PRODUCTION_SUPABASE_DB_URL: ${{ secrets.PRODUCTION_SUPABASE_DB_URL }}
+      PRODUCTION_SUPABASE_URL: ${{ secrets.PRODUCTION_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+      BACKUP_S3_PREFIX: ${{ vars.BACKUP_S3_PREFIX }}
+      BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.BACKUP_S3_REGION }}
+      AWS_DEFAULT_REGION: ${{ vars.BACKUP_S3_REGION }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Preflight protected backup configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            PRODUCTION_SUPABASE_DB_URL
+            PRODUCTION_SUPABASE_URL
+            PRODUCTION_SUPABASE_SERVICE_ROLE_KEY
+            BACKUP_AGE_RECIPIENT
+            BACKUP_S3_BUCKET
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            AWS_REGION
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required production-backup configuration is missing: ${name}"
+              exit 1
+            fi
+          done
+
+          expected="https://${EXPECTED_SUPABASE_PROJECT_REF}.supabase.co"
+          if [[ "${PRODUCTION_SUPABASE_URL%/}" != "$expected" ]]; then
+            echo "::error::Production Supabase URL does not match the canonical project ref"
+            exit 1
+          fi
+          if [[ "$PRODUCTION_SUPABASE_DB_URL" != *"${EXPECTED_SUPABASE_PROJECT_REF}"* ]]; then
+            echo "::error::Production database URL does not contain the canonical project ref"
+            exit 1
+          fi
+          if [[ "$BACKUP_AGE_RECIPIENT" != age1* ]]; then
+            echo "::error::BACKUP_AGE_RECIPIENT must be an age X25519 recipient"
+            exit 1
+          fi
+
+      - name: Install age and AWS CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age
+          aws --version
+
+      - name: Create logical database and Storage backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          work="${RUNNER_TEMP}/entiznetstore-backup"
+          rm -rf "$work"
+          mkdir -p "$work/database" "$work/storage"
+
+          supabase db dump --db-url "$PRODUCTION_SUPABASE_DB_URL" -f "$work/database/roles.sql" --role-only
+          supabase db dump --db-url "$PRODUCTION_SUPABASE_DB_URL" -f "$work/database/schema.sql"
+          # Storage object bytes are backed up separately below. Excluding storage.objects
+          # prevents restored database metadata from creating "ghost" objects before the
+          # verified byte upload recreates each object and its metadata through Storage.
+          supabase db dump --db-url "$PRODUCTION_SUPABASE_DB_URL" -f "$work/database/data.sql" --use-copy --data-only \
+            -x "storage.objects" \
+            -x "storage.buckets_vectors" \
+            -x "storage.vector_indexes"
+          supabase db dump --db-url "$PRODUCTION_SUPABASE_DB_URL" -f "$work/database/history_schema.sql" --schema supabase_migrations
+          supabase db dump --db-url "$PRODUCTION_SUPABASE_DB_URL" -f "$work/database/history_data.sql" --use-copy --data-only --schema supabase_migrations
+
+          BACKUP_STORAGE_OUTPUT_DIR="$work/storage" node scripts/export-supabase-storage.mjs
+
+          timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          cat > "$work/backup-metadata.json" <<JSON
+          {
+            "formatVersion": 1,
+            "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "sourceProjectRef": "${EXPECTED_SUPABASE_PROJECT_REF}",
+            "gitSha": "${GITHUB_SHA}",
+            "workflowRunId": "${GITHUB_RUN_ID}",
+            "reason": $(jq -Rn --arg value "${{ inputs.reason }}" '$value')
+          }
+          JSON
+
+          (
+            cd "$work"
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+          archive="${RUNNER_TEMP}/entiznetstore-${timestamp}.tar.gz"
+          tar -C "$work" -czf "$archive" .
+          encrypted="${archive}.age"
+          age -r "$BACKUP_AGE_RECIPIENT" -o "$encrypted" "$archive"
+          sha256sum "$encrypted" | tee "${encrypted}.sha256"
+
+          rm -f "$archive"
+          rm -rf "$work"
+          echo "BACKUP_FILE=$encrypted" >> "$GITHUB_ENV"
+          echo "BACKUP_SHA256=$(sha256sum "$encrypted" | awk '{print $1}')" >> "$GITHUB_ENV"
+          echo "BACKUP_OBJECT_NAME=$(basename "$encrypted")" >> "$GITHUB_ENV"
+
+      - name: Upload encrypted backup off-platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="${BACKUP_S3_PREFIX#/}"
+          prefix="${prefix%/}"
+          if [[ -n "$prefix" ]]; then
+            object_key="${prefix}/${BACKUP_OBJECT_NAME}"
+          else
+            object_key="${BACKUP_OBJECT_NAME}"
+          fi
+
+          endpoint_args=()
+          if [[ -n "${BACKUP_S3_ENDPOINT:-}" ]]; then
+            if [[ "$BACKUP_S3_ENDPOINT" != https://* ]]; then
+              echo "::error::BACKUP_S3_ENDPOINT must use HTTPS"
+              exit 1
+            fi
+            endpoint_args=(--endpoint-url "$BACKUP_S3_ENDPOINT")
+          fi
+
+          aws s3 cp "$BACKUP_FILE" "s3://${BACKUP_S3_BUCKET}/${object_key}" \
+            "${endpoint_args[@]}" \
+            --only-show-errors \
+            --metadata "sha256=${BACKUP_SHA256},source-project-ref=${EXPECTED_SUPABASE_PROJECT_REF},git-sha=${GITHUB_SHA}"
+
+          remote_sha="$(aws s3api head-object \
+            --bucket "$BACKUP_S3_BUCKET" \
+            --key "$object_key" \
+            "${endpoint_args[@]}" \
+            --query 'Metadata.sha256' \
+            --output text)"
+          if [[ "$remote_sha" != "$BACKUP_SHA256" ]]; then
+            echo "::error::Off-platform backup checksum metadata verification failed"
+            exit 1
+          fi
+
+          echo "Encrypted backup uploaded and verified: s3://${BACKUP_S3_BUCKET}/${object_key}"
+          echo "Backup SHA-256: ${BACKUP_SHA256}"
+          echo "Backup object key: ${object_key}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Backup SHA-256: ${BACKUP_SHA256}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove runner backup material
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          rm -rf "${RUNNER_TEMP}/entiznetstore-backup"
+          rm -f "${RUNNER_TEMP}"/entiznetstore-*.tar.gz "${RUNNER_TEMP}"/entiznetstore-*.tar.gz.age "${RUNNER_TEMP}"/entiznetstore-*.tar.gz.age.sha256

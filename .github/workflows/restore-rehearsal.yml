@@ -1,0 +1,228 @@
+name: Restore Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_object_key:
+        description: "Exact encrypted backup object key in the configured backup bucket"
+        required: true
+        type: string
+      expected_recovery_project_ref:
+        description: "Fresh disposable non-production Supabase project ref"
+        required: true
+        type: string
+      confirm_recovery_target:
+        description: "Repeat the disposable project ref to authorize destructive restore there"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entiznetstore-restore-${{ inputs.expected_recovery_project_ref }}
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: recovery-rehearsal
+    env:
+      PRODUCTION_PROJECT_REF: kllwwurklumhawfsilpd
+      EXPECTED_RECOVERY_PROJECT_REF: ${{ inputs.expected_recovery_project_ref }}
+      RECOVERY_SUPABASE_DB_URL: ${{ secrets.RECOVERY_SUPABASE_DB_URL }}
+      RECOVERY_SUPABASE_URL: ${{ secrets.RECOVERY_SUPABASE_URL }}
+      RECOVERY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.RECOVERY_SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_AGE_IDENTITY: ${{ secrets.BACKUP_AGE_IDENTITY }}
+      BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+      BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.BACKUP_S3_REGION }}
+      AWS_DEFAULT_REGION: ${{ vars.BACKUP_S3_REGION }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Guard destructive recovery target
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            EXPECTED_RECOVERY_PROJECT_REF
+            RECOVERY_SUPABASE_DB_URL
+            RECOVERY_SUPABASE_URL
+            RECOVERY_SUPABASE_SERVICE_ROLE_KEY
+            BACKUP_AGE_IDENTITY
+            BACKUP_S3_BUCKET
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            AWS_REGION
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required recovery configuration is missing: ${name}"
+              exit 1
+            fi
+          done
+
+          if [[ "$EXPECTED_RECOVERY_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" ]]; then
+            echo "::error::Production project ref is forbidden as a restore rehearsal target"
+            exit 1
+          fi
+          if [[ "${{ inputs.confirm_recovery_target }}" != "$EXPECTED_RECOVERY_PROJECT_REF" ]]; then
+            echo "::error::Recovery target confirmation does not match"
+            exit 1
+          fi
+          expected_url="https://${EXPECTED_RECOVERY_PROJECT_REF}.supabase.co"
+          if [[ "${RECOVERY_SUPABASE_URL%/}" != "$expected_url" ]]; then
+            echo "::error::Recovery Supabase URL/ref mismatch"
+            exit 1
+          fi
+          if [[ "$RECOVERY_SUPABASE_DB_URL" == *"${PRODUCTION_PROJECT_REF}"* ]]; then
+            echo "::error::Recovery database URL appears to reference production"
+            exit 1
+          fi
+          if [[ "$RECOVERY_SUPABASE_DB_URL" != *"${EXPECTED_RECOVERY_PROJECT_REF}"* ]]; then
+            echo "::error::Recovery database URL does not contain the confirmed recovery project ref"
+            exit 1
+          fi
+
+      - name: Install age and PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age postgresql-client
+          psql --version
+          aws --version
+
+      - name: Verify recovery target is blank
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_relations="$(psql "$RECOVERY_SUPABASE_DB_URL" -Atqc "select count(*) from (values (to_regclass('public.profiles')), (to_regclass('public.products')), (to_regclass('public.orders')), (to_regclass('app_private.operational_events'))) as t(rel) where rel is not null")"
+          auth_users="$(psql "$RECOVERY_SUPABASE_DB_URL" -Atqc 'select count(*) from auth.users')"
+          storage_objects="$(psql "$RECOVERY_SUPABASE_DB_URL" -Atqc 'select count(*) from storage.objects')"
+          if [[ "$app_relations" != "0" || "$auth_users" != "0" || "$storage_objects" != "0" ]]; then
+            echo "::error::Recovery target is not blank; refusing to overwrite an existing environment"
+            exit 1
+          fi
+
+      - name: Download and decrypt selected backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          work="${RUNNER_TEMP}/entiznetstore-restore"
+          rm -rf "$work"
+          mkdir -p "$work"
+          encrypted="$work/backup.tar.gz.age"
+
+          endpoint_args=()
+          if [[ -n "${BACKUP_S3_ENDPOINT:-}" ]]; then
+            if [[ "$BACKUP_S3_ENDPOINT" != https://* ]]; then
+              echo "::error::BACKUP_S3_ENDPOINT must use HTTPS"
+              exit 1
+            fi
+            endpoint_args=(--endpoint-url "$BACKUP_S3_ENDPOINT")
+          fi
+
+          expected_sha="$(aws s3api head-object \
+            --bucket "$BACKUP_S3_BUCKET" \
+            --key "${{ inputs.backup_object_key }}" \
+            "${endpoint_args[@]}" \
+            --query 'Metadata.sha256' \
+            --output text)"
+          if [[ ! "$expected_sha" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Backup object does not carry a valid SHA-256 metadata value"
+            exit 1
+          fi
+
+          aws s3 cp "s3://${BACKUP_S3_BUCKET}/${{ inputs.backup_object_key }}" "$encrypted" \
+            "${endpoint_args[@]}" --only-show-errors
+          actual_sha="$(sha256sum "$encrypted" | awk '{print $1}')"
+          if [[ "$actual_sha" != "$expected_sha" ]]; then
+            echo "::error::Downloaded backup SHA-256 mismatch"
+            exit 1
+          fi
+
+          identity="$work/age-identity.txt"
+          printf '%s\n' "$BACKUP_AGE_IDENTITY" > "$identity"
+          chmod 600 "$identity"
+          archive="$work/backup.tar.gz"
+          age -d -i "$identity" -o "$archive" "$encrypted"
+          mkdir "$work/extracted"
+          tar -C "$work/extracted" -xzf "$archive"
+
+          cd "$work/extracted"
+          sha256sum --check SHA256SUMS
+          metadata_ref="$(jq -r '.sourceProjectRef' backup-metadata.json)"
+          if [[ "$metadata_ref" != "$PRODUCTION_PROJECT_REF" ]]; then
+            echo "::error::Backup source project metadata is not canonical production"
+            exit 1
+          fi
+          echo "RESTORE_WORK=$work" >> "$GITHUB_ENV"
+
+      - name: Restore logical database into disposable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${RESTORE_WORK}/extracted/database"
+          psql --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --file "$base/roles.sql" \
+            --file "$base/schema.sql" \
+            --command 'SET session_replication_role = replica' \
+            --file "$base/data.sql" \
+            --file "$base/history_schema.sql" \
+            --file "$base/history_data.sql" \
+            --dbname "$RECOVERY_SUPABASE_DB_URL"
+
+      - name: Restore Storage objects with checksum verification
+        shell: bash
+        env:
+          RESTORE_STORAGE_SOURCE_DIR: ${{ env.RESTORE_WORK }}/extracted/storage
+        run: node scripts/restore-supabase-storage.mjs
+
+      - name: Verify restored database authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            scripts/verify-local-database.sql \
+            scripts/verify-m2-database-invariants.sql \
+            scripts/verify-m3-database-invariants.sql \
+            scripts/verify-m4a-database-invariants.sql \
+            scripts/test-security-definer-surface.sql
+          do
+            psql "$RECOVERY_SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      - name: Record restore rehearsal evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          object_count="$(jq '[.buckets[].objects[]] | length' "${RESTORE_WORK}/extracted/storage/manifest.json")"
+          source_sha="$(jq -r '.gitSha' "${RESTORE_WORK}/extracted/backup-metadata.json")"
+          echo "Restore target: ${EXPECTED_RECOVERY_PROJECT_REF}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source application SHA: ${source_sha}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Storage objects restored: ${object_count}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Database/RLS/SECURITY DEFINER/M4A structural checks: passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove decrypted recovery material
+        if: always()
+        shell: bash
+        run: rm -rf "${RUNNER_TEMP}/entiznetstore-restore"
