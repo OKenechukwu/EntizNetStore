@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unable to initialize payment" }, { status: 503 });
   }
 
+  // Do not create a durable initialization claim while there is no usable
+  // processor. This keeps checkout cancellable during processor onboarding.
   if (!provider.configured) {
     return NextResponse.json(
       {
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
   const initializationAttemptId = randomUUID();
 
   // Claim before any external processor call. The database row lock + durable
-  // attempt ID guarantee that concurrent HTTP requests cannot both initialize a
+  // attempt ID guarantee concurrent HTTP requests cannot both initialize a
   // processor payment for the same checkout.
   const { error: claimError } = await admin.rpc(
     "service_claim_checkout_payment_initialization",
@@ -172,6 +174,7 @@ export async function POST(request: NextRequest) {
   try {
     const initialized = await provider.initializePayment({
       checkoutSessionId: session.id,
+      initializationAttemptId,
       amountCents: Number(session.amount_cents),
       currency: "usd",
       buyerId: user.id,
@@ -201,12 +204,13 @@ export async function POST(request: NextRequest) {
       nextAction: initialized.nextAction,
     });
   } catch (error) {
-    // Once the processor call has been attempted, failure is potentially
-    // ambiguous. Only the trusted service path may cancel, and it refuses to do
-    // so if a provider reference actually reached the database. That case is
-    // deliberately left for reconciliation rather than risking lost money.
-    const { error: cancelError } = await admin.rpc(
-      "service_cancel_checkout_after_payment_initialization_failure",
+    // Once an external processor call has started, failure is potentially
+    // ambiguous: the processor may have accepted the request even when this
+    // server never received the response. Never cancel/release/retry
+    // automatically. Persist a reconciliation marker while retaining the
+    // durable claim that blocks a second external initialization.
+    const { error: uncertainError } = await admin.rpc(
+      "service_mark_checkout_payment_initialization_uncertain",
       {
         p_session_id: session.id,
         p_buyer_id: user.id,
@@ -214,32 +218,18 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    if (cancelError) {
+    if (uncertainError) {
       await reportOperationalError(
-        "payments.checkout_cancel_failed_after_initialization_error",
-        cancelError,
+        "payments.initialization_uncertainty_marker_failed",
+        uncertainError,
         {
           component: "payments",
-          operation: "cancel-checkout-after-payment-failure",
+          operation: "mark-payment-initialization-uncertain",
           severity: "critical",
           route: "/api/payments/create-intent",
           actorId: user.id,
           recordId: session.id,
         },
-      );
-    }
-
-    if (error instanceof PaymentProviderUnavailableError) {
-      await reportOperationalError("payments.provider_unavailable", error, {
-        component: "payments",
-        operation: "initialize-payment",
-        route: "/api/payments/create-intent",
-        actorId: user.id,
-        recordId: session.id,
-      });
-      return NextResponse.json(
-        { error: error.message, code: "PAYMENT_PROVIDER_UNAVAILABLE" },
-        { status: 503 },
       );
     }
 
@@ -253,7 +243,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: "Unable to initialize payment" },
+      {
+        error: "Payment initialization requires reconciliation before retry",
+        code: "PAYMENT_INITIALIZATION_UNCERTAIN",
+      },
       { status: 503 },
     );
   }
