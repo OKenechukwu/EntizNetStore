@@ -14,7 +14,11 @@ const NEVER_INDEX_PREFIXES = [
   '/internal',
 ] as const
 
-type LaunchEnvironment = Pick<NodeJS.ProcessEnv, 'SITE_INDEXING_ENABLED' | 'PUBLIC_LAUNCH_CONFIRMATION' | 'VERCEL_ENV'>
+type LaunchEnvironment = {
+  SITE_INDEXING_ENABLED?: string
+  PUBLIC_LAUNCH_CONFIRMATION?: string
+  VERCEL_ENV?: string
+}
 
 function normalizedPathname(pathname: string) {
   const raw = pathname.trim() || '/'
