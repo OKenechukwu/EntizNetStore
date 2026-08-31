@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isProduction = process.env.NODE_ENV === 'production'
+const PUBLIC_IMAGE_BUCKETS = ['product-media', 'seller-branding']
 
 function trustedSupabaseStorageBinding() {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
@@ -19,12 +20,12 @@ function trustedSupabaseStorageBinding() {
 
     return {
       origin: url.origin,
-      remotePattern: {
+      remotePatterns: PUBLIC_IMAGE_BUCKETS.map((bucket) => ({
         protocol: url.protocol.slice(0, -1),
         hostname: url.hostname,
         port: url.port,
-        pathname: '/storage/v1/object/public/**',
-      },
+        pathname: `/storage/v1/object/public/${bucket}/**`,
+      })),
     }
   } catch {
     return null
@@ -78,7 +79,7 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: supabaseStorageBinding ? [supabaseStorageBinding.remotePattern] : [],
+    remotePatterns: supabaseStorageBinding?.remotePatterns ?? [],
     maximumRedirects: 0,
     dangerouslyAllowLocalIP: false,
     dangerouslyAllowSVG: false,
