@@ -1,9 +1,10 @@
 // components/product/ProductGallery.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { isTrustedPublicMediaSource } from "@/lib/storage/publicMedia";
 import type { ProductImage } from "@/types/product";
 
 type Props = {
@@ -12,16 +13,24 @@ type Props = {
 };
 
 export default function ProductGallery({ images, productName }: Props) {
+  const safeImages = useMemo(
+    () => (images ?? []).filter((image) => isTrustedPublicMediaSource(image.url)),
+    [images],
+  );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  const currentImage = images[selectedIndex] || images[0];
+  useEffect(() => {
+    setSelectedIndex((previous) => Math.min(previous, Math.max(safeImages.length - 1, 0)));
+  }, [safeImages.length]);
+
+  const currentImage = safeImages[selectedIndex] || safeImages[0];
   const minSwipeDistance = 50;
 
   const goNext = useCallback(() => {
-    setSelectedIndex((prev) => (prev < images.length - 1 ? prev + 1 : prev));
-  }, [images.length]);
+    setSelectedIndex((prev) => (prev < safeImages.length - 1 ? prev + 1 : prev));
+  }, [safeImages.length]);
 
   const goPrev = useCallback(() => {
     setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
@@ -54,12 +63,12 @@ export default function ProductGallery({ images, productName }: Props) {
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    
+    if (touchStart === null || touchEnd === null) return;
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-    
+
     if (isLeftSwipe) {
       goNext();
     } else if (isRightSwipe) {
@@ -67,7 +76,7 @@ export default function ProductGallery({ images, productName }: Props) {
     }
   };
 
-  if (!images || images.length === 0) {
+  if (!currentImage || safeImages.length === 0) {
     return (
       <div className="w-full aspect-square bg-white/5 rounded-xl flex items-center justify-center">
         <span className="text-white/40">No images available</span>
@@ -78,7 +87,7 @@ export default function ProductGallery({ images, productName }: Props) {
   return (
     <div className="w-full space-y-4">
       {/* Main Image */}
-      <div 
+      <div
         className="relative w-full aspect-square rounded-xl overflow-hidden bg-white/5 group"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -94,7 +103,7 @@ export default function ProductGallery({ images, productName }: Props) {
         />
 
         {/* Navigation Arrows */}
-        {images.length > 1 && (
+        {safeImages.length > 1 && (
           <>
             <button
               onClick={goPrev}
@@ -107,7 +116,7 @@ export default function ProductGallery({ images, productName }: Props) {
 
             <button
               onClick={goNext}
-              disabled={selectedIndex === images.length - 1}
+              disabled={selectedIndex === safeImages.length - 1}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white opacity-0 transition hover:bg-black/80 disabled:opacity-30 group-hover:opacity-100"
               aria-label="Next image"
             >
@@ -117,19 +126,19 @@ export default function ProductGallery({ images, productName }: Props) {
         )}
 
         {/* Image Counter */}
-        {images.length > 1 && (
+        {safeImages.length > 1 && (
           <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm">
-            {selectedIndex + 1} / {images.length}
+            {selectedIndex + 1} / {safeImages.length}
           </div>
         )}
       </div>
 
       {/* Thumbnails */}
-      {images.length > 1 && (
+      {safeImages.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {images.map((img, index) => (
+          {safeImages.map((img, index) => (
             <button
-              key={index}
+              key={`${img.url}-${index}`}
               onClick={() => setSelectedIndex(index)}
               className={`
                 relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border-2 transition
