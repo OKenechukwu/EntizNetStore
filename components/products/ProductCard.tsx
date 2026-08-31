@@ -6,6 +6,7 @@ import Image from "next/image";
 import I18nText from "@/components/i18n/I18nText";
 import { useBrand } from "@/components/providers/BrandProvider";
 import { convertFromBase, formatPrice } from "@/lib/currency";
+import { trustedPublicMediaSource } from "@/lib/storage/publicMedia";
 
 export type ProductCardData = {
   id: string | number;
@@ -29,6 +30,7 @@ type Props = {
  * We standardize product pages to `/products/[slug]`.
  */
 const ROUTE_BASE = "/products";
+const FALLBACK_IMAGE = "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg";
 
 export default function ProductCard({ product }: Props) {
   const { id, slug, name, brand, image, price, badge, description } = product;
@@ -41,6 +43,7 @@ export default function ProductCard({ product }: Props) {
   // Defensive: if slug is missing, fall back to id
   const safeKey = (slug && String(slug).trim()) || String(id);
   const href = `${ROUTE_BASE}/${encodeURIComponent(safeKey)}`;
+  const safeImage = trustedPublicMediaSource(image, FALLBACK_IMAGE);
 
   return (
     <article
@@ -54,7 +57,7 @@ export default function ProductCard({ product }: Props) {
       {/* Media */}
       <div className="relative aspect-[4/3]">
         <Image
-          src={image || "/attached_assets/stock_images/luxury_adult_product_04d5ddeb.jpg"}
+          src={safeImage}
           alt={name}
           fill
           className="object-cover transition will-change-transform group-hover:scale-[1.02]"
