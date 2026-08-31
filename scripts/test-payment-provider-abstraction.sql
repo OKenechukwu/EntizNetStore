@@ -77,7 +77,6 @@ values (
   0
 );
 
--- This suite starts from a listing that has already passed M2 moderation.
 update public.products
 set moderation_status = 'approved', status = 'active'
 where id = '83000000-0000-0000-0000-000000000003';
@@ -109,23 +108,14 @@ from public.create_checkout_session(
   '85000000-0000-0000-0000-000000000005'
 );
 
-select public.attach_checkout_payment_reference(
-  (select id from public.payment_sessions where idempotency_key = '85000000-0000-0000-0000-000000000005'),
-  'simulator',
-  'sim_pay_success_path'
-);
-
+-- Browser callers cannot forge a provider reference anymore.
 do $$
-declare v_provider text; v_payment text; v_status text; v_total bigint;
 begin
-  select payment_provider, provider_payment_id, status, amount_cents
-    into v_provider, v_payment, v_status, v_total
-  from public.payment_sessions
-  where idempotency_key = '85000000-0000-0000-0000-000000000005';
-  if v_provider <> 'simulator' or v_payment <> 'sim_pay_success_path'
-     or v_status <> 'requires_payment' or v_total <> 2400 then
-    raise exception 'Generic payment attachment failed: provider %, payment %, status %, total %',
-      v_provider, v_payment, v_status, v_total;
+  if has_function_privilege('authenticated', 'public.attach_checkout_payment_reference(uuid,text,text)', 'EXECUTE') then
+    raise exception 'Authenticated role retained retired payment-reference attachment authority';
+  end if;
+  if has_function_privilege('authenticated', 'public.service_attach_checkout_payment_reference(uuid,uuid,uuid,text,text)', 'EXECUTE') then
+    raise exception 'Authenticated role can execute service payment-reference authority';
   end if;
 end
 $$;
@@ -134,6 +124,52 @@ reset role;
 set local role service_role;
 select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+select public.service_claim_checkout_payment_initialization(
+  (select id from public.payment_sessions where idempotency_key = '85000000-0000-0000-0000-000000000005'),
+  '81000000-0000-0000-0000-000000000001',
+  '87000000-0000-0000-0000-000000000007'
+);
+
+-- Claim replay with the exact same durable attempt is idempotent.
+select public.service_claim_checkout_payment_initialization(
+  (select id from public.payment_sessions where idempotency_key = '85000000-0000-0000-0000-000000000005'),
+  '81000000-0000-0000-0000-000000000001',
+  '87000000-0000-0000-0000-000000000007'
+);
+
+select public.service_attach_checkout_payment_reference(
+  (select id from public.payment_sessions where idempotency_key = '85000000-0000-0000-0000-000000000005'),
+  '81000000-0000-0000-0000-000000000001',
+  '87000000-0000-0000-0000-000000000007',
+  'simulator',
+  'sim_pay_success_path'
+);
+
+do $$
+declare
+  v_provider text;
+  v_payment text;
+  v_status text;
+  v_total bigint;
+  v_attempt uuid;
+begin
+  select payment_provider, provider_payment_id, status, amount_cents,
+         payment_initialization_attempt_id
+    into v_provider, v_payment, v_status, v_total, v_attempt
+  from public.payment_sessions
+  where idempotency_key = '85000000-0000-0000-0000-000000000005';
+
+  if v_provider <> 'simulator'
+     or v_payment <> 'sim_pay_success_path'
+     or v_status <> 'requires_payment'
+     or v_total <> 2400
+     or v_attempt <> '87000000-0000-0000-0000-000000000007'::uuid then
+    raise exception 'Generic service payment attachment failed: provider %, payment %, status %, total %, attempt %',
+      v_provider, v_payment, v_status, v_total, v_attempt;
+  end if;
+end
+$$;
 
 select public.finalize_checkout_payment_v2(
   'evt_retryable', 'simulator.payment.retryable_failure',
@@ -254,15 +290,23 @@ select * from public.create_checkout_session(
   '86000000-0000-0000-0000-000000000006'
 );
 
-select public.attach_checkout_payment_reference(
-  (select id from public.payment_sessions where idempotency_key = '86000000-0000-0000-0000-000000000006'),
-  'simulator', 'sim_pay_terminal_path'
-);
-
 reset role;
 set local role service_role;
 select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+select public.service_claim_checkout_payment_initialization(
+  (select id from public.payment_sessions where idempotency_key = '86000000-0000-0000-0000-000000000006'),
+  '81000000-0000-0000-0000-000000000001',
+  '88000000-0000-0000-0000-000000000008'
+);
+
+select public.service_attach_checkout_payment_reference(
+  (select id from public.payment_sessions where idempotency_key = '86000000-0000-0000-0000-000000000006'),
+  '81000000-0000-0000-0000-000000000001',
+  '88000000-0000-0000-0000-000000000008',
+  'simulator', 'sim_pay_terminal_path'
+);
 
 select public.finalize_checkout_payment_v2(
   'evt_terminal', 'simulator.payment.terminal_failure',
@@ -291,6 +335,115 @@ begin
 end
 $$;
 
+-- Ambiguous initialization does not cancel the order or release inventory.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '81000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"81000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+select * from public.create_checkout_session(
+  jsonb_build_array(jsonb_build_object(
+    'productId', '83000000-0000-0000-0000-000000000003',
+    'variantId', '84000000-0000-0000-0000-000000000004', 'quantity', 1
+  )),
+  jsonb_build_object('name','Provider Buyer','line1','1 Provider Street','city','Test City','postal_code','10000','country','US'),
+  '89000000-0000-0000-0000-000000000009'
+);
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+select public.service_claim_checkout_payment_initialization(
+  (select id from public.payment_sessions where idempotency_key = '89000000-0000-0000-0000-000000000009'),
+  '81000000-0000-0000-0000-000000000001',
+  '8a000000-0000-0000-0000-00000000000a'
+);
+
+select public.service_mark_checkout_payment_initialization_uncertain(
+  (select id from public.payment_sessions where idempotency_key = '89000000-0000-0000-0000-000000000009'),
+  '81000000-0000-0000-0000-000000000001',
+  '8a000000-0000-0000-0000-00000000000a'
+);
+
+do $$
+declare
+  v_session_status text;
+  v_order_status text;
+  v_payment_status text;
+  v_reservation_status text;
+  v_uncertain boolean;
+begin
+  select ps.status, coalesce((ps.metadata->>'payment_initialization_uncertain')::boolean, false)
+    into v_session_status, v_uncertain
+  from public.payment_sessions ps
+  where ps.idempotency_key = '89000000-0000-0000-0000-000000000009';
+
+  select o.status, o.payment_status
+    into v_order_status, v_payment_status
+  from public.orders o
+  join public.payment_sessions ps on ps.id = o.payment_session_id
+  where ps.idempotency_key = '89000000-0000-0000-0000-000000000009'
+  limit 1;
+
+  select r.status into v_reservation_status
+  from public.inventory_reservations r
+  join public.payment_sessions ps on ps.id = r.payment_session_id
+  where ps.idempotency_key = '89000000-0000-0000-0000-000000000009'
+  limit 1;
+
+  if v_session_status <> 'pending'
+     or v_order_status <> 'pending'
+     or v_payment_status <> 'pending'
+     or v_reservation_status <> 'pending'
+     or not v_uncertain then
+    raise exception 'Ambiguous initialization did not remain reconciliation-locked: session %, order %, payment %, reservation %, uncertain %',
+      v_session_status, v_order_status, v_payment_status, v_reservation_status, v_uncertain;
+  end if;
+end
+$$;
+
+-- A different attempt can never replace the durable claim automatically.
+do $$
+begin
+  begin
+    perform public.service_claim_checkout_payment_initialization(
+      (select id from public.payment_sessions where idempotency_key = '89000000-0000-0000-0000-000000000009'),
+      '81000000-0000-0000-0000-000000000001',
+      '8b000000-0000-0000-0000-00000000000b'
+    );
+    raise exception 'Conflicting initialization attempt unexpectedly replaced durable claim';
+  exception when sqlstate '55P03' then
+    null;
+  end;
+end
+$$;
+
+-- The Buyer cannot cancel underneath an in-flight/ambiguous processor attempt.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '81000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"81000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+do $$
+begin
+  begin
+    perform public.cancel_checkout_session(
+      (select id from public.payment_sessions where idempotency_key = '89000000-0000-0000-0000-000000000009')
+    );
+    raise exception 'Buyer cancellation unexpectedly succeeded after payment initialization claim';
+  exception when sqlstate '42501' then
+    null;
+  end;
+end
+$$;
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
 do $$
 begin
   if has_function_privilege('authenticated', 'public.finalize_checkout_payment_v2(text,text,uuid,text,text,text)', 'EXECUTE') then
@@ -298,6 +451,11 @@ begin
   end if;
   if not has_function_privilege('service_role', 'public.finalize_checkout_payment_v2(text,text,uuid,text,text,text)', 'EXECUTE') then
     raise exception 'Service role cannot execute provider finalizer';
+  end if;
+  if has_function_privilege('authenticated', 'public.service_claim_checkout_payment_initialization(uuid,uuid,uuid)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.service_attach_checkout_payment_reference(uuid,uuid,uuid,text,text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.service_mark_checkout_payment_initialization_uncertain(uuid,uuid,uuid)', 'EXECUTE') then
+    raise exception 'Authenticated role can execute payment initialization service authority';
   end if;
 end
 $$;
