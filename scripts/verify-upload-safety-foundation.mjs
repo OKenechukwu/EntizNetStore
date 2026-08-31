@@ -24,6 +24,7 @@ function requireFragments(relativePath, fragments) {
 
 requireFragments('package.json', [
   'test:upload-scanner',
+  'tests/upload-scanner-network-policy.test.mts',
   'test:upload-safety-http',
   'verify-upload-safety-foundation.mjs',
 ])
@@ -58,6 +59,7 @@ requireFragments('lib/storage/uploadScanner.ts', [
   'scanner_response_too_large',
   'readBoundedResponseText',
   'MAX_SCANNABLE_BYTES',
+  "normalized.startsWith('[') && normalized.endsWith(']')",
 ])
 
 requireFragments('tests/upload-scanner.test.mts', [
@@ -67,6 +69,12 @@ requireFragments('tests/upload-scanner.test.mts', [
   'remote scanner blocks malicious verdicts without accepting provider free-form metadata',
   'remote scanner fails closed on wrong content type, malformed JSON, oversized responses, timeout, and digest mismatch',
   "assert.equal(headers.has('x-entiznetstore-filename'), false)",
+])
+
+requireFragments('tests/upload-scanner-network-policy.test.mts', [
+  'production blocks IPv6 literals even when accidentally allowlisted',
+  'production blocks private/local hostname suffixes even when accidentally allowlisted',
+  'production rejects malformed bearer token material before network activity',
 ])
 
 requireFragments('app/api/health/route.ts', [
