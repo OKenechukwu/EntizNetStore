@@ -8,9 +8,11 @@ import {
   PRODUCT_MEDIA_BUCKET,
   PRODUCT_MEDIA_MAX_FILE_SIZE,
   PRODUCT_MEDIA_MIME_TYPES,
+  isOwnedProductMediaPath,
   productMediaPathFromPublicUrl,
   type ProductMediaMime,
 } from '@/lib/storage/productMedia'
+import { deleteProductMediaPathIfOrphan } from '@/lib/storage/productMediaServer'
 import {
   finalizeQuarantinedUpload,
   initializeSignedQuarantineUpload,
@@ -210,23 +212,27 @@ export async function DELETE(request: NextRequest) {
       filePath = productMediaPathFromPublicUrl(body.publicUrl, configuredUrl, auth.user.id)
     }
 
-    if (
-      !filePath ||
-      !filePath.startsWith(`${auth.user.id}/`) ||
-      filePath.includes('..') ||
-      filePath.includes('\\')
-    ) {
+    if (!filePath || !isOwnedProductMediaPath(filePath, auth.user.id)) {
       return NextResponse.json({ error: 'Invalid product media path' }, { status: 400 })
     }
 
-    const { error } = await getSupabaseAdmin().storage
-      .from(PRODUCT_MEDIA_BUCKET)
-      .remove([filePath])
-
-    if (error) {
-      await reportOperationalError('storage.product_media.delete_failed', error, {
+    const result = await deleteProductMediaPathIfOrphan(auth.user.id, filePath)
+    if (result === 'referenced') {
+      return NextResponse.json(
+        { error: 'Product media is still referenced by a product' },
+        { status: 409 },
+      )
+    }
+    if (result === 'not_found') {
+      return NextResponse.json({ error: 'Product media was not found' }, { status: 404 })
+    }
+    if (result === 'invalid_path') {
+      return NextResponse.json({ error: 'Invalid product media path' }, { status: 400 })
+    }
+    if (result === 'failed') {
+      await reportOperationalError('storage.product_media.delete_failed', 'product_media_delete_failed', {
         component: 'storage',
-        operation: 'delete-object',
+        operation: 'retire-and-delete-object',
         bucket: PRODUCT_MEDIA_BUCKET,
         route: '/api/seller/product-media/upload',
         actorId: auth.user.id,

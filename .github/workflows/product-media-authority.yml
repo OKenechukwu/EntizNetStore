@@ -38,6 +38,12 @@ jobs:
           -v ON_ERROR_STOP=1
           -f scripts/test-product-media-rpc-provenance.sql
 
+      - name: Prove product media retirement and reference integrity
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -v ON_ERROR_STOP=1
+          -f scripts/test-product-media-lifecycle.sql
+
       - name: Prove real PostgREST cannot bypass media provenance
         shell: bash
         run: |

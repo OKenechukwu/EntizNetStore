@@ -63,7 +63,7 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-  await deleteProductMediaPaths(oldPaths.filter((path) => !nextPaths.has(path)));
+  await deleteProductMediaPaths(user.id, oldPaths.filter((path) => !nextPaths.has(path)));
   return NextResponse.json({ id: data, moderationStatus: "not_submitted", status: "draft" });
 }
 
@@ -96,6 +96,6 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status });
   }
 
-  await deleteProductMediaPaths(oldPaths);
+  await deleteProductMediaPaths(user.id, oldPaths);
   return NextResponse.json({ deleted: true });
 }
