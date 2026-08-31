@@ -1,0 +1,217 @@
+name: M4A Production Database Promotion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entiznetstore-production-database-promotion
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: entiznetstore-production-release
+    env:
+      RELEASE_SHA: 4f74feaa67fd215e9cab4a21d7bc6b7addc2fc57
+      PRODUCTION_PROJECT_REF: kllwwurklumhawfsilpd
+      EXPECTED_PRE_M4A_VERSION: "20260826141217"
+      M4A_V1: "20260829174000"
+      M4A_V2: "20260830063500"
+      M4A_V3: "20260830165500"
+      M4A_V4: "20260830170500"
+    steps:
+      - name: Check out exact verified M4A release head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Validate canonical production database target
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          echo "::add-mask::$DATABASE_URL"
+
+          DATABASE_URL="$DATABASE_URL" PRODUCTION_PROJECT_REF="$PRODUCTION_PROJECT_REF" node - <<'NODE'
+          const raw = process.env.DATABASE_URL || ''
+          let url
+          try { url = new URL(raw) } catch { throw new Error('Production DB secret is not a valid connection URI') }
+          if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+            throw new Error('Production DB URI must use postgres/postgresql protocol')
+          }
+          if (!raw.includes(process.env.PRODUCTION_PROJECT_REF)) {
+            throw new Error('Production DB URI does not identify the canonical EntizNetStore Supabase project')
+          }
+          if (raw.includes('agwxifielftvzbdtdiov')) {
+            throw new Error('Deleted M4A verification branch URI is forbidden for production promotion')
+          }
+          NODE
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc "select 'connected:' || current_database() || ':' || current_user" >/tmp/m4a-db-target.txt
+          grep -q '^connected:postgres:' /tmp/m4a-db-target.txt
+          echo "Canonical production PostgreSQL target accepted."
+
+      - name: Verify production migration ledger is exactly pre-M4A
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          mkdir -p artifacts/m4a-production
+
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc \
+            "select version from supabase_migrations.schema_migrations order by version" \
+            > artifacts/m4a-production/migrations-before.txt
+
+          last_version="$(tail -n 1 artifacts/m4a-production/migrations-before.txt)"
+          test "$last_version" = "$EXPECTED_PRE_M4A_VERSION"
+
+          for version in "$M4A_V1" "$M4A_V2" "$M4A_V3" "$M4A_V4"; do
+            if grep -qx "$version" artifacts/m4a-production/migrations-before.txt; then
+              echo "Refusing promotion: M4A migration $version is already recorded remotely."
+              exit 1
+            fi
+          done
+
+          echo "Production migration ledger is exactly at the expected pre-M4A boundary."
+
+      - name: Capture schema-only pre-migration backup evidence
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          pg_dump "$DATABASE_URL" \
+            --schema-only \
+            --no-owner \
+            --no-privileges \
+            --exclude-schema='auth' \
+            --exclude-schema='storage' \
+            --exclude-schema='realtime' \
+            --exclude-schema='supabase_*' \
+            --file artifacts/m4a-production/public-schema-before.sql
+          gzip -9 artifacts/m4a-production/public-schema-before.sql
+          echo "Schema-only pre-migration evidence captured; no production row data was exported."
+
+      - name: Compare local and production migration history
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          supabase migration list --db-url "$DATABASE_URL" \
+            | tee artifacts/m4a-production/migration-list-before.txt
+
+      - name: Dry-run canonical M4A production migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          supabase db push --db-url "$DATABASE_URL" --dry-run \
+            | tee artifacts/m4a-production/db-push-dry-run.txt
+
+          for version in "$M4A_V1" "$M4A_V2" "$M4A_V3" "$M4A_V4"; do
+            grep -q "$version" artifacts/m4a-production/db-push-dry-run.txt || {
+              echo "Dry run did not include expected migration $version"
+              exit 1
+            }
+          done
+          echo "Dry run contains all four canonical M4A migrations."
+
+      - name: Apply four canonical M4A migrations to production
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          supabase db push --db-url "$DATABASE_URL"
+
+      - name: Verify exact post-migration ledger
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc \
+            "select version from supabase_migrations.schema_migrations order by version" \
+            > artifacts/m4a-production/migrations-after.txt
+
+          test "$(tail -n 1 artifacts/m4a-production/migrations-after.txt)" = "$M4A_V4"
+          for version in "$M4A_V1" "$M4A_V2" "$M4A_V3" "$M4A_V4"; do
+            test "$(grep -xc "$version" artifacts/m4a-production/migrations-after.txt)" = "1"
+          done
+          echo "Production migration ledger contains each canonical M4A version exactly once."
+
+      - name: Run production M3 preservation structural gate
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/verify-m3-database-invariants.sql
+
+      - name: Run production M4A structural security gate
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.ENTIZNETSTORE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DATABASE_URL"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/verify-m4a-database-invariants.sql
+
+      - name: Capture non-secret production migration evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/m4a-production
+          RELEASE_SHA="$RELEASE_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" node - <<'NODE'
+          const fs = require('fs')
+          fs.writeFileSync('artifacts/m4a-production/evidence.json', JSON.stringify({
+            releaseSha: process.env.RELEASE_SHA,
+            productionProjectRef: 'kllwwurklumhawfsilpd',
+            expectedVersions: [
+              '20260829174000',
+              '20260830063500',
+              '20260830165500',
+              '20260830170500'
+            ],
+            githubRunId: process.env.GITHUB_RUN_ID,
+            recordedAt: new Date().toISOString()
+          }, null, 2) + '\n')
+          NODE
+
+      - name: Upload production migration evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: m4a-production-database-evidence-${{ github.run_id }}
+          path: artifacts/m4a-production
+          if-no-files-found: warn
+          retention-days: 30
