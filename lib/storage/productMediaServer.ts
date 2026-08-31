@@ -68,8 +68,55 @@ export async function verifyOwnedProductMediaUrls(userId: string, urls: string[]
   return { ok: true as const, paths }
 }
 
-export async function deleteProductMediaPaths(paths: string[]) {
-  if (paths.length === 0) return
-  const { error } = await getSupabaseAdmin().storage.from(PRODUCT_MEDIA_BUCKET).remove(paths)
-  if (error) console.error('Unable to clean up product media objects:', error)
+export type ProductMediaDeleteStatus =
+  | 'deleted'
+  | 'referenced'
+  | 'not_found'
+  | 'invalid_path'
+  | 'failed'
+
+export async function deleteProductMediaPathIfOrphan(
+  actorId: string,
+  path: string,
+): Promise<ProductMediaDeleteStatus> {
+  const admin = getSupabaseAdmin()
+  const { data: claim, error: claimError } = await admin.rpc(
+    'service_claim_product_media_orphan',
+    {
+      p_actor_id: actorId,
+      p_destination_path: path,
+    },
+  )
+
+  if (claimError) {
+    console.error('Unable to claim product media cleanup:', claimError.message)
+    return 'failed'
+  }
+
+  if (claim !== 'claimed') {
+    if (claim === 'referenced' || claim === 'not_found' || claim === 'invalid_path') {
+      return claim
+    }
+    console.error('Unexpected product media cleanup claim result')
+    return 'failed'
+  }
+
+  const { error } = await admin.storage.from(PRODUCT_MEDIA_BUCKET).remove([path])
+  if (error) {
+    console.error('Unable to clean up retired product media object:', error.message)
+    return 'failed'
+  }
+
+  return 'deleted'
+}
+
+export async function deleteProductMediaPaths(actorId: string, paths: string[]) {
+  const results: Array<{ path: string; status: ProductMediaDeleteStatus }> = []
+  for (const path of [...new Set(paths)]) {
+    results.push({
+      path,
+      status: await deleteProductMediaPathIfOrphan(actorId, path),
+    })
+  }
+  return results
 }
