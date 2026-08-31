@@ -37,6 +37,7 @@ concurrency:
 
 jobs:
   capacity:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,6 +61,7 @@ jobs:
         env:
           ENTIZNETSTORE_BASE_URL: https://entiznetstore.vercel.app
           CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app
+          CAPACITY_EXPECTED_SHA: ${{ github.sha }}
           CAPACITY_CONCURRENCY: ${{ inputs.concurrency }}
           CAPACITY_REQUESTS_PER_PATH: ${{ inputs.requests_per_path }}
           CAPACITY_MAX_P95_MS: ${{ inputs.max_p95_ms }}
