@@ -69,6 +69,15 @@ requireFragments('tests/upload-scanner.test.mts', [
   "assert.equal(headers.has('x-entiznetstore-filename'), false)",
 ])
 
+requireFragments('app/api/health/route.ts', [
+  'validateUploadScannerConfiguration',
+  "uploadSafety: uploadScannerConfiguration.ok ? 'configured' : 'blocked'",
+])
+
+requireFragments('scripts/test-production-http-smoke.mjs', [
+  "['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)",
+])
+
 requireFragments('docs/operations/UPLOAD_SCANNER_SECURITY.md', [
   'explicit comma-separated allowlist of exact HTTPS origins',
   'does **not** send the user\'s filename',
