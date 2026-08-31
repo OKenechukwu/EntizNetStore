@@ -11,6 +11,13 @@ export type PaymentNextAction =
 
 export interface PaymentInitializationInput {
   checkoutSessionId: string;
+  /**
+   * Durable server-generated identifier for exactly one external payment
+   * initialization attempt. Every real provider adapter MUST send this through
+   * the processor's native idempotency mechanism so a transport-level retry at
+   * the provider boundary cannot create a second payment object.
+   */
+  initializationAttemptId: string;
   amountCents: number;
   currency: "usd";
   buyerId: string;
@@ -75,6 +82,9 @@ class UnconfiguredPaymentProvider implements PaymentProviderAdapter {
  * processor that accepts the marketplace business model and legal entity is
  * approved. Adding a processor means implementing this interface and wiring it
  * here; checkout/order/inventory/escrow code must not depend on provider SDKs.
+ *
+ * Processor onboarding is not complete until initializePayment uses
+ * input.initializationAttemptId as the provider-native idempotency key.
  */
 export function getPaymentProvider(): PaymentProviderAdapter {
   const provider = process.env.PAYMENT_PROVIDER?.trim().toLowerCase() || "unconfigured";
