@@ -38,6 +38,16 @@ jobs:
           -v ON_ERROR_STOP=1
           -f scripts/test-product-media-rpc-provenance.sql
 
+      - name: Prove real PostgREST cannot bypass media provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/test-product-media-rpc-http.mjs
+
       - name: Stop local Supabase stack
         if: always()
         run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
