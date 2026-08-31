@@ -1,0 +1,68 @@
+name: Production Read Capacity Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RUN_READ_ONLY_CAPACITY_GATE'
+        required: true
+        type: string
+      concurrency:
+        description: 'Concurrent read workers (1-25)'
+        required: true
+        default: '4'
+        type: string
+      requests_per_path:
+        description: 'Requests per safe read path (1-250)'
+        required: true
+        default: '20'
+        type: string
+      max_p95_ms:
+        description: 'Maximum acceptable p95 latency in ms'
+        required: true
+        default: '2500'
+        type: string
+      max_failure_percent:
+        description: 'Maximum failure percentage (0-25)'
+        required: true
+        default: '1'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entiznetstore-production-read-capacity
+  cancel-in-progress: false
+
+jobs:
+  capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Refuse unconfirmed execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ inputs.confirmation }}' = 'RUN_READ_ONLY_CAPACITY_GATE'
+
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Run bounded read-only capacity envelope
+        env:
+          ENTIZNETSTORE_BASE_URL: https://entiznetstore.vercel.app
+          CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app
+          CAPACITY_CONCURRENCY: ${{ inputs.concurrency }}
+          CAPACITY_REQUESTS_PER_PATH: ${{ inputs.requests_per_path }}
+          CAPACITY_MAX_P95_MS: ${{ inputs.max_p95_ms }}
+          CAPACITY_MAX_FAILURE_PERCENT: ${{ inputs.max_failure_percent }}
+          CAPACITY_REQUEST_TIMEOUT_MS: '8000'
+        run: node scripts/test-production-read-capacity.mjs
