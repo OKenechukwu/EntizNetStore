@@ -1,0 +1,43 @@
+name: Product Media Authority
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-media-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product-media-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Start fresh local Supabase stack
+        run: supabase start
+
+      - name: Reset from repository migrations and seed
+        run: supabase db reset --local
+
+      - name: Prove direct-RPC product media provenance boundary
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -v ON_ERROR_STOP=1
+          -f scripts/test-product-media-rpc-provenance.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
