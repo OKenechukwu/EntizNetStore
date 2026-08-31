@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-upload-safety-foundation.mjs && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs && node scripts/verify-actions-foundation.mjs && node scripts/verify-backup-recovery-foundation.mjs && node scripts/test-m4a-hosted-guard-contract.mjs",
     "test:storage-recovery": "node --experimental-strip-types --test tests/storage-compensation.test.mts",
-    "test:upload-scanner": "node --experimental-strip-types --test tests/upload-scanner.test.mts",
+    "test:upload-scanner": "node --experimental-strip-types --test tests/upload-scanner.test.mts tests/upload-scanner-network-policy.test.mts",
     "test:upload-safety-http": "node scripts/test-upload-safety-http.mjs",
     "test:operational-logging": "node --experimental-strip-types --test tests/operational-event.test.mts",
     "test:canonical-checkout": "node --experimental-strip-types --test tests/canonical-checkout.test.mts",
