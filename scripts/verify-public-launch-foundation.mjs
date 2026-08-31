@@ -94,7 +94,7 @@ requireFragments('scripts/test-production-http-smoke.mjs', [
 
 requireFragments('docs/operations/PUBLIC_LAUNCH_INTERLOCK.md', [
   'ENTIZNETSTORE_PUBLIC_WEB_V1',
-  'Vercel production',
+  'VERCEL_ENV=production',
   'does not replace the P0 launch gates',
 ])
 
