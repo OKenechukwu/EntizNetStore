@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -19,6 +20,21 @@ function responseHeaders() {
   return {
     'Cache-Control': 'private, no-store, max-age=0',
     'X-Robots-Tag': 'noindex, nofollow',
+  }
+}
+
+function serverSupabaseBinding(): string | null {
+  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!rawUrl) return null
+
+  try {
+    const origin = new URL(rawUrl).origin
+    return createHash('sha256')
+      .update(`entiznetstore:supabase-origin:v1:${origin}`)
+      .digest('hex')
+      .slice(0, 24)
+  } catch {
+    return null
   }
 }
 
@@ -111,6 +127,7 @@ export async function GET() {
       service: 'entiznetstore',
       checks,
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
+      backendBinding: serverSupabaseBinding(),
       durationMs: Date.now() - startedAt,
     },
     {

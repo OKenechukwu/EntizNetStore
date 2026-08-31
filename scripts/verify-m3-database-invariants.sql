@@ -2,7 +2,8 @@
 
 -- Structural M3 release gate. This complements behavioral suites by locking the
 -- production security/performance shape into every fresh database reproduction.
--- Later P0 hardening may add tables, but every public table must remain RLS-protected.
+-- Later milestones may add public tables, but they may not remove the M3/P0
+-- baseline and every public table must remain RLS-protected.
 
 do $$
 declare
@@ -21,7 +22,7 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
 
-  if v_public_tables <> 46 or v_rls_tables <> v_public_tables then
+  if v_public_tables < 46 or v_rls_tables <> v_public_tables then
     raise exception 'M3/P0 public-table/RLS invariant failed: tables %, RLS %',
       v_public_tables, v_rls_tables;
   end if;

@@ -100,8 +100,11 @@ export default async function ProductPage({ params }: Props) {
 
   const canonicalStoreSlug = storefrontDetails?.storeSlug ?? null;
 
+  // The application shell owns the single global <main> landmark. Product
+  // pages use a neutral container so assistive technology never sees nested
+  // main landmarks while preserving the same visual/layout surface.
   return (
-    <main className="min-h-screen w-full bg-background px-4 py-8 md:px-8">
+    <div className="min-h-screen w-full bg-background px-4 py-8 md:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
@@ -152,6 +155,6 @@ export default async function ProductPage({ params }: Props) {
           />
         )}
       </div>
-    </main>
+    </div>
   );
 }

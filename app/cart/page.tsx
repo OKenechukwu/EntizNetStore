@@ -21,6 +21,7 @@ import {
   loadCanonicalCartWithGuestImport,
   removeCanonicalCartItem,
   setCanonicalCartItem,
+  setCanonicalWholesaleCartItem,
 } from "@/lib/cart/client";
 import type { CanonicalCart, CanonicalCartItem } from "@/lib/cart/contracts";
 
@@ -36,9 +37,33 @@ function availabilityMessage(reason: string | null): string {
       return "This selected variant is currently unavailable.";
     case "insufficient_inventory":
       return "The requested quantity is no longer available.";
+    case "wholesale_offer_unavailable":
+      return "This wholesale offer is no longer available.";
+    case "verified_business_buyer_required":
+      return "A verified, active Business capability is required for this wholesale offer.";
+    case "wholesale_quantity_does_not_meet_offer_terms":
+      return "This wholesale quantity no longer meets the offer's MOQ or order-multiple terms.";
+    case "wholesale_pricing_tier_unavailable":
+      return "A valid wholesale pricing tier is no longer available for this quantity.";
     default:
       return "This item needs review before checkout.";
   }
+}
+
+function wholesaleQuantityBounds(item: CanonicalCartItem): {
+  minimum: number;
+  step: number;
+  maximum: number;
+} {
+  if (item.purchaseMode !== "wholesale" || !item.wholesaleTerms) {
+    return { minimum: 1, step: 1, maximum: 100 };
+  }
+
+  return {
+    minimum: Math.max(1, item.wholesaleTerms.minimumOrderQuantity),
+    step: Math.max(1, item.wholesaleTerms.orderMultiple),
+    maximum: 100000,
+  };
 }
 
 export default function CartPage() {
@@ -113,17 +138,32 @@ export default function CartPage() {
   const hasUnavailableItems = Boolean(user?.isBuyer && canonicalCart?.hasUnavailableItems);
 
   const handleCanonicalQuantity = async (item: CanonicalCartItem, quantity: number) => {
-    if (quantity < 1) return;
+    const { minimum, maximum } = wholesaleQuantityBounds(item);
+    if (quantity < minimum || quantity > maximum) return;
+
     setBusyKey(item.id);
     setError(null);
     try {
-      setCanonicalCart(
-        await setCanonicalCartItem({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity,
-        }),
-      );
+      if (item.purchaseMode === "wholesale") {
+        if (!item.wholesaleTerms?.offerId) {
+          throw new Error("Wholesale pricing context is unavailable. Remove this line and add the offer again.");
+        }
+
+        setCanonicalCart(
+          await setCanonicalWholesaleCartItem({
+            offerId: item.wholesaleTerms.offerId,
+            quantity,
+          }),
+        );
+      } else {
+        setCanonicalCart(
+          await setCanonicalCartItem({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity,
+          }),
+        );
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to update cart");
     } finally {
@@ -132,7 +172,7 @@ export default function CartPage() {
   };
 
   const handleGuestQuantity = (item: GuestCartItem, quantity: number) => {
-    if (quantity < 1) return;
+    if (quantity < 1 || quantity > 100) return;
     setGuestQty(item.id, quantity, item.variantId);
     setGuestCart(getGuestCart());
   };
@@ -211,7 +251,7 @@ export default function CartPage() {
             </h1>
             <p className="mt-2 text-sm" style={{ color: theme.colors.text.secondary }}>
               {user?.isBuyer
-                ? "Your signed-in cart is stored securely with your account."
+                ? "Your signed-in cart is stored securely with your account. Retail and wholesale pricing are revalidated before checkout."
                 : "Guest cart prices are for browsing only. Final availability and totals are verified after sign-in."}
             </p>
           </div>
@@ -265,15 +305,29 @@ export default function CartPage() {
               {displayedItems.map((rawItem) => {
                 const isCanonical = "productId" in rawItem;
                 const item = rawItem as CanonicalCartItem | GuestCartItem;
-                const quantity = isCanonical ? (item as CanonicalCartItem).quantity : (item as GuestCartItem).qty;
-                const unitPrice = isCanonical ? (item as CanonicalCartItem).unitPriceCents / 100 : (item as GuestCartItem).priceBase;
-                const linePrice = isCanonical ? (item as CanonicalCartItem).lineTotalCents / 100 : unitPrice * quantity;
-                const image = isCanonical ? (item as CanonicalCartItem).image : (item as GuestCartItem).image;
-                const variantTitle = isCanonical ? (item as CanonicalCartItem).variantTitle : (item as GuestCartItem).variantTitle;
-                const unavailable = isCanonical && !(item as CanonicalCartItem).available;
+                const canonicalItem = isCanonical ? (item as CanonicalCartItem) : null;
+                const guestItem = !isCanonical ? (item as GuestCartItem) : null;
+                const quantity = canonicalItem?.quantity ?? guestItem?.qty ?? 0;
+                const unitPrice = canonicalItem ? canonicalItem.unitPriceCents / 100 : guestItem?.priceBase ?? 0;
+                const linePrice = canonicalItem ? canonicalItem.lineTotalCents / 100 : unitPrice * quantity;
+                const image = canonicalItem ? canonicalItem.image : guestItem?.image;
+                const variantTitle = canonicalItem ? canonicalItem.variantTitle : guestItem?.variantTitle;
+                const unavailable = Boolean(canonicalItem && !canonicalItem.available);
+                const isWholesale = canonicalItem?.purchaseMode === "wholesale";
+                const bounds = canonicalItem
+                  ? wholesaleQuantityBounds(canonicalItem)
+                  : { minimum: 1, step: 1, maximum: 100 };
+                const decreaseQuantity = quantity - bounds.step;
+                const increaseQuantity = quantity + bounds.step;
+                const cannotDecrease = quantity <= bounds.minimum || decreaseQuantity < bounds.minimum;
+                const cannotIncrease = quantity >= bounds.maximum || increaseQuantity > bounds.maximum;
 
                 return (
-                  <div key={`${item.id}:${isCanonical ? (item as CanonicalCartItem).variantId : (item as GuestCartItem).variantId || "default"}`} className="rounded-lg border p-4 sm:p-6" style={{ borderColor: theme.colors.glass.border }}>
+                  <div
+                    key={`${item.id}:${canonicalItem?.purchaseMode ?? "guest"}:${canonicalItem?.variantId ?? guestItem?.variantId ?? "default"}`}
+                    className="rounded-lg border p-4 sm:p-6"
+                    style={{ borderColor: theme.colors.glass.border }}
+                  >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                       <div className="h-20 w-20 overflow-hidden rounded-lg flex-shrink-0" style={{ backgroundColor: theme.colors.surface }}>
                         {image ? (
@@ -285,14 +339,42 @@ export default function CartPage() {
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-semibold"><I18nText text={item.title} /></h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-semibold"><I18nText text={item.title} /></h3>
+                          {isWholesale && (
+                            <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                              Wholesale
+                            </span>
+                          )}
+                        </div>
                         {variantTitle && <p className="mt-1 text-xs" style={{ color: theme.colors.text.secondary }}>{variantTitle}</p>}
                         <p className="mt-1 text-sm" style={{ color: theme.colors.text.secondary }}>
-                          <Price amount={unitPrice} /> <T k="cart.each" />
+                          <Price amount={unitPrice} /> {isWholesale && canonicalItem?.wholesaleTerms?.unitLabel
+                            ? `per ${canonicalItem.wholesaleTerms.unitLabel}`
+                            : <T k="cart.each" />}
                         </p>
-                        {unavailable && (
+
+                        {isWholesale && canonicalItem?.wholesaleTerms && (
+                          <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-500/5 p-3 text-xs" style={{ color: theme.colors.text.secondary }}>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                              <span><strong style={{ color: theme.colors.text.primary }}>MOQ:</strong> {canonicalItem.wholesaleTerms.minimumOrderQuantity}</span>
+                              <span><strong style={{ color: theme.colors.text.primary }}>Order multiple:</strong> {canonicalItem.wholesaleTerms.orderMultiple}</span>
+                              {canonicalItem.wholesaleTerms.casePackSize ? (
+                                <span><strong style={{ color: theme.colors.text.primary }}>Case pack:</strong> {canonicalItem.wholesaleTerms.casePackSize}</span>
+                              ) : null}
+                              <span><strong style={{ color: theme.colors.text.primary }}>Lead time:</strong> {canonicalItem.wholesaleTerms.leadTimeDays} day{canonicalItem.wholesaleTerms.leadTimeDays === 1 ? "" : "s"}</span>
+                              {canonicalItem.wholesaleTerms.incoterm ? (
+                                <span><strong style={{ color: theme.colors.text.primary }}>Incoterm:</strong> {canonicalItem.wholesaleTerms.incoterm}</span>
+                              ) : null}
+                              <span><strong style={{ color: theme.colors.text.primary }}>Applied tier:</strong> {canonicalItem.wholesaleTerms.tierMinimumQuantity}+</span>
+                            </div>
+                            <p className="mt-2">Wholesale eligibility and tier price are checked again on the server before checkout.</p>
+                          </div>
+                        )}
+
+                        {unavailable && canonicalItem && (
                           <p className="mt-2 text-sm text-amber-400">
-                            {availabilityMessage((item as CanonicalCartItem).availabilityReason)}
+                            {availabilityMessage(canonicalItem.availabilityReason)}
                           </p>
                         )}
 
@@ -301,24 +383,29 @@ export default function CartPage() {
                           <div className="flex items-center rounded-lg border" style={{ borderColor: theme.colors.glass.border }}>
                             <button
                               type="button"
-                              aria-label={`Decrease quantity for ${item.title}`}
-                              onClick={() => isCanonical
-                                ? void handleCanonicalQuantity(item as CanonicalCartItem, quantity - 1)
-                                : handleGuestQuantity(item as GuestCartItem, quantity - 1)}
-                              disabled={quantity <= 1 || busyKey === item.id}
+                              aria-label={`Decrease quantity for ${item.title}${isWholesale ? ` by ${bounds.step}` : ""}`}
+                              onClick={() => canonicalItem
+                                ? void handleCanonicalQuantity(canonicalItem, decreaseQuantity)
+                                : guestItem && handleGuestQuantity(guestItem, decreaseQuantity)}
+                              disabled={cannotDecrease || busyKey === item.id}
                               className="min-h-11 min-w-11 disabled:opacity-40"
                             >−</button>
-                            <span className="w-10 text-center font-medium">{quantity}</span>
+                            <span className="min-w-12 px-2 text-center font-medium">{quantity}</span>
                             <button
                               type="button"
-                              aria-label={`Increase quantity for ${item.title}`}
-                              onClick={() => isCanonical
-                                ? void handleCanonicalQuantity(item as CanonicalCartItem, quantity + 1)
-                                : handleGuestQuantity(item as GuestCartItem, quantity + 1)}
-                              disabled={busyKey === item.id}
+                              aria-label={`Increase quantity for ${item.title}${isWholesale ? ` by ${bounds.step}` : ""}`}
+                              onClick={() => canonicalItem
+                                ? void handleCanonicalQuantity(canonicalItem, increaseQuantity)
+                                : guestItem && handleGuestQuantity(guestItem, increaseQuantity)}
+                              disabled={cannotIncrease || busyKey === item.id}
                               className="min-h-11 min-w-11 disabled:opacity-40"
                             >+</button>
                           </div>
+                          {isWholesale && (
+                            <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
+                              Changes in multiples of {bounds.step}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -401,7 +488,7 @@ export default function CartPage() {
                 )}
 
                 <div className="mt-5 space-y-2 text-xs" style={{ color: theme.colors.text.secondary }}>
-                  <p>🔒 Checkout totals are recalculated from the live catalogue on the server.</p>
+                  <p>🔒 Checkout totals are recalculated from the live catalogue and wholesale tiers on the server.</p>
                   <p>🚚 Shipping and tax are not claimed until trusted quote providers return them.</p>
                   <p>↩️ Returns follow the Seller policy shown for each product/store.</p>
                 </div>
