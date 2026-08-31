@@ -403,15 +403,23 @@ end
 $$;
 
 -- Final payment success consumes reserved inventory, confirms the order and
--- converts only the cart captured in the payment-session metadata.
-select public.attach_checkout_payment_reference(
+-- converts only the cart captured in the payment-session metadata. Payment
+-- provider identity is now established only through the service initialization
+-- claim/attach authority, matching the production route.
+reset role;
+set local role service_role;
+select public.service_claim_checkout_payment_initialization(
   :'session_id'::uuid,
+  'a1000000-0000-0000-0000-000000000001',
+  'aa000000-0000-0000-0000-00000000000a'
+);
+select public.service_attach_checkout_payment_reference(
+  :'session_id'::uuid,
+  'a1000000-0000-0000-0000-000000000001',
+  'aa000000-0000-0000-0000-00000000000a',
   'm3test',
   'm3-provider-payment-1'
 );
-
-reset role;
-set local role service_role;
 select public.finalize_checkout_payment_v2(
   'm3-event-1',
   'payment.succeeded',
