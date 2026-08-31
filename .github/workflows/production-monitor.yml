@@ -15,8 +15,9 @@ concurrency:
 
 jobs:
   smoke:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -28,12 +29,25 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run canonical production smoke
+      - name: Run canonical production smoke with deployment convergence retry
         id: smoke
         continue-on-error: true
         env:
           ENTIZNETSTORE_BASE_URL: https://entiznetstore.vercel.app
-        run: node scripts/test-production-http-smoke.mjs
+          ENTIZNETSTORE_EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "Production smoke attempt ${attempt}/5 for ${ENTIZNETSTORE_EXPECTED_SHA:0:12}"
+            if node scripts/test-production-http-smoke.mjs; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              sleep 20
+            fi
+          done
+          exit 1
 
       - name: Create or update production incident
         if: steps.smoke.outcome == 'failure'
@@ -42,6 +56,7 @@ jobs:
           script: |
             const title = '[monitor] EntizNetStore production smoke failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const expectedVersion = context.sha.slice(0, 12);
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -50,11 +65,13 @@ jobs:
             });
             const existing = issues.find((issue) => issue.title === title && !issue.pull_request);
             const body = [
-              'The scheduled EntizNetStore production smoke check failed.',
+              'The scheduled EntizNetStore production smoke check failed after the deployment-convergence retry window.',
               '',
+              `Expected main version: ${expectedVersion}`,
               `Workflow run: ${runUrl}`,
               `Detected at: ${new Date().toISOString()}`,
               '',
+              'Treat deployment-version drift, readiness failure, security-header regression, or authorization exposure as release incidents until disproven.',
               'Follow `docs/operations/INCIDENT_RESPONSE.md` before changing production state.',
               'Do not paste credentials, assertions, signed URLs, KYC data, payment payloads, or other secrets into this issue.',
             ].join('\n');
@@ -82,6 +99,7 @@ jobs:
           script: |
             const title = '[monitor] EntizNetStore production smoke failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const version = context.sha.slice(0, 12);
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -93,7 +111,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: `Production smoke recovered successfully. Verification run: ${runUrl}`,
+                body: `Production smoke recovered successfully at expected main version ${version}. Verification run: ${runUrl}`,
               });
               await github.rest.issues.update({
                 owner: context.repo.owner,

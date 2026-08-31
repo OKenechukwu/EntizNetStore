@@ -17,6 +17,7 @@
     "test:operational-logging": "node --experimental-strip-types --test tests/operational-event.test.mts",
     "test:canonical-checkout": "node --experimental-strip-types --test tests/canonical-checkout.test.mts",
     "test:production-http-smoke": "node scripts/test-production-http-smoke.mjs",
+    "test:production-read-capacity": "node scripts/test-production-read-capacity.mjs",
     "start": "PORT=${PORT:-3000} next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "node scripts/lint-with-baseline.mjs",
     "lint:strict": "eslint . --max-warnings=0"

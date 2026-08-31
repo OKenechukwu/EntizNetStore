@@ -1,9 +1,17 @@
 const rawBaseUrl = process.env.ENTIZNETSTORE_BASE_URL || process.argv[2]
+const rawExpectedSha = process.env.ENTIZNETSTORE_EXPECTED_SHA?.trim().toLowerCase() || ''
 
 if (!rawBaseUrl) {
   console.error('Usage: ENTIZNETSTORE_BASE_URL=https://entiznetstore.example npm run test:production-http-smoke')
   process.exit(2)
 }
+
+if (rawExpectedSha && !/^[0-9a-f]{12,40}$/.test(rawExpectedSha)) {
+  console.error('ENTIZNETSTORE_EXPECTED_SHA must be a 12..40 character hexadecimal Git SHA')
+  process.exit(2)
+}
+
+const expectedVersion = rawExpectedSha ? rawExpectedSha.slice(0, 12) : null
 
 let baseUrl
 try {
@@ -74,6 +82,9 @@ await request('/api/health', 200, (body) => {
   if (!['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)) {
     throw new Error('readiness response did not report the bounded upload-safety launch gate')
   }
+  if (expectedVersion && body?.version !== expectedVersion) {
+    throw new Error(`production deployment drift: expected version ${expectedVersion}, got ${body?.version || 'missing'}`)
+  }
 })
 await request('/api/messages/conversations', 401, (body) => {
   if (body?.error !== 'Unauthorized') throw new Error('anonymous messaging route did not fail closed')
@@ -108,4 +119,6 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log(`Production HTTP smoke passed for ${baseUrl.origin}`)
+console.log(
+  `Production HTTP smoke passed for ${baseUrl.origin}${expectedVersion ? ` at ${expectedVersion}` : ''}`,
+)
