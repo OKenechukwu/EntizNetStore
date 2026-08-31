@@ -41,6 +41,39 @@ values
     'Returns accepted under the Seller return policy.'
   );
 
+-- M2 media fixtures must represent the same provenance that production now
+-- requires: a live owned Storage object plus clean quarantine/scan evidence.
+insert into storage.objects(bucket_id, name, metadata)
+values (
+  'product-media',
+  '91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp',
+  '{"mimetype":"image/webp","size":128}'::jsonb
+);
+
+insert into public.upload_scan_jobs(
+  id, actor_id, purpose, quarantine_path, destination_bucket, destination_path,
+  declared_mime, verified_mime, byte_size, sha256, status, scanner,
+  scanner_version, scanner_result_code, scanned_at, promoted_at
+)
+values (
+  '91111111-1111-4111-8111-111111111111',
+  '91000000-0000-0000-0000-000000000001',
+  'product_media',
+  '91000000-0000-0000-0000-000000000001/product_media/91111111-1111-4111-8111-111111111111.webp',
+  'product-media',
+  '91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp',
+  'image/webp',
+  'image/webp',
+  128,
+  repeat('9', 64),
+  'clean',
+  'ci-m2-regression',
+  '1',
+  'clean',
+  now(),
+  now()
+);
+
 -- Store slugs are persisted, clean and unique instead of derived by scanning.
 do $$
 declare
@@ -99,7 +132,7 @@ $$;
 -- Seller one creates a rich draft through the canonical RPC.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 select public.seller_save_product_v3(
   null,
@@ -112,7 +145,7 @@ select public.seller_save_product_v3(
   40.00,
   null,
   array['b9ec6994-3765-4a06-a072-6bcf6b619645']::uuid[],
-  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/test.webp'],
+  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
   '[{"title":"Default","sku":"M2-ONE","price":129.99,"compareAtPrice":159.99,"costPerItem":40,"trackInventory":true,"inventoryQuantity":12,"inventoryPolicy":"deny","weightGrams":250,"requiresShipping":true,"isActive":true}]'::jsonb,
   true,
   false,
@@ -180,7 +213,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002', true);
-select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 do $$
 declare
@@ -204,7 +237,7 @@ $$;
 
 -- Seller one submits the complete product for moderation.
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_submit_product_for_review(:'product_id'::uuid);
 
 reset role;
@@ -295,7 +328,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_set_product_publication(:'product_id'::uuid, false);
 
 reset role;
@@ -313,7 +346,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 select public.seller_set_product_publication(:'product_id'::uuid, true);
 
 -- Any Seller edit invalidates approval and unpublishes immediately.
@@ -328,7 +361,7 @@ select public.seller_save_product_v3(
   42.00,
   null,
   array['b9ec6994-3765-4a06-a072-6bcf6b619645']::uuid[],
-  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/test.webp'],
+  array['https://example.supabase.co/storage/v1/object/public/product-media/91000000-0000-0000-0000-000000000001/11111111-1111-4111-8111-111111111111.webp'],
   '[{"title":"Default","sku":"M2-ONE-EDIT","price":139.99,"inventoryQuantity":10,"inventoryPolicy":"deny","trackInventory":true,"requiresShipping":true,"isActive":true}]'::jsonb,
   true, false, true, true, 250, 'silicone', 18,
   array['premium','edited'], array['moderated','edited']
@@ -367,7 +400,7 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '92000000-0000-0000-0000-000000000002', true);
-select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"92000000-0000-0000-0000-000000000002","role":"authenticated","iss":"https://example.supabase.co/auth/v1"}', true);
 
 do $$
 declare
