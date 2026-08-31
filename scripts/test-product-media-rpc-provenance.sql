@@ -176,7 +176,7 @@ as $$
     'CI-only media provenance product',
     'physical', 19.99, null, null, null, '{}'::uuid[],
     case when p_url is null then '{}'::text[] else array[p_url] end,
-    '[{"title":"Default","sku":"MEDIA-RPC-CI","price":19.99,"trackInventory":true,"inventoryQuantity":3,"inventoryPolicy":"deny","requiresShipping":true,"isActive":true}]'::jsonb,
+    '[{"title":"Default","price":19.99,"trackInventory":true,"inventoryQuantity":3,"inventoryPolicy":"deny","requiresShipping":true,"isActive":true}]'::jsonb,
     true, false, true, true, 100, null, 18,
     array['ci-provenance'], array['ci-provenance']
   );
