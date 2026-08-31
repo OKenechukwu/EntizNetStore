@@ -26,7 +26,7 @@ const MAX_RESPONSE_BYTES = 16 * 1024;
 const MAX_SCANNABLE_BYTES = 15 * 1024 * 1024;
 const MAX_TOKEN_BYTES = 4096;
 const EICAR_MARKER = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
-const BLOCKED_PRODUCTION_HOST_SUFFIXES = ['.localhost', '.local', '.internal'] as const;
+const BLOCKED_PRODUCTION_HOST_SUFFIXES = ['.localhost', '.local', '.localdomain', '.lan', '.internal'] as const;
 
 function unavailable(code: string, scanner = 'configuration'): UploadScanResult {
   return { verdict: 'unavailable', scanner, code };
@@ -116,9 +116,12 @@ function parseAllowedOrigins(): { ok: true; origins: Set<string> } | { ok: false
 
 function productionHostnameBlocked(hostname: string) {
   const normalized = hostname.toLowerCase().replace(/\.$/, '');
+  const ipCandidate = normalized.startsWith('[') && normalized.endsWith(']')
+    ? normalized.slice(1, -1)
+    : normalized;
   return (
     normalized === 'localhost' ||
-    isIP(normalized) !== 0 ||
+    isIP(ipCandidate) !== 0 ||
     BLOCKED_PRODUCTION_HOST_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
   );
 }
