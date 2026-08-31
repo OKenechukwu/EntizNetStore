@@ -85,6 +85,22 @@ jobs:
 
           echo "Isolated Supabase service-role credential validated and production credential use refused."
 
+      - name: Remove prior failed isolated Vercel deployment
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /tmp/m4a-prior-delete.json --write-out '%{http_code}' \
+            --request DELETE \
+            --url "https://api.vercel.com/v13/deployments/dpl_43B6dEvujPqaQwAoBy5dn5sq1j1D?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+          if [ "$status" != "200" ] && [ "$status" != "204" ] && [ "$status" != "404" ]; then
+            cat /tmp/m4a-prior-delete.json
+            exit 1
+          fi
+          echo "Prior isolated M4A deployment is absent."
+
       - name: Remove stale branch-scoped Vercel verification variables
         shell: bash
         env:
@@ -236,6 +252,42 @@ jobs:
           echo "Timed out waiting for isolated Vercel deployment."
           exit 1
 
+      - name: Ensure disposable hosted category fixture
+        id: category
+        shell: bash
+        env:
+          SERVICE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          auth_headers=(--header "apikey: ${SERVICE_KEY}")
+          if [[ "$SERVICE_KEY" == eyJ* ]]; then
+            auth_headers+=(--header "Authorization: Bearer ${SERVICE_KEY}")
+          fi
+
+          existing="$(curl --fail-with-body --silent --show-error \
+            --url "${SUPABASE_URL}/rest/v1/categories?select=id&is_active=eq.true&limit=1" \
+            "${auth_headers[@]}")"
+          existing_id="$(printf '%s' "$existing" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(Array.isArray(x)&&x[0]?.id)process.stdout.write(x[0].id)})')"
+          if [ -n "$existing_id" ]; then
+            echo "created_id=" >> "$GITHUB_OUTPUT"
+            echo "Using existing active category for hosted verification."
+            exit 0
+          fi
+
+          slug="m4a-hosted-verification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          body="$(SLUG="$slug" node -e 'process.stdout.write(JSON.stringify({name:"M4A Hosted Verification",slug:process.env.SLUG,is_active:true,is_adult:false,description:"Disposable hosted M4A verification category"}))')"
+          created="$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "${SUPABASE_URL}/rest/v1/categories" \
+            "${auth_headers[@]}" \
+            --header 'Content-Type: application/json' \
+            --header 'Prefer: return=representation' \
+            --data "$body")"
+          category_id="$(printf '%s' "$created" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(Array.isArray(x)&&x[0]?.id)process.stdout.write(x[0].id)})')"
+          test -n "$category_id"
+          echo "created_id=$category_id" >> "$GITHUB_OUTPUT"
+          echo "Created disposable active category for hosted verification."
+
       - name: Run hosted M4A HTTP authority matrix
         env:
           APP_ORIGIN: ${{ steps.deployment.outputs.base_url }}
@@ -292,6 +344,24 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Remove disposable hosted category fixture
+        if: always() && steps.category.outputs.created_id != ''
+        shell: bash
+        env:
+          SERVICE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+          CATEGORY_ID: ${{ steps.category.outputs.created_id }}
+        run: |
+          set -euo pipefail
+          auth_headers=(--header "apikey: ${SERVICE_KEY}")
+          if [[ "$SERVICE_KEY" == eyJ* ]]; then
+            auth_headers+=(--header "Authorization: Bearer ${SERVICE_KEY}")
+          fi
+          curl --fail-with-body --silent --show-error \
+            --request DELETE \
+            --url "${SUPABASE_URL}/rest/v1/categories?id=eq.${CATEGORY_ID}" \
+            "${auth_headers[@]}" >/dev/null
+          echo "Disposable hosted category removed."
+
       - name: Revoke temporary Vercel automation bypass
         if: always() && steps.bypass.outputs.secret != ''
         shell: bash
@@ -306,6 +376,24 @@ jobs:
             --header "Authorization: Bearer ${VERCEL_TOKEN}" \
             --header 'Content-Type: application/json' \
             --data "{\"revoke\":{\"secret\":\"${BYPASS}\",\"regenerate\":false}}" >/dev/null
+
+      - name: Delete isolated Vercel deployment
+        if: always() && steps.deployment.outputs.id != ''
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /tmp/m4a-deployment-delete.json --write-out '%{http_code}' \
+            --request DELETE \
+            --url "https://api.vercel.com/v13/deployments/${DEPLOYMENT_ID}?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+          if [ "$status" != "200" ] && [ "$status" != "204" ] && [ "$status" != "404" ]; then
+            cat /tmp/m4a-deployment-delete.json
+            exit 1
+          fi
+          echo "Isolated Vercel deployment removed."
 
       - name: Remove branch-scoped Vercel verification variables
         if: always()
