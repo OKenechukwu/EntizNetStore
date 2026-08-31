@@ -109,7 +109,9 @@ if (exists(".github/workflows/production-capacity.yml")) {
     "workflow_dispatch:",
     "RUN_READ_ONLY_CAPACITY_GATE",
     "persist-credentials: false",
+    "if: github.ref == 'refs/heads/main'",
     "CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app",
+    "CAPACITY_EXPECTED_SHA: ${{ github.sha }}",
     "node scripts/test-production-read-capacity.mjs",
   ]) {
     if (!capacity.includes(fragment)) {
@@ -131,6 +133,22 @@ if (exists("scripts/test-production-http-smoke.mjs")) {
   ]) {
     if (!smoke.includes(fragment)) {
       fail(`Production smoke lost release-identity control: ${fragment}`);
+    }
+  }
+}
+
+if (exists("scripts/test-production-read-capacity.mjs")) {
+  const capacityProbe = read("scripts/test-production-read-capacity.mjs");
+  for (const fragment of [
+    "CAPACITY_EXPECTED_ORIGIN",
+    "CAPACITY_EXPECTED_SHA",
+    "deployment_version_mismatch",
+    "const paths = ['/', '/api/health']",
+    "boundedInteger('CAPACITY_CONCURRENCY', 4, 1, 25)",
+    "boundedInteger('CAPACITY_REQUESTS_PER_PATH', 20, 1, 250)",
+  ]) {
+    if (!capacityProbe.includes(fragment)) {
+      fail(`Production capacity probe lost safety control: ${fragment}`);
     }
   }
 }
