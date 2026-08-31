@@ -1,0 +1,85 @@
+name: Image Egress Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-egress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-egress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-image-egress.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SHIPPING_QUOTE_PROVIDER: unconfigured
+      TAX_QUOTE_PROVIDER: unconfigured
+      PAYMENT_PROVIDER: unconfigured
+      NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
+      PAYOUT_PROVIDER: unconfigured
+      UPLOAD_SCANNER_MODE: deterministic
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify image egress foundation
+        run: node scripts/verify-image-egress-foundation.mjs
+
+      - name: Run public media source regression
+        run: npm run test:public-media-source
+
+      - name: Run image egress configuration regression
+        run: npm run test:image-egress-config
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Exercise live image optimizer SSRF boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT=3000 npm start > /tmp/entiznetstore-image-egress.log 2>&1 &
+          APP_PID=$!
+          cleanup() {
+            kill "$APP_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1:3000/robots.txt; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js server did not become ready"
+            cat /tmp/entiznetstore-image-egress.log
+            exit 1
+          fi
+
+          APP_ORIGIN=http://127.0.0.1:3000 npm run test:image-optimizer-egress || {
+            status=$?
+            echo "Image optimizer egress regression failed; server log follows"
+            cat /tmp/entiznetstore-image-egress.log
+            exit "$status"
+          }
