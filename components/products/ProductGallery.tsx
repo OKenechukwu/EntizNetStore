@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { isTrustedPublicMediaSource } from "@/lib/storage/publicMedia";
 
 interface GalleryProps {
@@ -14,12 +14,9 @@ export default function ProductGallery({ images }: GalleryProps) {
     [images],
   );
   const [active, setActive] = useState(0);
+  const displayIndex = Math.min(active, Math.max(safeImages.length - 1, 0));
+  const current = safeImages[displayIndex] ?? safeImages[0];
 
-  useEffect(() => {
-    setActive((previous) => Math.min(previous, Math.max(safeImages.length - 1, 0)));
-  }, [safeImages.length]);
-
-  const current = safeImages[active] ?? safeImages[0];
   if (!current) {
     return (
       <div className="flex aspect-square w-full items-center justify-center rounded-xl border bg-white/5 text-sm text-foreground/50">
@@ -46,7 +43,7 @@ export default function ProductGallery({ images }: GalleryProps) {
               key={`${img.src}-${i}`}
               onClick={() => setActive(i)}
               className={`relative aspect-square overflow-hidden rounded-md border ${
-                i === active ? "ring-2 ring-pink-600" : ""
+                i === displayIndex ? "ring-2 ring-pink-600" : ""
               }`}
               aria-label={`View product image ${i + 1}`}
             >
