@@ -5,7 +5,6 @@
 do $$
 declare
   expected_authenticated text[] := array[
-    'attach_checkout_payment_reference(uuid,text,text)',
     'business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)',
     'business_set_trading_roles(text[])',
     'buyer_clear_cart()',
@@ -87,7 +86,7 @@ begin
   ) unsafe;
 
   if cardinality(unscoped) > 0 then
-    raise exception 'authenticated SECURITY DEFININER RPC(s) lost auth.uid() scoping: %', unscoped;
+    raise exception 'authenticated SECURITY DEFINER RPC(s) lost auth.uid() scoping: %', unscoped;
   end if;
 end;
 $$;
@@ -117,42 +116,91 @@ begin
 end;
 $$;
 
--- The retired Stripe-specific wrapper is trusted-worker-only.
+-- Direct provider-reference mutation is retired from all API roles. The old
+-- signatures remain only so historical migrations and provenance remain clear.
 do $$
 declare
-  fn regprocedure := 'public.attach_checkout_payment_intent(uuid,text)'::regprocedure;
+  generic_old regprocedure := 'public.attach_checkout_payment_reference(uuid,text,text)'::regprocedure;
+  stripe_old regprocedure := 'public.attach_checkout_payment_intent(uuid,text)'::regprocedure;
+  role_name text;
 begin
-  if has_function_privilege('anon', fn, 'EXECUTE') then
-    raise exception 'anon must not execute attach_checkout_payment_intent';
+  foreach role_name in array array['anon','authenticated','service_role'] loop
+    if has_function_privilege(role_name, generic_old, 'EXECUTE') then
+      raise exception '% unexpectedly executes retired attach_checkout_payment_reference', role_name;
+    end if;
+    if has_function_privilege(role_name, stripe_old, 'EXECUTE') then
+      raise exception '% unexpectedly executes retired attach_checkout_payment_intent', role_name;
+    end if;
+  end loop;
+end;
+$$;
+
+-- External payment initialization is service authority only. Browser roles can
+-- select their own checkout through RLS, but cannot claim a processor attempt,
+-- attach a provider identity or manipulate an ambiguous reconciliation state.
+do $$
+declare
+  service_fns regprocedure[] := array[
+    'public.service_claim_checkout_payment_initialization(uuid,uuid,uuid)'::regprocedure,
+    'public.service_attach_checkout_payment_reference(uuid,uuid,uuid,text,text)'::regprocedure,
+    'public.service_mark_checkout_payment_initialization_uncertain(uuid,uuid,uuid)'::regprocedure
+  ];
+  fn regprocedure;
+  definition text;
+begin
+  foreach fn in array service_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or has_function_privilege('authenticated', fn, 'EXECUTE') then
+      raise exception 'browser role can execute service payment authority %', fn;
+    end if;
+    if not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'service_role lost payment authority %', fn;
+    end if;
+
+    select pg_get_functiondef(fn::oid) into definition;
+    if definition not ilike '%security definer%'
+       or definition not ilike '%set search_path to ''pg_catalog''%'
+          and definition not ilike '%set search_path = pg_catalog%' then
+      raise exception 'payment authority % lost SECURITY DEFINER/search_path hardening', fn;
+    end if;
+  end loop;
+end;
+$$;
+
+-- Buyer cancellation remains self-authorized, but must stop once trusted server
+-- authority has claimed an external processor initialization.
+do $$
+declare
+  fn regprocedure := 'public.cancel_checkout_session(uuid)'::regprocedure;
+  definition text;
+begin
+  if has_function_privilege('anon', fn, 'EXECUTE')
+     or not has_function_privilege('authenticated', fn, 'EXECUTE') then
+    raise exception 'checkout cancellation browser privilege contract changed';
   end if;
-  if has_function_privilege('authenticated', fn, 'EXECUTE') then
-    raise exception 'authenticated must not execute attach_checkout_payment_intent';
-  end if;
-  if not has_function_privilege('service_role', fn, 'EXECUTE') then
-    raise exception 'service_role must retain attach_checkout_payment_intent compatibility access';
+
+  select pg_get_functiondef(fn::oid) into definition;
+  if definition not ilike '%buyer_id = auth.uid()%'
+     or definition not ilike '%payment_initialization_attempt_id is null%' then
+    raise exception 'checkout cancellation lost actor/initialization-claim guard';
   end if;
 end;
 $$;
 
--- The canonical provider-neutral browser RPC stays self-scoped and available.
+-- Provider reference identity must be unique across checkout sessions.
 do $$
-declare
-  fn regprocedure := 'public.attach_checkout_payment_reference(uuid,text,text)'::regprocedure;
-  definition text;
 begin
-  if has_function_privilege('anon', fn, 'EXECUTE') then
-    raise exception 'anon must not execute attach_checkout_payment_reference';
-  end if;
-  if not has_function_privilege('authenticated', fn, 'EXECUTE') then
-    raise exception 'authenticated must execute canonical payment-reference RPC';
-  end if;
-  if not has_function_privilege('service_role', fn, 'EXECUTE') then
-    raise exception 'service_role must execute canonical payment-reference RPC';
-  end if;
-
-  select pg_get_functiondef(fn::oid) into definition;
-  if definition not ilike '%auth.uid()%' then
-    raise exception 'canonical payment-reference RPC lost auth.uid() ownership scoping';
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and tablename = 'payment_sessions'
+      and indexname = 'idx_payment_sessions_provider_reference_unique'
+      and indexdef ilike '%unique index%'
+      and indexdef ilike '%payment_provider%'
+      and indexdef ilike '%provider_payment_id%'
+  ) then
+    raise exception 'provider payment reference uniqueness invariant missing';
   end if;
 end;
 $$;
