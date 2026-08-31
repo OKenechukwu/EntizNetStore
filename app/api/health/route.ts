@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { validateUploadScannerConfiguration } from '@/lib/storage/uploadScanner'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -120,12 +121,16 @@ export async function GET() {
 
   const checks = { database, storage, operations }
   const healthy = database === 'ok' && storage === 'ok' && operations === 'ok'
+  const uploadScannerConfiguration = validateUploadScannerConfiguration()
 
   return NextResponse.json(
     {
       status: healthy ? 'ok' : 'degraded',
       service: 'entiznetstore',
       checks,
+      launchGates: {
+        uploadSafety: uploadScannerConfiguration.ok ? 'configured' : 'blocked',
+      },
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
       backendBinding: serverSupabaseBinding(),
       durationMs: Date.now() - startedAt,
