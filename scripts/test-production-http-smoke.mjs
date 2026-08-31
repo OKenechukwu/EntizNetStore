@@ -27,6 +27,7 @@ if (baseUrl.protocol !== 'https:' && baseUrl.hostname !== 'localhost' && baseUrl
 }
 
 const failures = []
+let indexingLaunchGate = null
 
 function fail(message) {
   failures.push(message)
@@ -82,6 +83,10 @@ await request('/api/health', 200, (body) => {
   if (!['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)) {
     throw new Error('readiness response did not report the bounded upload-safety launch gate')
   }
+  if (!['enabled', 'blocked'].includes(body?.launchGates?.indexing)) {
+    throw new Error('readiness response did not report the bounded indexing launch gate')
+  }
+  indexingLaunchGate = body.launchGates.indexing
   if (expectedVersion && body?.version !== expectedVersion) {
     throw new Error(`production deployment drift: expected version ${expectedVersion}, got ${body?.version || 'missing'}`)
   }
@@ -110,6 +115,39 @@ if (rootResponse) {
   }
   if (rootResponse.headers.get('x-frame-options')?.toUpperCase() !== 'DENY') {
     fail('root response must set X-Frame-Options: DENY')
+  }
+
+  const robotsHeader = rootResponse.headers.get('x-robots-tag') || ''
+  if (indexingLaunchGate === 'blocked' && !/\bnoindex\b/i.test(robotsHeader)) {
+    fail('root response must set X-Robots-Tag noindex while indexing launch gate is blocked')
+  }
+  if (indexingLaunchGate === 'enabled' && /\bnoindex\b/i.test(robotsHeader)) {
+    fail('root response retained X-Robots-Tag noindex after indexing launch gate was enabled')
+  }
+}
+
+const robotsResponse = await fetch(new URL('/robots.txt', baseUrl), {
+  redirect: 'manual',
+  headers: { 'User-Agent': 'EntizNetStore-release-smoke/1.0' },
+}).catch(() => null)
+
+if (!robotsResponse) {
+  fail('/robots.txt request failed')
+} else {
+  if (robotsResponse.status !== 200) fail(`/robots.txt expected HTTP 200, got ${robotsResponse.status}`)
+  const robotsText = await robotsResponse.text()
+  const blocksEntireSite = /^Disallow:\s*\/\s*$/im.test(robotsText)
+  if (indexingLaunchGate === 'blocked' && !blocksEntireSite) {
+    fail('/robots.txt must Disallow: / while indexing launch gate is blocked')
+  }
+  if (indexingLaunchGate === 'enabled') {
+    if (blocksEntireSite) fail('/robots.txt still blocks the entire site after indexing launch gate was enabled')
+    for (const path of ['/api/', '/admin/', '/dashboard/', '/checkout/']) {
+      const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (!new RegExp(`^Disallow:\\s*${escaped}\\s*$`, 'im').test(robotsText)) {
+        fail(`/robots.txt must keep sensitive path non-indexable after launch: ${path}`)
+      }
+    }
   }
 }
 

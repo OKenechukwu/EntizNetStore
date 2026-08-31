@@ -32,6 +32,7 @@ Before merging/deploying a production candidate:
 7. Confirm deployment capacity is available. The Vercel team is now on Pro, but plan tier alone is not capacity evidence. Run the bounded production read-capacity gate at the approved envelope before launch or after material infrastructure changes.
 8. Confirm the repository Node engine contract, package-lock root engine metadata and CI runtime remain aligned on Node 22.
 9. Confirm `main` repository protection/ruleset is enabled before public launch. Direct pushes, force pushes and branch deletion must not bypass the required PR/status-check path.
+10. Keep the public-indexing interlock blocked until the final launch review. Search indexing requires Vercel production plus both explicit launch switches; do not copy the active confirmation into Preview/Staging.
 
 ## Canonical Node.js runtime
 
@@ -61,6 +62,7 @@ Application rollback is safe only when the target application remains compatible
 3. Require the deployment to reach `READY` before declaring the application rollout complete.
 4. Verify the canonical HTTPS endpoint, not only the deployment-specific preview URL.
 5. Verify `/api/health.version` matches the expected merge SHA prefix before broadening traffic.
+6. Verify the bounded launch-gate signals match the intended release state; a healthy deployment does not automatically mean uploads or public indexing are launch-enabled.
 
 ## Readiness and HTTP smoke verification
 
@@ -70,6 +72,7 @@ The public readiness probe is intentionally minimal and non-secret:
 - JSON must report `status=ok`, `service=entiznetstore`, and DB/Storage/operations checks as `ok`;
 - `version` is the first 12 characters of the Vercel Git source SHA when available;
 - `launchGates.uploadSafety` reports only `configured` or `blocked` and must not expose scanner endpoints/tokens/failure details;
+- `launchGates.indexing` reports only `enabled` or `blocked` and must not expose launch-variable values or reasons;
 - it must not expose database rows, credentials, connection strings or provider secrets;
 - degraded core readiness returns HTTP 503.
 
@@ -81,9 +84,23 @@ ENTIZNETSTORE_EXPECTED_SHA=<full-main-merge-sha> \
 npm run test:production-http-smoke
 ```
 
-The smoke runner verifies the public root, exact deployment identity, readiness, bounded upload-safety launch signal, representative anonymous fail-closed messaging/KYC/Admin-integration routes, API `no-store` behavior and core response security headers. Authenticated Buyer/Seller/cross-account/Admin ownership testing is a separate reusable authorization gate and must use dedicated isolated identities; credentials must never be committed.
+The smoke runner verifies the public root, exact deployment identity, readiness, bounded upload-safety/indexing launch signals, indexing-header/robots consistency, representative anonymous fail-closed messaging/KYC/Admin-integration routes, API `no-store` behavior and core response security headers. Authenticated Buyer/Seller/cross-account/Admin ownership testing is a separate reusable authorization gate and must use dedicated isolated identities; credentials must never be committed.
 
 The scheduled production monitor runs this smoke every 15 minutes and binds `ENTIZNETSTORE_EXPECTED_SHA` to the exact `main` SHA of the monitor run. It retries five times over a short deployment-convergence window before opening/updating an incident. This prevents a temporarily deploying release from creating an immediate false positive while still treating a persistent stale deployment as an incident.
+
+## Public launch indexing interlock
+
+Public discoverability is deliberately separate from core service health. The marketplace becomes indexable only when all three conditions hold:
+
+- Vercel supplies `VERCEL_ENV=production`;
+- `SITE_INDEXING_ENABLED=true`;
+- `PUBLIC_LAUNCH_CONFIRMATION=ENTIZNETSTORE_PUBLIC_WEB_V1`.
+
+Before activation, root metadata, `X-Robots-Tag` and `/robots.txt` fail closed. After activation, private route families remain non-indexable. Preview and development deployments cannot become indexable merely because launch variables are copied.
+
+The indexing interlock does **not** attest that backup/restore, payment, payout, scanner, EntizNet signing, legal/policy, monitoring, domain or repository-protection gates are complete. Activate it only after the final launch review.
+
+Detailed procedure: `docs/operations/PUBLIC_LAUNCH_INTERLOCK.md`.
 
 ## Bounded production capacity gate
 
@@ -113,6 +130,8 @@ Production responses must include the repository-defined baseline headers. In pa
 - production CSP must not contain `unsafe-eval`;
 - `object-src 'none'`, `frame-ancestors 'none'` and a restrictive base/form policy remain enforced;
 - API responses are `private, no-store` and `noindex`;
+- prelaunch application pages remain `noindex, nofollow, noarchive` through the public-launch interlock;
+- private route families remain non-indexable after launch;
 - content-type sniffing is disabled;
 - framing is denied;
 - referrer and permissions policies are explicit.
@@ -129,8 +148,9 @@ After deployment:
 4. Run representative fail-closed integration checks. Unsigned EntizNet Admin API calls must remain unauthorized.
 5. Confirm the production build log selected Node 22.x from the repository engine contract.
 6. Confirm the production deployment source SHA and `/api/health.version` match the expected `main` release.
-7. Confirm no new public API route uses a development/test/seed/mock/fixture/maintenance/migration route segment and no production API endpoint contains direct verbose console logging.
-8. Record any new error signature and owner in the incident/runbook system before broadening traffic.
+7. Confirm the indexing health signal, root `X-Robots-Tag` and `/robots.txt` agree with the intentional public-launch state.
+8. Confirm no new public API route uses a development/test/seed/mock/fixture/maintenance/migration route segment and no production API endpoint contains direct verbose console logging.
+9. Record any new error signature and owner in the incident/runbook system before broadening traffic.
 
 A clean release check is evidence for a release window; it is not a substitute for P0-07 continuous monitoring/alerts.
 
@@ -143,7 +163,8 @@ If a newly deployed application release is unsafe:
 3. Roll back/promote that application deployment using Vercel controls when available.
 4. Do **not** reverse or rewrite applied migrations. If the database requires correction, ship a new forward migration.
 5. Re-run `/api/health`, the exact-SHA production HTTP smoke runner and runtime-error checks after rollback. For rollback verification, the expected SHA is the intentionally restored compatible deployment SHA, not the abandoned release SHA.
-6. Document the incident, root cause and follow-up before re-release.
+6. If the incident requires removing the marketplace from search discovery without an application rollback, disable either public-indexing launch switch and redeploy, then verify the interlock is blocked.
+7. Document the incident, root cause and follow-up before re-release.
 
 ## Repository protection gate
 
@@ -166,7 +187,8 @@ Production, preview and local/staging environments must not silently share privi
 - payment and payout provider secrets/webhook keys;
 - observability destinations;
 - malware/content-scanning provider and its exact egress origin allowlist;
-- backup/recovery credentials and encryption-key ownership.
+- backup/recovery credentials and encryption-key ownership;
+- `SITE_INDEXING_ENABLED` and `PUBLIC_LAUNCH_CONFIRMATION` production-only activation state.
 
 Client-exposed values must use only explicitly public configuration. Service-role, signing-private-key and provider-secret values remain server-only.
 
@@ -183,6 +205,7 @@ This procedure does not itself clear these launch blockers:
 - real payment/payout provider sandbox and signed callback E2E;
 - production EntizNet Ed25519 signing configuration and authenticated cross-product E2E;
 - external logging/alerting ownership and final incident rehearsal;
-- final provider-specific CSP validation.
+- final provider-specific CSP validation;
+- explicit final public-indexing activation only after the preceding launch conditions are accepted.
 
 Record release evidence in repository documentation and update `LAUNCH_BLOCKERS.md` whenever a blocker materially changes.
