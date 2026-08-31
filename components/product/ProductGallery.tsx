@@ -21,20 +21,23 @@ export default function ProductGallery({ images, productName }: Props) {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  useEffect(() => {
-    setSelectedIndex((previous) => Math.min(previous, Math.max(safeImages.length - 1, 0)));
-  }, [safeImages.length]);
-
-  const currentImage = safeImages[selectedIndex] || safeImages[0];
+  const displayIndex = Math.min(selectedIndex, Math.max(safeImages.length - 1, 0));
+  const currentImage = safeImages[displayIndex] || safeImages[0];
   const minSwipeDistance = 50;
 
   const goNext = useCallback(() => {
-    setSelectedIndex((prev) => (prev < safeImages.length - 1 ? prev + 1 : prev));
+    setSelectedIndex((prev) => {
+      const current = Math.min(prev, Math.max(safeImages.length - 1, 0));
+      return current < safeImages.length - 1 ? current + 1 : current;
+    });
   }, [safeImages.length]);
 
   const goPrev = useCallback(() => {
-    setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-  }, []);
+    setSelectedIndex((prev) => {
+      const current = Math.min(prev, Math.max(safeImages.length - 1, 0));
+      return current > 0 ? current - 1 : current;
+    });
+  }, [safeImages.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -107,7 +110,7 @@ export default function ProductGallery({ images, productName }: Props) {
           <>
             <button
               onClick={goPrev}
-              disabled={selectedIndex === 0}
+              disabled={displayIndex === 0}
               className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white opacity-0 transition hover:bg-black/80 disabled:opacity-30 group-hover:opacity-100"
               aria-label="Previous image"
             >
@@ -116,7 +119,7 @@ export default function ProductGallery({ images, productName }: Props) {
 
             <button
               onClick={goNext}
-              disabled={selectedIndex === safeImages.length - 1}
+              disabled={displayIndex === safeImages.length - 1}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white opacity-0 transition hover:bg-black/80 disabled:opacity-30 group-hover:opacity-100"
               aria-label="Next image"
             >
@@ -128,7 +131,7 @@ export default function ProductGallery({ images, productName }: Props) {
         {/* Image Counter */}
         {safeImages.length > 1 && (
           <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm">
-            {selectedIndex + 1} / {safeImages.length}
+            {displayIndex + 1} / {safeImages.length}
           </div>
         )}
       </div>
@@ -143,7 +146,7 @@ export default function ProductGallery({ images, productName }: Props) {
               className={`
                 relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border-2 transition
                 ${
-                  index === selectedIndex
+                  index === displayIndex
                     ? "border-brand-secondary"
                     : "border-white/10 hover:border-white/30"
                 }
