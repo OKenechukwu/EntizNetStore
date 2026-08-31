@@ -117,8 +117,12 @@ begin
     from storage.objects o
     where o.bucket_id = 'product-media'
       and o.name = v_object_name
-      and coalesce(o.is_delete_marker, false) = false
-      and o.archived_at is null
+      -- Newer hosted Storage schemas expose archival/version markers while the
+      -- pinned local Storage image used by CI may not. to_jsonb(record) keeps
+      -- this check portable: missing optional keys evaluate to NULL, while
+      -- production still rejects delete markers and archived object records.
+      and coalesce((to_jsonb(o) ->> 'is_delete_marker')::boolean, false) = false
+      and (to_jsonb(o) ->> 'archived_at') is null
   ) then
     raise exception 'product_media_object_missing' using errcode = '42501';
   end if;
