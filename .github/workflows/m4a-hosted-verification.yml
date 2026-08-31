@@ -1,0 +1,333 @@
+name: M4A Hosted Release Verification
+
+on:
+  push:
+    branches:
+      - m4a-hosted-verification
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4a-hosted-release-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: entiznetstore-preview-verification
+    env:
+      RELEASE_SHA: 4f74feaa67fd215e9cab4a21d7bc6b7addc2fc57
+      SOURCE_BRANCH: m4a-hosted-release-4f74feaa
+      SUPABASE_URL: https://agwxifielftvzbdtdiov.supabase.co
+      NEXT_PUBLIC_SUPABASE_URL: https://agwxifielftvzbdtdiov.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnd3hpZmllbGZ0dnpiZHRkaW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDY2NDgsImV4cCI6MjEwMzY4MjY0OH0.3b-AOy57vdHc8DQyJlbpBWRSWRbIKXo3tq4VU7g9nQI
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnd3hpZmllbGZ0dnpiZHRkaW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDY2NDgsImV4cCI6MjEwMzY4MjY0OH0.3b-AOy57vdHc8DQyJlbpBWRSWRbIKXo3tq4VU7g9nQI
+      PRODUCTION_SUPABASE_URL: https://kllwwurklumhawfsilpd.supabase.co
+      VERCEL_PROJECT_ID: prj_zecR1DW1GImCsW2MmrtTZnxCffbs
+      VERCEL_PROJECT_NAME: entiznetstore
+      VERCEL_TEAM_ID: team_x6Y9DG451RilMGOAyYDkE1U5
+      GITHUB_REPO_ID: "1052455609"
+      PLAYWRIGHT_NODE_MODULES: /tmp/entiznetstore-playwright/node_modules
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out exact M4A release head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install isolated Chromium browser tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX=/tmp/entiznetstore-playwright
+          rm -rf "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1 axe-core@4.13.0
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Validate isolated Supabase service-role secret and reject production key
+        shell: bash
+        env:
+          SERVICE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SERVICE_KEY"
+          echo "::add-mask::$SERVICE_KEY"
+
+          auth_headers=(--header "apikey: ${SERVICE_KEY}")
+          if [[ "$SERVICE_KEY" == eyJ* ]]; then
+            auth_headers+=(--header "Authorization: Bearer ${SERVICE_KEY}")
+          fi
+
+          isolated_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --url "${SUPABASE_URL}/rest/v1/profiles_buyer?select=id&limit=1" \
+            "${auth_headers[@]}")"
+          test "$isolated_status" = "200"
+
+          production_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --url "${PRODUCTION_SUPABASE_URL}/rest/v1/profiles_buyer?select=id&limit=1" \
+            "${auth_headers[@]}")"
+          if [ "$production_status" = "200" ]; then
+            echo "Refusing hosted verification: supplied service-role credential is valid against production Supabase."
+            exit 1
+          fi
+
+          echo "Isolated Supabase service-role credential validated and production credential use refused."
+
+      - name: Remove stale branch-scoped Vercel verification variables
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          response="$(curl --fail-with-body --silent --show-error \
+            --url "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?gitBranch=${SOURCE_BRANCH}&teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+          printf '%s' "$response" | SOURCE_BRANCH="$SOURCE_BRANCH" node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              const x=JSON.parse(s); const vars=(x.envs||x.env||[]).filter(v=>v.gitBranch===process.env.SOURCE_BRANCH);
+              for (const v of vars) process.stdout.write(v.id+"\n");
+            })' > /tmp/m4a-stale-env-ids
+          while IFS= read -r id; do
+            [ -z "$id" ] && continue
+            curl --fail-with-body --silent --show-error \
+              --request DELETE \
+              --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env/${id}?teamId=${VERCEL_TEAM_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" >/dev/null
+          done < /tmp/m4a-stale-env-ids
+
+      - name: Bind isolated Supabase and disable real commerce providers for release branch
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          SERVICE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          test -n "$SERVICE_KEY"
+          echo "::add-mask::$SERVICE_KEY"
+
+          add_env() {
+            local key="$1" value="$2" type="$3"
+            body="$(KEY="$key" VALUE="$value" TYPE="$type" SOURCE_BRANCH="$SOURCE_BRANCH" node -e '
+              process.stdout.write(JSON.stringify({
+                key:process.env.KEY,
+                value:process.env.VALUE,
+                type:process.env.TYPE,
+                target:["preview"],
+                gitBranch:process.env.SOURCE_BRANCH,
+                comment:"Temporary EntizNetStore M4A hosted release verification"
+              }))')"
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --url "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_TEAM_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header 'Content-Type: application/json' \
+              --data "$body" >/dev/null
+          }
+
+          add_env NEXT_PUBLIC_SUPABASE_URL "$NEXT_PUBLIC_SUPABASE_URL" plain
+          add_env NEXT_PUBLIC_SUPABASE_ANON_KEY "$NEXT_PUBLIC_SUPABASE_ANON_KEY" plain
+          add_env SUPABASE_URL "$SUPABASE_URL" plain
+          add_env SUPABASE_SERVICE_ROLE_KEY "$SERVICE_KEY" sensitive
+          add_env SITE_INDEXING_ENABLED false plain
+          add_env SHIPPING_QUOTE_PROVIDER unconfigured plain
+          add_env TAX_QUOTE_PROVIDER unconfigured plain
+          add_env PAYMENT_PROVIDER unconfigured plain
+          add_env NEXT_PUBLIC_PAYMENT_PROVIDER unconfigured plain
+          add_env PAYOUT_PROVIDER unconfigured plain
+
+      - name: Generate temporary Vercel automation bypass
+        id: bypass
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          secret="$(node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))")"
+          echo "::add-mask::$secret"
+          body="$(SECRET="$secret" node -e "process.stdout.write(JSON.stringify({generate:{secret:process.env.SECRET,note:'EntizNetStore M4A isolated hosted verification'}}))")"
+          response="$(curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "$body")"
+          SECRET="$secret" node -e '
+            const x=JSON.parse(process.argv[1]);
+            if(!x.protectionBypass?.[process.env.SECRET]) process.exit(1);
+          ' "$response"
+          echo "secret=$secret" >> "$GITHUB_OUTPUT"
+
+      - name: Create exact-SHA isolated Vercel deployment
+        id: deployment
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(RELEASE_SHA="$RELEASE_SHA" SOURCE_BRANCH="$SOURCE_BRANCH" GITHUB_REPO_ID="$GITHUB_REPO_ID" VERCEL_PROJECT_ID="$VERCEL_PROJECT_ID" VERCEL_PROJECT_NAME="$VERCEL_PROJECT_NAME" node -e '
+            process.stdout.write(JSON.stringify({
+              name:process.env.VERCEL_PROJECT_NAME,
+              project:process.env.VERCEL_PROJECT_ID,
+              gitSource:{
+                type:"github",
+                ref:process.env.SOURCE_BRANCH,
+                repoId:Number(process.env.GITHUB_REPO_ID),
+                sha:process.env.RELEASE_SHA
+              },
+              gitMetadata:{
+                commitRef:process.env.SOURCE_BRANCH,
+                commitSha:process.env.RELEASE_SHA,
+                ci:true,
+                ciType:"github-actions"
+              }
+            }))')"
+          response="$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "https://api.vercel.com/v13/deployments?forceNew=1&teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "$body")"
+          printf '%s' "$response" > /tmp/m4a-vercel-deployment-create.json
+          deployment_id="$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s); if(x.id) process.stdout.write(x.id)})')"
+          deployment_url="$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s); if(x.url) process.stdout.write("https://"+x.url.replace(/^https?:\/\//,""))})')"
+          test -n "$deployment_id"
+          test -n "$deployment_url"
+          echo "id=$deployment_id" >> "$GITHUB_OUTPUT"
+          echo "base_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Created isolated deployment ${deployment_id} for exact ${RELEASE_SHA:0:12}."
+
+      - name: Wait for exact deployment readiness
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            response="$(curl --fail-with-body --silent --show-error \
+              --url "https://api.vercel.com/v13/deployments/${DEPLOYMENT_ID}?teamId=${VERCEL_TEAM_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+            state="$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);process.stdout.write(String(x.readyState||x.state||""))})')"
+            if [ "$state" = "READY" ]; then
+              echo "Exact isolated deployment is READY."
+              exit 0
+            fi
+            if [ "$state" = "ERROR" ] || [ "$state" = "CANCELED" ]; then
+              echo "Isolated deployment entered terminal state: $state"
+              printf '%s\n' "$response"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for isolated Vercel deployment."
+          exit 1
+
+      - name: Run hosted M4A HTTP authority matrix
+        env:
+          APP_ORIGIN: ${{ steps.deployment.outputs.base_url }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+          M4A_EXPECTED_COMMIT_SHA: ${{ env.RELEASE_SHA }}
+          M4A_HTTP_TEST_ENVIRONMENT: staging
+          M4A_HTTP_ALLOW_REMOTE_MUTATION: "true"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ steps.bypass.outputs.secret }}
+          DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ env.PRODUCTION_SUPABASE_URL }}
+        run: node scripts/test-m4a-hosted-http.mjs
+
+      - name: Run hosted authenticated Chromium and WCAG matrix
+        env:
+          APP_ORIGIN: ${{ steps.deployment.outputs.base_url }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEPLOYED_AUTH_SUPABASE_SERVICE_ROLE_KEY }}
+          M4A_EXPECTED_COMMIT_SHA: ${{ env.RELEASE_SHA }}
+          M4A_HTTP_TEST_ENVIRONMENT: staging
+          M4A_HTTP_ALLOW_REMOTE_MUTATION: "true"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ steps.bypass.outputs.secret }}
+          DEPLOYED_PRODUCTION_SUPABASE_URL: ${{ env.PRODUCTION_SUPABASE_URL }}
+          PLAYWRIGHT_NODE_MODULES: ${{ env.PLAYWRIGHT_NODE_MODULES }}
+        run: node scripts/test-m4a-hosted-browser.mjs
+
+      - name: Record non-secret hosted release evidence
+        if: always()
+        shell: bash
+        env:
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.base_url }}
+        run: |
+          mkdir -p artifacts/m4a-hosted
+          RELEASE_SHA="$RELEASE_SHA" SOURCE_BRANCH="$SOURCE_BRANCH" SUPABASE_URL="$SUPABASE_URL" DEPLOYMENT_ID="$DEPLOYMENT_ID" DEPLOYMENT_URL="$DEPLOYMENT_URL" GITHUB_RUN_ID="$GITHUB_RUN_ID" node -e '
+            const fs=require("fs");
+            const u=new URL(process.env.SUPABASE_URL);
+            fs.writeFileSync("artifacts/m4a-hosted/evidence.json", JSON.stringify({
+              releaseSha:process.env.RELEASE_SHA,
+              sourceBranch:process.env.SOURCE_BRANCH,
+              isolatedSupabaseRef:u.hostname.split(".")[0],
+              deploymentId:process.env.DEPLOYMENT_ID||null,
+              deploymentUrl:process.env.DEPLOYMENT_URL||null,
+              githubRunId:process.env.GITHUB_RUN_ID,
+              recordedAt:new Date().toISOString()
+            },null,2)+"\n");
+          '
+
+      - name: Upload hosted M4A evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: m4a-hosted-release-evidence-${{ github.run_id }}
+          path: |
+            artifacts/m4a-hosted
+            artifacts/web-responsive/m4a
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Revoke temporary Vercel automation bypass
+        if: always() && steps.bypass.outputs.secret != ''
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BYPASS: ${{ steps.bypass.outputs.secret }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v1/projects/${VERCEL_PROJECT_ID}/protection-bypass?teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "{\"revoke\":{\"secret\":\"${BYPASS}\",\"regenerate\":false}}" >/dev/null
+
+      - name: Remove branch-scoped Vercel verification variables
+        if: always()
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          response="$(curl --fail-with-body --silent --show-error \
+            --url "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?gitBranch=${SOURCE_BRANCH}&teamId=${VERCEL_TEAM_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}")"
+          printf '%s' "$response" | SOURCE_BRANCH="$SOURCE_BRANCH" node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              const x=JSON.parse(s); const vars=(x.envs||x.env||[]).filter(v=>v.gitBranch===process.env.SOURCE_BRANCH);
+              for (const v of vars) process.stdout.write(v.id+"\n");
+            })' > /tmp/m4a-env-ids
+          while IFS= read -r id; do
+            [ -z "$id" ] && continue
+            curl --fail-with-body --silent --show-error \
+              --request DELETE \
+              --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env/${id}?teamId=${VERCEL_TEAM_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" >/dev/null
+          done < /tmp/m4a-env-ids
+          echo "Temporary branch-scoped Vercel environment overrides removed."
