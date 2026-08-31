@@ -30,6 +30,17 @@ if (!allowLocal && (!expectedOrigin || new URL(expectedOrigin).origin !== baseUr
   process.exit(2)
 }
 
+const rawExpectedSha = (process.env.CAPACITY_EXPECTED_SHA || '').trim().toLowerCase()
+if (!allowLocal && !/^[0-9a-f]{12,40}$/.test(rawExpectedSha)) {
+  console.error('CAPACITY_EXPECTED_SHA must bind production probes to a 12..40 character hexadecimal Git SHA')
+  process.exit(2)
+}
+if (rawExpectedSha && !/^[0-9a-f]{12,40}$/.test(rawExpectedSha)) {
+  console.error('CAPACITY_EXPECTED_SHA must be a 12..40 character hexadecimal Git SHA')
+  process.exit(2)
+}
+const expectedVersion = rawExpectedSha ? rawExpectedSha.slice(0, 12) : null
+
 function boundedInteger(name, fallback, min, max) {
   const value = Number.parseInt(process.env[name] || String(fallback), 10)
   if (!Number.isInteger(value) || value < min || value > max) {
@@ -60,15 +71,22 @@ async function runOne(path) {
       signal: AbortSignal.timeout(timeoutMs),
       headers: { 'User-Agent': 'EntizNetStore-capacity-probe/1.0' },
     })
-    const elapsedMs = performance.now() - started
     const healthy = response.status === 200
     if (path === '/api/health') {
       const body = await response.json().catch(() => null)
-      results.push({ path, elapsedMs, ok: healthy && body?.status === 'ok', status: response.status })
+      const elapsedMs = performance.now() - started
+      const versionMatches = !expectedVersion || body?.version === expectedVersion
+      results.push({
+        path,
+        elapsedMs,
+        ok: healthy && body?.status === 'ok' && versionMatches,
+        status: response.status,
+        reason: versionMatches ? undefined : 'deployment_version_mismatch',
+      })
       return
     }
     await response.body?.cancel().catch(() => undefined)
-    results.push({ path, elapsedMs, ok: healthy, status: response.status })
+    results.push({ path, elapsedMs: performance.now() - started, ok: healthy, status: response.status })
   } catch (error) {
     results.push({
       path,
@@ -108,6 +126,7 @@ const throughputRps = results.length / Math.max(durationMs / 1000, 0.001)
 
 const summary = {
   origin: baseUrl.origin,
+  expectedVersion,
   paths,
   concurrency,
   requests: results.length,
