@@ -82,7 +82,7 @@ export default function ProductGallery({ images, productName }: Props) {
   if (!currentImage || safeImages.length === 0) {
     return (
       <div className="w-full aspect-square bg-white/5 rounded-xl flex items-center justify-center">
-        <span className="text-white/40">No images available</span>
+        <span className="text-foreground/70">No images available</span>
       </div>
     );
   }
