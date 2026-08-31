@@ -5,18 +5,15 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import { LayoutContent } from "./layout-content";
 import SessionWatcher from "@/components/SessionWatcher";
-
-// ✅ Correct path to the provider we created
 import { BrandProvider } from "@/components/providers/BrandProvider";
-
-// ✅ I18n default export
 import I18nProvider from "@/components/i18n/I18nProvider";
 
 import { cookies } from "next/headers";
 import { DEFAULT_CURRENCY, type CurrencyCode } from "@/lib/currency";
+import { publicIndexingAllowed } from "@/lib/launch/publicIndexing";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 
-const siteIndexingEnabled = process.env.SITE_INDEXING_ENABLED === "true";
+const siteIndexingEnabled = publicIndexingAllowed();
 
 export const metadata: Metadata = {
   title: "EntizNet Store - Luxury Adult Marketplace",
@@ -31,14 +28,15 @@ export const metadata: Metadata = {
     : {
         index: false,
         follow: false,
+        noarchive: true,
         googleBot: {
           index: false,
           follow: false,
+          noarchive: true,
         },
       },
 };
 
-// Read & normalize supported locales from env
 function readSupportedLocales(): string[] {
   const raw = process.env.NEXT_PUBLIC_SUPPORTED_LOCALES || "en";
   return raw
@@ -54,7 +52,6 @@ function clampLocale(candidate: string | undefined, supported: string[]): string
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const c = await cookies();
 
-  // ✅ Read new cookie names first, fall back to legacy ones
   const cookieLocaleRaw =
     c.get("entiz_locale")?.value ||
     c.get("locale")?.value ||
@@ -83,7 +80,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <I18nProvider initialLocale={initialLocale} initialCurrency={initialCurrency}>
               <SessionWatcher />
 
-              {/* Skip link for accessibility */}
               <a
                 href="#main"
                 className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-foreground focus:text-background focus:px-3 focus:py-2"
@@ -91,7 +87,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 Skip to content
               </a>
 
-              {/* Header on every page */}
               <Header />
 
               <LayoutContent>
