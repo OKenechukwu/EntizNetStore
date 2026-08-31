@@ -14,11 +14,50 @@ alter table public.upload_scan_jobs
 
 alter table public.upload_scan_jobs
   add constraint upload_scan_jobs_product_media_retirement_check
-  check (retired_at is null or purpose = 'product_media');
+  check (
+    retired_at is null
+    or (
+      purpose = 'product_media'
+      and destination_bucket = 'product-media'
+      and promoted_at is not null
+    )
+  );
 
 create index if not exists idx_upload_scan_jobs_product_media_retired
   on public.upload_scan_jobs(actor_id, destination_path, retired_at)
   where purpose = 'product_media' and destination_bucket = 'product-media';
+
+create or replace function app_private.guard_product_media_retirement_immutable()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+begin
+  -- Retirement is a one-way lifecycle transition. Once an object has been
+  -- claimed for deletion, application code must never make its scanner
+  -- provenance attachable again by clearing or rewriting retired_at.
+  if old.retired_at is not null
+     and new.retired_at is distinct from old.retired_at then
+    raise exception 'product_media_retirement_is_immutable' using errcode = '55000';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function app_private.guard_product_media_retirement_immutable()
+  from public, anon, authenticated;
+grant execute on function app_private.guard_product_media_retirement_immutable()
+  to service_role;
+
+drop trigger if exists trg_guard_product_media_retirement_immutable
+  on public.upload_scan_jobs;
+create trigger trg_guard_product_media_retirement_immutable
+before update of retired_at
+on public.upload_scan_jobs
+for each row
+execute function app_private.guard_product_media_retirement_immutable();
 
 create or replace function app_private.guard_product_media_provenance()
 returns trigger
@@ -222,6 +261,9 @@ grant execute on function public.service_claim_product_media_orphan(uuid, text)
 
 comment on column public.upload_scan_jobs.retired_at is
   'For product media, marks scanner provenance as permanently retired before physical object deletion. Retired objects cannot be reattached by authenticated Seller RPCs.';
+
+comment on function app_private.guard_product_media_retirement_immutable() is
+  'Makes product-media scanner provenance retirement irreversible once claimed.';
 
 comment on function public.service_claim_product_media_orphan(uuid, text) is
   'Service-only atomic orphan claim. Serializes with product-media attachment, refuses referenced paths, and retires scanner provenance before Storage deletion.';
