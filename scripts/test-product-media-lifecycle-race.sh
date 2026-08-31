@@ -12,6 +12,7 @@ ATTACH_READY="${TMP_DIR}/attach-ready"
 CLAIM_READY="${TMP_DIR}/claim-ready"
 ATTACH_LOG="${TMP_DIR}/attach.log"
 CLAIM_LOG="${TMP_DIR}/claim.log"
+REFERENCED_RETIRE_LOG="${TMP_DIR}/referenced-retire.log"
 REATTACH_LOG="${TMP_DIR}/reattach.log"
 IMMUTABLE_LOG="${TMP_DIR}/immutable.log"
 export ATTACH_READY CLAIM_READY
@@ -155,6 +156,25 @@ fi
 PRODUCT_ID="$(psql "${DB_URL}" -v ON_ERROR_STOP=1 -Atqc "select id from public.products where seller_id='${ACTOR_ID}'::uuid and title='Lifecycle Race Attach Wins' limit 1;")"
 if [[ -z "${PRODUCT_ID}" ]]; then
   echo "Attach-wins fixture product was not committed" >&2
+  exit 1
+fi
+
+# The transition itself is authoritative, not just the helper RPC. Even trusted
+# service-role code cannot set retired_at while a live catalogue reference exists.
+set +e
+psql "${DB_URL}" -v ON_ERROR_STOP=1 >"${REFERENCED_RETIRE_LOG}" 2>&1 -c \
+  "set role service_role; update public.upload_scan_jobs set retired_at = now() where id = '${JOB_ID}'::uuid;"
+REFERENCED_RETIRE_STATUS=$?
+set -e
+
+if [[ ${REFERENCED_RETIRE_STATUS} -eq 0 ]]; then
+  echo "Direct retirement unexpectedly bypassed a live product-media reference" >&2
+  exit 1
+fi
+
+if ! grep -q "product_media_retirement_still_referenced" "${REFERENCED_RETIRE_LOG}"; then
+  echo "Referenced direct retirement failed for the wrong reason" >&2
+  cat "${REFERENCED_RETIRE_LOG}" >&2
   exit 1
 fi
 
