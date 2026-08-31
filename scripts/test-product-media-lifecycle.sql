@@ -153,13 +153,19 @@ select pg_temp.lifecycle_save(
 
 reset role;
 set local role service_role;
-select public.service_claim_product_media_orphan(
-  'c1000000-0000-4000-8000-000000000001',
-  'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
-) as claim_while_two_refs \gset
-\if :'claim_while_two_refs' != 'referenced'
-  \error expected referenced claim while two catalogue rows exist
-\endif
+do $$
+declare
+  v_claim text;
+begin
+  select public.service_claim_product_media_orphan(
+    'c1000000-0000-4000-8000-000000000001',
+    'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
+  ) into v_claim;
+  if v_claim <> 'referenced' then
+    raise exception 'Expected referenced claim while two catalogue rows exist, got %', v_claim;
+  end if;
+end
+$$;
 
 reset role;
 set local role authenticated;
@@ -174,13 +180,19 @@ select pg_temp.lifecycle_save(:'product_one'::uuid, null, 'Lifecycle Product One
 
 reset role;
 set local role service_role;
-select public.service_claim_product_media_orphan(
-  'c1000000-0000-4000-8000-000000000001',
-  'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
-) as claim_while_one_ref \gset
-\if :'claim_while_one_ref' != 'referenced'
-  \error expected referenced claim while one catalogue row exists
-\endif
+do $$
+declare
+  v_claim text;
+begin
+  select public.service_claim_product_media_orphan(
+    'c1000000-0000-4000-8000-000000000001',
+    'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
+  ) into v_claim;
+  if v_claim <> 'referenced' then
+    raise exception 'Expected referenced claim while one catalogue row exists, got %', v_claim;
+  end if;
+end
+$$;
 
 reset role;
 set local role authenticated;
@@ -195,29 +207,37 @@ select pg_temp.lifecycle_save(:'product_two'::uuid, null, 'Lifecycle Product Two
 
 reset role;
 set local role service_role;
-select public.service_claim_product_media_orphan(
-  'c1000000-0000-4000-8000-000000000001',
-  'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
-) as orphan_claim \gset
-\if :'orphan_claim' != 'claimed'
-  \error expected orphan claim after final catalogue reference is removed
-\endif
+do $$
+declare
+  v_claim text;
+  v_retry text;
+  v_cross_actor text;
+begin
+  select public.service_claim_product_media_orphan(
+    'c1000000-0000-4000-8000-000000000001',
+    'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
+  ) into v_claim;
+  if v_claim <> 'claimed' then
+    raise exception 'Expected orphan claim after final reference removal, got %', v_claim;
+  end if;
 
-select public.service_claim_product_media_orphan(
-  'c1000000-0000-4000-8000-000000000001',
-  'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
-) as retry_claim \gset
-\if :'retry_claim' != 'claimed'
-  \error expected retired orphan claim to remain retryable after physical-delete failure
-\endif
+  select public.service_claim_product_media_orphan(
+    'c1000000-0000-4000-8000-000000000001',
+    'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
+  ) into v_retry;
+  if v_retry <> 'claimed' then
+    raise exception 'Expected retired orphan claim to remain retryable, got %', v_retry;
+  end if;
 
-select public.service_claim_product_media_orphan(
-  'c2000000-0000-4000-8000-000000000002',
-  'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
-) as cross_actor_claim \gset
-\if :'cross_actor_claim' != 'invalid_path'
-  \error expected cross-actor orphan claim to fail closed
-\endif
+  select public.service_claim_product_media_orphan(
+    'c2000000-0000-4000-8000-000000000002',
+    'c1000000-0000-4000-8000-000000000001/77777777-7777-4777-8777-777777777777.webp'
+  ) into v_cross_actor;
+  if v_cross_actor <> 'invalid_path' then
+    raise exception 'Expected cross-actor claim to fail closed, got %', v_cross_actor;
+  end if;
+end
+$$;
 
 reset role;
 do $$
