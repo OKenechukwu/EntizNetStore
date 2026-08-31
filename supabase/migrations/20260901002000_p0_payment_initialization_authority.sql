@@ -2,9 +2,10 @@
 --
 -- External payment initialization is a trusted server operation. A Buyer may
 -- choose/pay their own checkout, but must never be able to stamp arbitrary
--- provider references directly. More importantly, concurrent create-intent
--- requests must serialize before any external processor call so two provider
--- payment intents cannot be created for one checkout.
+-- provider references directly. Concurrent create-intent requests must
+-- serialize before any external processor call so two provider payments cannot
+-- be created for one checkout. Once an external call begins, any ambiguous
+-- outcome remains reconciliation-locked instead of being auto-cancelled.
 
 begin;
 
@@ -23,6 +24,13 @@ alter table public.payment_sessions
 create unique index if not exists idx_payment_sessions_initialization_attempt
   on public.payment_sessions(payment_initialization_attempt_id)
   where payment_initialization_attempt_id is not null;
+
+-- A provider reference is a money-movement identity. It must never identify two
+-- local checkout sessions, otherwise webhook/reconciliation authority becomes
+-- ambiguous. Production was verified clean before this forward invariant.
+create unique index if not exists idx_payment_sessions_provider_reference_unique
+  on public.payment_sessions(payment_provider, provider_payment_id)
+  where payment_provider is not null and provider_payment_id is not null;
 
 -- Retire the old direct provider-reference attachment surfaces. They remain in
 -- the schema only for migration-history compatibility and receive no API-role
@@ -127,7 +135,10 @@ begin
   update public.payment_sessions
   set payment_initialization_attempt_id = p_attempt_id,
       payment_initialization_started_at = now(),
-      metadata = metadata || jsonb_build_object('payment_initialization_claimed', true),
+      metadata = metadata || jsonb_build_object(
+        'payment_initialization_claimed', true,
+        'payment_initialization_attempt_id', p_attempt_id
+      ),
       updated_at = now()
   where id = p_session_id;
 end;
@@ -198,6 +209,16 @@ begin
     raise exception 'payment_reference_conflict' using errcode = '22023';
   end if;
 
+  if exists (
+    select 1
+    from public.payment_sessions ps
+    where ps.id <> p_session_id
+      and ps.payment_provider = v_provider
+      and ps.provider_payment_id = v_payment_id
+  ) then
+    raise exception 'provider_payment_reference_already_bound' using errcode = '23505';
+  end if;
+
   select count(*)::integer into v_order_count
   from public.orders o
   where o.payment_session_id = p_session_id;
@@ -226,7 +247,8 @@ begin
       status = 'requires_payment',
       metadata = metadata || jsonb_build_object(
         'payment_provider', v_provider,
-        'payment_initialization_attempt_id', p_attempt_id
+        'payment_initialization_attempt_id', p_attempt_id,
+        'payment_initialization_uncertain', false
       ),
       updated_at = now()
   where id = p_session_id;
@@ -252,7 +274,12 @@ revoke all on function public.service_attach_checkout_payment_reference(uuid, uu
 grant execute on function public.service_attach_checkout_payment_reference(uuid, uuid, uuid, text, text)
   to service_role;
 
-create or replace function public.service_cancel_checkout_after_payment_initialization_failure(
+-- After an external processor call starts, a timeout or transport failure is
+-- ambiguous: the provider may have accepted the request even when our server
+-- never received its response. Never release inventory or cancel orders here.
+-- Keep the durable claim so automatic retry remains impossible until a trusted
+-- reconciliation process proves what happened at the provider.
+create or replace function public.service_mark_checkout_payment_initialization_uncertain(
   p_session_id uuid,
   p_buyer_id uuid,
   p_attempt_id uuid
@@ -276,52 +303,43 @@ begin
 
   if not found
      or v_session.buyer_id <> p_buyer_id
-     or v_session.payment_initialization_attempt_id is distinct from p_attempt_id then
+     or v_session.payment_initialization_attempt_id is distinct from p_attempt_id
+     or v_session.payment_initialization_started_at is null then
     raise exception 'payment_initialization_attempt_not_found_or_access_denied' using errcode = '42501';
   end if;
 
   if v_session.status not in ('pending', 'requires_payment') then
-    raise exception 'checkout_session_no_longer_cancellable' using errcode = '22023';
+    return;
   end if;
 
-  -- If the reference reached the database but the caller missed the response,
-  -- automatic cancellation would turn a known provider payment into an orphan.
-  -- Leave it payable and force reconciliation instead.
+  -- A provider reference may have committed even if the caller missed the RPC
+  -- response. In that case the canonical stored reference is already the
+  -- reconciliation anchor; do not overwrite its metadata with uncertainty.
   if v_session.payment_provider is not null
      or v_session.provider_payment_id is not null
      or v_session.stripe_payment_intent_id is not null then
-    raise exception 'payment_reference_already_attached_reconciliation_required' using errcode = '55000';
+    return;
   end if;
 
   update public.payment_sessions
-  set status = 'cancelled',
-      metadata = metadata || jsonb_build_object('payment_initialization_failed', true),
+  set metadata = metadata || jsonb_build_object(
+        'payment_initialization_uncertain', true,
+        'payment_initialization_uncertain_at', now(),
+        'payment_initialization_attempt_id', p_attempt_id
+      ),
       updated_at = now()
   where id = p_session_id;
-
-  update public.inventory_reservations
-  set status = 'released',
-      updated_at = now()
-  where payment_session_id = p_session_id
-    and status = 'pending';
-
-  update public.orders
-  set status = 'cancelled',
-      payment_status = 'failed',
-      updated_at = now()
-  where payment_session_id = p_session_id
-    and payment_status = 'pending';
 end;
 $$;
 
-revoke all on function public.service_cancel_checkout_after_payment_initialization_failure(uuid, uuid, uuid)
+revoke all on function public.service_mark_checkout_payment_initialization_uncertain(uuid, uuid, uuid)
   from public, anon, authenticated;
-grant execute on function public.service_cancel_checkout_after_payment_initialization_failure(uuid, uuid, uuid)
+grant execute on function public.service_mark_checkout_payment_initialization_uncertain(uuid, uuid, uuid)
   to service_role;
 
 -- Buyer cancellation is allowed only before any external payment initialization
--- claim exists. Once claimed, only the trusted failure path above may cancel the
--- session, and only when no provider reference has been attached.
+-- claim exists. Once claimed, no browser action may release inventory underneath
+-- an in-flight or ambiguous processor operation.
 create or replace function public.cancel_checkout_session(p_session_id uuid)
 returns void
 language plpgsql
@@ -368,7 +386,7 @@ comment on function public.service_claim_checkout_payment_initialization(uuid, u
   'Service-only pre-processor claim. Locks the checkout, validates Buyer/order/reservation state and prevents duplicate external payment initialization.';
 comment on function public.service_attach_checkout_payment_reference(uuid, uuid, uuid, text, text) is
   'Service-only provider-reference binding tied to the exact Buyer and initialization attempt.';
-comment on function public.service_cancel_checkout_after_payment_initialization_failure(uuid, uuid, uuid) is
-  'Service-only fail-closed cancellation after a claimed initialization attempt when no provider reference reached the database.';
+comment on function public.service_mark_checkout_payment_initialization_uncertain(uuid, uuid, uuid) is
+  'Service-only reconciliation lock marker for ambiguous external initialization. Never cancels orders, releases inventory, clears the attempt, or authorizes retry.';
 
 commit;
