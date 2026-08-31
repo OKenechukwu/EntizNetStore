@@ -92,6 +92,10 @@ if (exists(".github/workflows/production-monitor.yml")) {
     "actions/github-script@v9",
     "persist-credentials: false",
     "node-version: 22",
+    "if: github.ref == 'refs/heads/main'",
+    "ENTIZNETSTORE_EXPECTED_SHA: ${{ github.sha }}",
+    "deployment-convergence retry",
+    "for attempt in 1 2 3 4 5",
   ]) {
     if (!monitor.includes(fragment)) {
       fail(`Production monitor lost required Actions/runtime control: ${fragment}`);
@@ -114,6 +118,20 @@ if (exists(".github/workflows/production-capacity.yml")) {
   }
   if (/\bschedule\s*:/.test(capacity) || /\bpush\s*:/.test(capacity) || /\bpull_request\s*:/.test(capacity)) {
     fail("Production capacity workflow must remain manual-only");
+  }
+}
+
+if (exists("scripts/test-production-http-smoke.mjs")) {
+  const smoke = read("scripts/test-production-http-smoke.mjs");
+  for (const fragment of [
+    "ENTIZNETSTORE_EXPECTED_SHA",
+    "production deployment drift",
+    "expectedVersion",
+    "launchGates?.uploadSafety",
+  ]) {
+    if (!smoke.includes(fragment)) {
+      fail(`Production smoke lost release-identity control: ${fragment}`);
+    }
   }
 }
 
