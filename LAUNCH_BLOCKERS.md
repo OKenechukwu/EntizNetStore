@@ -53,7 +53,7 @@ Detailed record: `docs/operations/M4A_PRODUCTION_EVIDENCE_2026-08-31.md`.
 ## P0-01 — Durable production backups and tested restore
 **Status: IN PROGRESS — ENGINEERING AUTOMATION BUILT; OPERATIONAL ACTIVATION + REHEARSAL PENDING**
 
-Implemented on `codex/p0-backup-recovery-hardening`:
+Implemented by PR #37:
 
 - encrypted logical backup design using the supported Supabase CLI roles/schema/data split;
 - explicit `supabase_migrations` history backup;
@@ -64,6 +64,8 @@ Implemented on `codex/p0-backup-recovery-hardening`:
 - no plaintext dump commits and no customer backup retained as GitHub Actions artifact;
 - destructive restore workflow hard-refuses production and requires target-ref confirmation;
 - restore checksum verification, Storage restore and DB/RLS/SECURITY DEFINER/M4A structural checks.
+
+PR #37 is merged to production `main` at `79d767c21e95f89433d6e46d1264c7aba478c344`.
 
 Still required to mark `VERIFIED`:
 
@@ -108,42 +110,52 @@ Still required:
 PR #35 closed the deployed authenticated gate after isolated hosted verification. Buyer, Seller, Business/BSM and Admin protected routes were tested with disposable identities against isolated Supabase/Vercel, including age-gate completion, exact backend binding, cross-role denial, deterministic cleanup and zero production mutation. The gate remains mandatory after material auth/session/RLS changes.
 
 ## P0-05 — Seller/Admin/KYC/upload security
-**Status: IN PROGRESS — QUARANTINE/SCANNING ARCHITECTURE VERIFIED; REAL SCANNER + POLICY PENDING**
+**Status: IN PROGRESS — APPLICATION TRUST BOUNDARY VERIFIED; REAL SCANNER + POLICY PENDING**
 
 PR #30 moved supported user uploads behind quarantine -> validate -> scan -> promote, with magic-byte validation, SHA-256, private quarantine, service-only scan ledger, fail-closed production scanner contract, compensation cleanup and HTTP/database regressions.
+
+PR #38 then hardened the external-scanner boundary and is merged to production `main` at `29770498815f174da54110f4064432e784a04097` after exact-head CI, fresh DB reproduction, authenticated HTTP/Chromium/WCAG and Vercel preview verification. The application now enforces exact HTTPS-origin pinning, SSRF/private-host/IP-literal refusal, bearer-token validation, outbound SHA-256 integrity, bounded payload/response sizes, strict JSON verdict parsing, redirect refusal, metadata minimization and fail-closed transport/provider behavior. `/api/health` exposes only `launchGates.uploadSafety=configured|blocked` without scanner secrets or endpoint details.
 
 Still required:
 
 - provision an approved authenticated HTTPS malware/content scanner;
-- verify real deployed clean/malicious/error/timeout behavior;
+- configure the exact production scanner origin allowlist and dedicated bearer credential;
+- verify live deployed clean, blocked/EICAR, provider-error and timeout behavior through the quarantine flow;
 - finalize launch content/moderation policy and escalation for accepted upload classes.
 
-Production must remain fail-closed while the scanner is unconfigured.
+Production must remain fail-closed while the scanner is unconfigured or unhealthy.
 
 ## P0-06 — Production domain, capacity and final release hardening
-**Status: IN PROGRESS — VERCEL PRO + RELEASE CONTROLS VERIFIED; OWNED DOMAIN/LOAD/FINAL REHEARSAL PENDING**
+**Status: IN PROGRESS — PRO RELEASE + EXACT-SHA/CAPACITY ENGINEERING BUILT; OWNED DOMAIN/REHEARSALS/REPO PROTECTION PENDING**
 
-Verified:
+Verified/implemented:
 
 - Vercel project `entiznetstore` linked to the canonical GitHub repo;
 - Vercel team is on Pro;
 - exact-SHA deployment verification, DB/Storage/operations health and production runtime-log checks;
+- production smoke can fail on deployed-version drift rather than accepting a healthy stale release;
+- scheduled production monitor binds health to the exact `main` SHA and retries through a short deployment-convergence window;
+- manual-only bounded production read-capacity gate hard-bound to `main`, the canonical production origin and exact deployed SHA;
+- capacity probe is limited to `GET /` + `GET /api/health`, max concurrency 25 and max 500 total requests;
 - Node 22/npm lockfile/runtime controls;
 - noindex remains default until public-launch switch;
-- M4A production release healthy.
+- M4A and subsequent release-hardening production deployments healthy.
 
 Still required:
 
+- enable GitHub `main` branch protection/ruleset so routine direct pushes, force pushes and branch deletion cannot bypass the PR/status-check release path;
 - canonical owned launch domain + DNS/HTTPS;
-- launch traffic/load/concurrency verification at the selected operational envelope;
+- execute and record the bounded capacity rehearsal at the approved launch envelope;
 - final environment-secret isolation/CSP review after external providers are selected;
 - final rollback/release rehearsal on the owned domain;
 - set `SITE_INDEXING_ENABLED=true` only at intentional public launch.
 
-## P0-07 — Observability and commerce incident response
-**Status: IN PROGRESS**
+Runbooks: `docs/operations/PRODUCTION_RELEASE.md` and `docs/operations/PRODUCTION_CAPACITY.md`.
 
-Verified: DB/Storage/operations health, bounded redacted operational events, 30-day private event ledger, 15-minute production monitor, GitHub incident automation, incident runbook and production runtime error inspection.
+## P0-07 — Observability and commerce incident response
+**Status: IN PROGRESS — CORE MONITORING + RELEASE-DRIFT DETECTION VERIFIED; EXTERNAL ALERT OWNERSHIP PENDING**
+
+Verified: DB/Storage/operations health, bounded redacted operational events, 30-day private event ledger, 15-minute production monitor, exact-main deployment-drift detection, convergence retries, GitHub incident automation, incident runbook and production runtime error inspection.
 
 Still required:
 
@@ -200,12 +212,12 @@ Finalize launch terms/privacy, returns/refunds, Seller policies, prohibited/rest
 
 # Fastest path to public web V1
 
-1. **P0-01:** activate the new encrypted DB + Storage backup path and complete one isolated restore rehearsal.
+1. **P0-01:** activate the encrypted DB + Storage backup path and complete one isolated restore rehearsal.
 2. **P0-05:** provision the real upload scanner and finish content/moderation policy.
 3. **P0-03 + P0-09:** select payment/payout providers and complete real sandbox E2E/reconciliation.
 4. **P0-08:** provision EntizNet production Ed25519 signing and run real cross-product E2E.
 5. **P0-07:** connect external logging/alerting and rehearse incident recovery.
-6. **P0-06:** owned domain, load/capacity test, final provider-aware CSP/env audit, rollback rehearsal, indexing switch.
+6. **P0-06:** enable `main` protection, execute bounded capacity evidence, configure owned domain, perform final provider-aware CSP/env audit, rollback rehearsal and indexing switch.
 7. **P0-02:** closes as the secret/rotation ownership gate across the integrations above.
 
 P0-04 and P0-10 are now reusable regression gates, not unresolved feature defects. M4A is production-complete.
