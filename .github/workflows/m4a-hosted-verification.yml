@@ -164,6 +164,7 @@ jobs:
           add_env PAYMENT_PROVIDER unconfigured plain
           add_env NEXT_PUBLIC_PAYMENT_PROVIDER unconfigured plain
           add_env PAYOUT_PROVIDER unconfigured plain
+          add_env VERCEL_PREVIEW_FEEDBACK_ENABLED 0 plain
 
       - name: Generate temporary Vercel automation bypass
         id: bypass
