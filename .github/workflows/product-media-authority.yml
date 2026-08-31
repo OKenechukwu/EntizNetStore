@@ -44,6 +44,10 @@ jobs:
           -v ON_ERROR_STOP=1
           -f scripts/test-product-media-lifecycle.sql
 
+      - name: Prove product media attach/retire races across sessions
+        shell: bash
+        run: bash scripts/test-product-media-lifecycle-race.sh
+
       - name: Prove real PostgREST cannot bypass media provenance
         shell: bash
         run: |
