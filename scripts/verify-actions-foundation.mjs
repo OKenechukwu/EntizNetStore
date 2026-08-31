@@ -21,6 +21,8 @@ const requiredWorkflows = [
   ".github/workflows/ci.yml",
   ".github/workflows/http-authorization.yml",
   ".github/workflows/production-monitor.yml",
+  ".github/workflows/production-backup.yml",
+  ".github/workflows/restore-rehearsal.yml",
 ];
 
 for (const workflow of requiredWorkflows) {
@@ -64,6 +66,8 @@ for (const workflow of workflowFiles) {
 for (const workflow of [
   ".github/workflows/ci.yml",
   ".github/workflows/http-authorization.yml",
+  ".github/workflows/production-backup.yml",
+  ".github/workflows/restore-rehearsal.yml",
 ]) {
   if (!exists(workflow)) continue;
   const source = read(workflow);
