@@ -57,6 +57,9 @@ jobs:
       - name: Run upload scanner fail-closed regression
         run: npm run test:upload-scanner
 
+      - name: Run public launch indexing regression
+        run: npm run test:launch-indexing
+
       - name: Run operational logging redaction regression
         run: npm run test:operational-logging
 
