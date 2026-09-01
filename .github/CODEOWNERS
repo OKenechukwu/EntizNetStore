@@ -1,0 +1,22 @@
+# EntizNetStore repository ownership
+#
+# CODEOWNERS is an assignment/visibility control. It becomes an enforced review
+# boundary only when GitHub main-branch protection/rulesets require code-owner
+# review. Until then, the canonical release boundary remains mandatory automated
+# checks plus expected-head locked merges.
+
+* @OKenechukwu
+
+# Release and supply-chain controls
+/.github/ @OKenechukwu
+/package.json @OKenechukwu
+/package-lock.json @OKenechukwu
+
+# Backend authority and forward database changes
+/supabase/migrations/ @OKenechukwu
+/app/api/ @OKenechukwu
+/scripts/ @OKenechukwu
+
+# Production operations and launch evidence
+/docs/operations/ @OKenechukwu
+/LAUNCH_BLOCKERS.md @OKenechukwu
