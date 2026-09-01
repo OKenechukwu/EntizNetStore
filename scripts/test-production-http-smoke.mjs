@@ -76,9 +76,12 @@ await request('/api/health', 200, (body) => {
     body?.service !== 'entiznetstore' ||
     body?.checks?.database !== 'ok' ||
     body?.checks?.storage !== 'ok' ||
-    body?.checks?.operations !== 'ok'
+    body?.checks?.operations !== 'ok' ||
+    body?.checks?.payments !== 'ok'
   ) {
-    throw new Error('readiness response did not report database=ok, storage=ok and operations=ok')
+    throw new Error(
+      'readiness response did not report database=ok, storage=ok, operations=ok and payments=ok',
+    )
   }
   if (!['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)) {
     throw new Error('readiness response did not report the bounded upload-safety launch gate')
