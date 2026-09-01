@@ -6,15 +6,20 @@ Last reviewed: **2026-09-01**
 
 ## Current observed state
 
-At the PR #44 production promotion checkpoint, GitHub reported:
+After the PR #45 production promotion, GitHub reported:
 
-- branch: `main`
-- protection enabled: **false**
-- required status checks: none
+- branch: `main`;
+- current commit: `28a8f1efd1fafd88792e0c6c345874f1d5bb8701`;
+- protection enabled: **false**;
+- required status-check enforcement: **off**;
+- required status contexts: none;
+- repository rulesets: none.
 
-The application release process already uses feature branches, PRs, exact-head CI, Vercel previews and expected-head locked merges, but those practices are not yet enforced by repository policy. A direct push or forceful administrative action could therefore bypass the intended release path.
+The application release process already uses feature branches, PRs, exact-head CI, Vercel previews, expected-head locked merges, production-safe database sequencing and post-promotion verification, but those practices are not yet enforced by GitHub repository policy. A direct push or forceful administrative action could therefore bypass the intended release path.
 
 The connected GitHub automation in the 2026-09-01 development session exposes protection/ruleset reads but no protection/ruleset write action. Repository protection remains an external governance action; do not emulate it by force-moving refs or adding fragile workflow-only checks.
+
+Repository-controlled supply-chain hardening is tracked in `REPOSITORY_SUPPLY_CHAIN.md` and includes CODEOWNERS, Dependabot surveillance and a machine-checked workflow trust boundary. Those controls complement GitHub branch protection; they do not replace it.
 
 ## Required production policy
 
@@ -24,7 +29,7 @@ Apply a repository ruleset or equivalent classic branch protection specifically 
 2. Do not require a human approval count solely for routine engineering if the owner wants autonomous release execution; the PR itself plus mandatory automated gates is the minimum release boundary.
 3. Require conversation resolution before merge.
 4. Require the branch to be up to date with `main` before merge, or otherwise ensure the exact tested PR head is based on current `main`.
-5. Require these exact GitHub check contexts, observed on the fully-green PR #44 head:
+5. Require these exact GitHub check contexts, most recently re-proven on PR #45:
    - `verify`
    - `database-reproduction`
    - `dependency-audit`
@@ -35,13 +40,13 @@ Apply a repository ruleset or equivalent classic branch protection specifically 
 7. Block deletion of `main`.
 8. Apply enforcement to administrators/owners so the normal release path cannot be silently bypassed.
 9. Do not require linear history while the repository intentionally uses verified merge commits.
-10. Do not require signed feature-branch commits until the GitHub/API automation signing model is explicitly designed; the production merge commits created by GitHub are already verifiable.
+10. Do not require signed feature-branch commits until the GitHub/API automation signing model is explicitly designed; production merge commits created by GitHub are already verifiable.
 
 ## Why these checks are mandatory
 
-`verify` covers the production application foundation, lint, failure-recovery regressions, TypeScript and build.
+`verify` covers the production application foundation, repository-governance guard, lint, failure-recovery regressions, TypeScript and build.
 
-`database-reproduction` proves a fresh Supabase database can replay the repository migration chain and pass identity, RLS, commerce, payment, payout, wholesale and security regressions. It includes the independent payment-initialization and payout concurrency tests.
+`database-reproduction` proves a fresh Supabase database can replay the repository migration chain and pass identity, RLS, commerce, payment, reconciliation, payout, wholesale and security regressions. It includes the independent payment-initialization and payout concurrency tests.
 
 `dependency-audit` rejects high-severity production dependency vulnerabilities according to the CI policy.
 
