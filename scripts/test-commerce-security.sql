@@ -520,6 +520,10 @@ begin
 end
 $$;
 
+-- A checkout that was cancelled before processor initialization owns no
+-- provider reference. A later callback carrying any payment identifier must be
+-- rejected at the reference-integrity boundary; legitimate late terminal-state
+-- behavior for initialized payments is covered by test-payment-terminal-state.sql.
 reset role;
 set local role service_role;
 do $$
@@ -530,9 +534,9 @@ begin
       (select id from public.payment_sessions where idempotency_key = '80000000-0000-0000-0000-000000000008'),
       'pi_p0_checkout_cancelled', true
     );
-    raise exception 'Cancelled checkout unexpectedly accepted a success event';
-  exception when others then
-    if sqlerrm not like 'Checkout session is no longer payable%' then raise; end if;
+    raise exception 'Cancelled checkout unexpectedly accepted an unowned provider reference';
+  exception when sqlstate '22023' then
+    if sqlerrm not like 'Provider payment reference does not match checkout session%' then raise; end if;
   end;
 end
 $$;
