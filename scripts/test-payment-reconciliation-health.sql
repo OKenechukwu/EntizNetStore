@@ -17,7 +17,7 @@ values (
 );
 
 insert into public.profiles_buyer(id, display_name)
-values ('a1000000-0000-0000-000000000001', 'Payment Health Buyer');
+values ('a1000000-0000-0000-0000-000000000001', 'Payment Health Buyer');
 
 -- Browser roles never receive this reconciliation surface. Inspect pg_proc
 -- configuration directly instead of depending on pg_get_functiondef formatting.
@@ -51,6 +51,43 @@ begin
      or definition not ilike '%stripe_payment_intent_id is null%'
      or definition not ilike '%status in (''pending'', ''requires_payment'')%' then
     raise exception 'payment reconciliation health authority lost hardened semantics';
+  end if;
+end
+$$;
+
+-- Readiness is public traffic, so both negative-path scans must stay on narrow
+-- active partial indexes rather than growing into full historical payment scans.
+do $$
+declare
+  unbound_definition text;
+  uncertain_definition text;
+begin
+  select indexdef into unbound_definition
+  from pg_indexes
+  where schemaname = 'public'
+    and tablename = 'payment_sessions'
+    and indexname = 'idx_payment_sessions_unbound_initialization_started';
+
+  select indexdef into uncertain_definition
+  from pg_indexes
+  where schemaname = 'public'
+    and tablename = 'payment_sessions'
+    and indexname = 'idx_payment_sessions_uncertain_initialization_started';
+
+  if unbound_definition is null
+     or unbound_definition not ilike '%payment_initialization_started_at%'
+     or unbound_definition not ilike '%payment_initialization_attempt_id IS NOT NULL%'
+     or unbound_definition not ilike '%provider_payment_id IS NULL%'
+     or unbound_definition not ilike '%status%pending%requires_payment%' then
+    raise exception 'stale-unbound reconciliation partial index lost required predicate';
+  end if;
+
+  if uncertain_definition is null
+     or uncertain_definition not ilike '%payment_initialization_started_at%'
+     or uncertain_definition not ilike '%payment_initialization_attempt_id IS NOT NULL%'
+     or uncertain_definition not ilike '%payment_initialization_uncertain%'
+     or uncertain_definition not ilike '%status%pending%requires_payment%' then
+    raise exception 'uncertain reconciliation partial index lost required predicate';
   end if;
 end
 $$;
