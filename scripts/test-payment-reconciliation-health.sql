@@ -17,13 +17,16 @@ values (
 );
 
 insert into public.profiles_buyer(id, display_name)
-values ('a1000000-0000-0000-0000-000000000001', 'Payment Health Buyer');
+values ('a1000000-0000-0000-000000000001', 'Payment Health Buyer');
 
--- Browser roles never receive this reconciliation surface.
+-- Browser roles never receive this reconciliation surface. Inspect pg_proc
+-- configuration directly instead of depending on pg_get_functiondef formatting.
 do $$
 declare
   fn regprocedure := 'public.service_payment_reconciliation_health(integer)'::regprocedure;
   definition text;
+  is_security_definer boolean;
+  function_config text[];
 begin
   if has_function_privilege('anon', fn, 'EXECUTE') then
     raise exception 'anon can execute payment reconciliation health';
@@ -35,12 +38,18 @@ begin
     raise exception 'service_role cannot execute payment reconciliation health';
   end if;
 
-  select pg_get_functiondef(fn::oid) into definition;
-  if definition not ilike '%security definer%'
-     or definition not ilike '%SET search_path TO pg_catalog, public%'
+  select p.prosecdef, p.proconfig, pg_get_functiondef(p.oid)
+  into is_security_definer, function_config, definition
+  from pg_proc p
+  where p.oid = fn::oid;
+
+  if not is_security_definer
+     or not ('search_path=pg_catalog, public' = any(coalesce(function_config, '{}'::text[])))
      or definition not ilike '%payment_initialization_started_at%'
      or definition not ilike '%payment_initialization_uncertain%'
-     or definition not ilike '%provider_payment_id is null%' then
+     or definition not ilike '%provider_payment_id is null%'
+     or definition not ilike '%stripe_payment_intent_id is null%'
+     or definition not ilike '%status in (''pending'', ''requires_payment'')%' then
     raise exception 'payment reconciliation health authority lost hardened semantics';
   end if;
 end
@@ -68,9 +77,10 @@ $$;
 
 reset role;
 
--- Recent unbound claim is within the grace window. A stale provider-bound
--- requires_payment session may legitimately await a customer action, and a
--- terminal checkout is not an active reconciliation condition.
+-- A recent unbound claim remains inside the grace window. A stale provider-bound
+-- requires_payment session may legitimately await customer action. Terminal
+-- paid/failed/cancelled sessions are not active reconciliation conditions even
+-- if their historical initialization timestamp is old.
 insert into public.payment_sessions(
   id, buyer_id, idempotency_key, status, amount_cents,
   payment_initialization_attempt_id, payment_initialization_started_at,
@@ -99,6 +109,22 @@ values
     'a9000000-0000-0000-0000-000000000009',
     'cancelled', 1000,
     'aa000000-0000-0000-0000-000000000010', now() - interval '30 minutes',
+    null, null, '{}'::jsonb
+  ),
+  (
+    'b1000000-0000-0000-0000-000000000017',
+    'a1000000-0000-0000-0000-000000000001',
+    'b2000000-0000-0000-0000-000000000018',
+    'paid', 1000,
+    'b3000000-0000-0000-0000-000000000019', now() - interval '30 minutes',
+    null, null, '{}'::jsonb
+  ),
+  (
+    'b4000000-0000-0000-0000-000000000020',
+    'a1000000-0000-0000-0000-000000000001',
+    'b5000000-0000-0000-0000-000000000021',
+    'failed', 1000,
+    'b6000000-0000-0000-0000-000000000022', now() - interval '30 minutes',
     null, null, '{}'::jsonb
   );
 
