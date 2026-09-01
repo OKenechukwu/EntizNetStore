@@ -30,6 +30,17 @@ for (const workflow of requiredWorkflows) {
   if (!exists(workflow)) fail(`Required workflow missing: ${workflow}`);
 }
 
+const requiredPaymentReconciliationFiles = [
+  "supabase/migrations/20260901011000_p0_payment_reconciliation_health.sql",
+  "scripts/test-payment-reconciliation-health.sql",
+  "scripts/test-payment-initialization-concurrency.sh",
+  "app/api/health/route.ts",
+];
+
+for (const file of requiredPaymentReconciliationFiles) {
+  if (!exists(file)) fail(`Payment reconciliation release guard missing: ${file}`);
+}
+
 if (exists(".github/workflows/lockfile-sync.yml")) {
   fail("Obsolete write-capable lockfile-sync workflow must not exist");
 }
@@ -96,6 +107,7 @@ if (exists(".github/workflows/production-monitor.yml")) {
     "ENTIZNETSTORE_EXPECTED_SHA: ${{ github.sha }}",
     "deployment-convergence retry",
     "for attempt in 1 2 3 4 5",
+    "cron: '*/15 * * * *'",
   ]) {
     if (!monitor.includes(fragment)) {
       fail(`Production monitor lost required Actions/runtime control: ${fragment}`);
@@ -130,9 +142,46 @@ if (exists("scripts/test-production-http-smoke.mjs")) {
     "production deployment drift",
     "expectedVersion",
     "launchGates?.uploadSafety",
+    "body?.checks?.payments !== 'ok'",
   ]) {
     if (!smoke.includes(fragment)) {
-      fail(`Production smoke lost release-identity control: ${fragment}`);
+      fail(`Production smoke lost release/readiness control: ${fragment}`);
+    }
+  }
+}
+
+if (exists("app/api/health/route.ts")) {
+  const healthRoute = read("app/api/health/route.ts");
+  for (const fragment of [
+    "service_payment_reconciliation_health",
+    "p_stale_minutes: 10",
+    "payments === 'ok'",
+    "const checks = { database, storage, operations, payments }",
+  ]) {
+    if (!healthRoute.includes(fragment)) {
+      fail(`Public readiness route lost payment reconciliation guard: ${fragment}`);
+    }
+  }
+}
+
+if (exists("scripts/test-payment-initialization-concurrency.sh")) {
+  const paymentAuthority = read("scripts/test-payment-initialization-concurrency.sh");
+  if (!paymentAuthority.includes("scripts/test-payment-reconciliation-health.sql")) {
+    fail("Payment authority CI lane no longer executes reconciliation health regression");
+  }
+}
+
+if (exists("scripts/test-payment-reconciliation-health.sql")) {
+  const paymentHealth = read("scripts/test-payment-reconciliation-health.sql");
+  for (const fragment of [
+    "service_payment_reconciliation_health(integer)",
+    "payment_initialization_uncertain",
+    "stale_unbound_claim_count",
+    "has_function_privilege('authenticated'",
+    "search_path=pg_catalog, public",
+  ]) {
+    if (!paymentHealth.includes(fragment)) {
+      fail(`Payment reconciliation regression lost required invariant: ${fragment}`);
     }
   }
 }
