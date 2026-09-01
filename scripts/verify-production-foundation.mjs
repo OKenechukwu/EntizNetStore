@@ -186,11 +186,14 @@ for (const requiredPath of [
   "lib/storage/uploadScanner.ts",
   "scripts/test-http-authorization.mjs",
   "scripts/test-operational-event-ledger.sql",
+  "scripts/test-payment-initialization-concurrency.sh",
+  "scripts/test-payment-reconciliation-health.sql",
   "scripts/test-production-http-smoke.mjs",
   "scripts/test-storage-boundary.mjs",
   "scripts/test-upload-quarantine-safety.sql",
   "supabase/migrations/20260825153000_operational_event_ledger.sql",
   "supabase/migrations/20260826065000_p0_upload_quarantine_scanning.sql",
+  "supabase/migrations/20260901011000_p0_payment_reconciliation_health.sql",
   "supabase/seed.sql",
   "tests/upload-scanner.test.mts",
 ]) {
@@ -223,6 +226,7 @@ if (exists(".github/workflows/ci.yml")) {
   for (const requiredFragment of [
     "scripts/test-operational-event-ledger.sql",
     "scripts/test-upload-quarantine-safety.sql",
+    "scripts/test-payment-initialization-concurrency.sh",
     "npm run test:upload-scanner",
     "UPLOAD_SCANNER_MODE: deterministic",
   ]) {
@@ -276,7 +280,10 @@ if (exists("app/api/health/route.ts")) {
     "operational_event_health",
     "p_window_minutes: 15",
     "p_threshold: 5",
-    "checks = { database, storage, operations }",
+    "service_payment_reconciliation_health",
+    "p_stale_minutes: 10",
+    "checks = { database, storage, operations, payments }",
+    "payments === 'ok'",
   ]) {
     if (!healthRoute.includes(requiredFragment)) {
       fail(`Production readiness route lost required health control: ${requiredFragment}`);
@@ -290,7 +297,8 @@ if (exists("scripts/test-production-http-smoke.mjs")) {
     "body?.checks?.database !== 'ok'",
     "body?.checks?.storage !== 'ok'",
     "body?.checks?.operations !== 'ok'",
-    "database=ok, storage=ok and operations=ok",
+    "body?.checks?.payments !== 'ok'",
+    "database=ok, storage=ok, operations=ok and payments=ok",
   ]) {
     if (!productionSmoke.includes(requiredFragment)) {
       fail(`Production smoke lost required readiness assertion: ${requiredFragment}`);
@@ -326,6 +334,22 @@ if (exists("supabase/migrations/20260826065000_p0_upload_quarantine_scanning.sql
   ]) {
     if (!uploadMigration.includes(requiredFragment)) {
       fail(`Upload quarantine migration lost required control: ${requiredFragment}`);
+    }
+  }
+}
+
+if (exists("supabase/migrations/20260901011000_p0_payment_reconciliation_health.sql")) {
+  const paymentHealthMigration = read("supabase/migrations/20260901011000_p0_payment_reconciliation_health.sql");
+  for (const requiredFragment of [
+    "service_payment_reconciliation_health",
+    "idx_payment_sessions_unbound_initialization_started",
+    "idx_payment_sessions_uncertain_initialization_started",
+    "payment_initialization_uncertain",
+    "set search_path = pg_catalog, public",
+    "to service_role",
+  ]) {
+    if (!paymentHealthMigration.includes(requiredFragment)) {
+      fail(`Payment reconciliation migration lost required control: ${requiredFragment}`);
     }
   }
 }
