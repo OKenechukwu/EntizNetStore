@@ -240,16 +240,31 @@ begin
 end
 $$;
 
-select public.attach_checkout_payment_reference(
-  (
-    select id from public.payment_sessions
-    where buyer_id = auth.uid()
-      and idempotency_key = '70000000-0000-0000-0000-000000000007'
-  ),
+-- Provider identity is trusted-server authority. Claim exactly one external
+-- initialization attempt before binding the simulated Stripe reference.
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select public.service_claim_checkout_payment_initialization(
+  (select id from public.payment_sessions
+   where buyer_id = '10000000-0000-0000-0000-000000000001'
+     and idempotency_key = '70000000-0000-0000-0000-000000000007'),
+  '10000000-0000-0000-0000-000000000001',
+  '71000000-0000-0000-0000-000000000007'
+);
+select public.service_attach_checkout_payment_reference(
+  (select id from public.payment_sessions
+   where buyer_id = '10000000-0000-0000-0000-000000000001'
+     and idempotency_key = '70000000-0000-0000-0000-000000000007'),
+  '10000000-0000-0000-0000-000000000001',
+  '71000000-0000-0000-0000-000000000007',
   'stripe',
   'pi_p0_checkout_one'
 );
 
+reset role;
+set local role authenticated;
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
 select set_config(
   'request.jwt.claims',
@@ -481,11 +496,8 @@ select * from public.create_checkout_session(
   '80000000-0000-0000-0000-000000000008'
 );
 
-select public.attach_checkout_payment_reference(
-  (select id from public.payment_sessions where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008'),
-  'stripe',
-  'pi_p0_checkout_cancelled'
-);
+-- Cancellation is valid only before trusted server authority has claimed an
+-- external processor initialization. No provider reference exists on this path.
 select public.cancel_checkout_session(
   (select id from public.payment_sessions where buyer_id = auth.uid() and idempotency_key = '80000000-0000-0000-0000-000000000008')
 );
@@ -508,6 +520,10 @@ begin
 end
 $$;
 
+-- A checkout that was cancelled before processor initialization owns no
+-- provider reference. A later callback carrying any payment identifier must be
+-- rejected at the reference-integrity boundary; legitimate late terminal-state
+-- behavior for initialized payments is covered by test-payment-terminal-state.sql.
 reset role;
 set local role service_role;
 do $$
@@ -518,9 +534,9 @@ begin
       (select id from public.payment_sessions where idempotency_key = '80000000-0000-0000-0000-000000000008'),
       'pi_p0_checkout_cancelled', true
     );
-    raise exception 'Cancelled checkout unexpectedly accepted a success event';
-  exception when others then
-    if sqlerrm not like 'Checkout session is no longer payable%' then raise; end if;
+    raise exception 'Cancelled checkout unexpectedly accepted an unowned provider reference';
+  exception when sqlstate '22023' then
+    if sqlerrm not like 'Provider payment reference does not match checkout session%' then raise; end if;
   end;
 end
 $$;

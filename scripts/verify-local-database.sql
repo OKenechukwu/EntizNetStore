@@ -95,6 +95,36 @@ begin
   ) then
     raise exception 'KYC documents lost upload_scan_job_id evidence link';
   end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'payment_sessions'
+      and column_name = 'payment_initialization_attempt_id'
+      and data_type = 'uuid'
+  ) or not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'payment_sessions'
+      and column_name = 'payment_initialization_started_at'
+      and data_type = 'timestamp with time zone'
+  ) then
+    raise exception 'Payment initialization durable-claim columns are missing';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public'
+      and t.relname = 'payment_sessions'
+      and c.conname = 'payment_sessions_initialization_attempt_check'
+  ) then
+    raise exception 'Payment initialization paired claim constraint is missing';
+  end if;
 end
 $$;
 
@@ -277,7 +307,8 @@ begin
     'idx_upload_scan_jobs_purpose_created','idx_kyc_documents_upload_scan_job_id',
     'business_trading_roles_one_primary','idx_wholesale_offers_active_variant',
     'idx_wholesale_offers_seller_status','idx_wholesale_offer_tiers_lookup',
-    'idx_cart_items_wholesale_offer'
+    'idx_cart_items_wholesale_offer','idx_payment_sessions_initialization_attempt',
+    'idx_payment_sessions_provider_reference_unique'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -292,6 +323,7 @@ $$;
 do $$
 declare
   v_fn text;
+  v_role text;
 begin
   if has_function_privilege('anon','public.create_checkout_session(jsonb,jsonb,uuid)','EXECUTE')
      or has_function_privilege('authenticated','public.create_checkout_session(jsonb,jsonb,uuid)','EXECUTE') then
@@ -305,11 +337,18 @@ begin
     raise exception 'M3 create_checkout_session_v2 execution boundary is incorrect';
   end if;
 
-  if has_function_privilege('anon','public.attach_checkout_payment_intent(uuid,text)','EXECUTE')
-     or has_function_privilege('authenticated','public.attach_checkout_payment_intent(uuid,text)','EXECUTE')
-     or not has_function_privilege('service_role','public.attach_checkout_payment_intent(uuid,text)','EXECUTE') then
-    raise exception 'Legacy payment-intent wrapper must be trusted-worker-only';
-  end if;
+  -- Direct provider-reference attachment was retired. No API role, including
+  -- service_role, may bypass the durable initialization-attempt authority.
+  foreach v_fn in array array[
+    'public.attach_checkout_payment_intent(uuid,text)',
+    'public.attach_checkout_payment_reference(uuid,text,text)'
+  ] loop
+    foreach v_role in array array['anon','authenticated','service_role'] loop
+      if has_function_privilege(v_role, v_fn, 'EXECUTE') then
+        raise exception 'Retired payment-reference function remains executable by %: %', v_role, v_fn;
+      end if;
+    end loop;
+  end loop;
 
   foreach v_fn in array array[
     'public.cancel_checkout_session(uuid)',
@@ -331,6 +370,9 @@ begin
   foreach v_fn in array array[
     'public.finalize_checkout_payment(text,text,uuid,text,boolean)',
     'public.finalize_checkout_payment_v2(text,text,uuid,text,text,text)',
+    'public.service_claim_checkout_payment_initialization(uuid,uuid,uuid)',
+    'public.service_attach_checkout_payment_reference(uuid,uuid,uuid,text,text)',
+    'public.service_mark_checkout_payment_initialization_uncertain(uuid,uuid,uuid)',
     'public.request_seller_payout(uuid,uuid,timestamp with time zone)',
     'public.attach_seller_payout_provider_reference(uuid,text,text)',
     'public.cancel_seller_payout_request(uuid,text)',
@@ -441,6 +483,8 @@ begin
     and p.proname in (
       'create_checkout_session','create_checkout_session_v2',
       'attach_checkout_payment_intent','attach_checkout_payment_reference',
+      'service_claim_checkout_payment_initialization','service_attach_checkout_payment_reference',
+      'service_mark_checkout_payment_initialization_uncertain',
       'cancel_checkout_session','finalize_checkout_payment','finalize_checkout_payment_v2',
       'transition_seller_order','request_seller_payout','attach_seller_payout_provider_reference',
       'cancel_seller_payout_request','finalize_seller_payout_v1',

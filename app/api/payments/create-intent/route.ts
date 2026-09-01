@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { reportOperationalError } from "@/lib/observability/operationalEventSink";
@@ -5,6 +6,7 @@ import {
   getPaymentProvider,
   PaymentProviderUnavailableError,
 } from "@/lib/payments/provider";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 const requestSchema = z.object({
@@ -25,6 +27,11 @@ type ShippingAddressSnapshot = {
   postalCode?: string | null;
   postal_code?: string | null;
   country?: string | null;
+};
+
+type RpcError = {
+  code?: string | null;
+  message?: string | null;
 };
 
 function toProviderAddress(value: unknown) {
@@ -50,6 +57,10 @@ function toProviderAddress(value: unknown) {
   };
 }
 
+function isInitializationConflict(error: RpcError | null) {
+  return error?.code === "55P03" || error?.code === "22023" || error?.code === "42501";
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -60,6 +71,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid checkout session" }, { status: 400 });
   }
 
+  // Buyer identity/RLS determines which checkout is visible. Privileged payment
+  // mutation later uses the server-only service client with an explicit Buyer ID.
   const { data: session, error: sessionError } = await supabase
     .from("payment_sessions")
     .select("id, status, currency, amount_cents, shipping_address, payment_provider, provider_payment_id")
@@ -109,6 +122,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unable to initialize payment" }, { status: 503 });
   }
 
+  // Do not create a durable initialization claim while there is no usable
+  // processor. This keeps checkout cancellable during processor onboarding.
   if (!provider.configured) {
     return NextResponse.json(
       {
@@ -119,9 +134,47 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const admin = getSupabaseAdmin();
+  const initializationAttemptId = randomUUID();
+
+  // Claim before any external processor call. The database row lock + durable
+  // attempt ID guarantee concurrent HTTP requests cannot both initialize a
+  // processor payment for the same checkout.
+  const { error: claimError } = await admin.rpc(
+    "service_claim_checkout_payment_initialization",
+    {
+      p_session_id: session.id,
+      p_buyer_id: user.id,
+      p_attempt_id: initializationAttemptId,
+    },
+  );
+
+  if (claimError) {
+    if (!isInitializationConflict(claimError)) {
+      await reportOperationalError("payments.initialization_claim_failed", claimError, {
+        component: "payments",
+        operation: "claim-payment-initialization",
+        severity: "error",
+        route: "/api/payments/create-intent",
+        actorId: user.id,
+        recordId: session.id,
+      });
+      return NextResponse.json({ error: "Unable to initialize payment" }, { status: 503 });
+    }
+
+    return NextResponse.json(
+      {
+        error: "Payment initialization is already in progress or this checkout is no longer payable",
+        code: "PAYMENT_INITIALIZATION_CONFLICT",
+      },
+      { status: 409 },
+    );
+  }
+
   try {
     const initialized = await provider.initializePayment({
       checkoutSessionId: session.id,
+      initializationAttemptId,
       amountCents: Number(session.amount_cents),
       currency: "usd",
       buyerId: user.id,
@@ -129,10 +182,12 @@ export async function POST(request: NextRequest) {
       shippingAddress: toProviderAddress(session.shipping_address),
     });
 
-    const { error: attachError } = await supabase.rpc(
-      "attach_checkout_payment_reference",
+    const { error: attachError } = await admin.rpc(
+      "service_attach_checkout_payment_reference",
       {
         p_session_id: session.id,
+        p_buyer_id: user.id,
+        p_attempt_id: initializationAttemptId,
         p_provider: initialized.provider,
         p_provider_payment_id: initialized.providerPaymentId,
       },
@@ -149,21 +204,27 @@ export async function POST(request: NextRequest) {
       nextAction: initialized.nextAction,
     });
   } catch (error) {
-    // Once provider initialization is attempted, an ambiguous failure must not
-    // leave a locally payable session that can be initialized a second time.
-    // Existing terminal-state handling rejects any later provider success as a
-    // reconciliation incident instead of risking duplicate money movement.
-    const { error: cancelError } = await supabase.rpc("cancel_checkout_session", {
-      p_session_id: session.id,
-    });
+    // Once an external processor call has started, failure is potentially
+    // ambiguous: the processor may have accepted the request even when this
+    // server never received the response. Never cancel/release/retry
+    // automatically. Persist a reconciliation marker while retaining the
+    // durable claim that blocks a second external initialization.
+    const { error: uncertainError } = await admin.rpc(
+      "service_mark_checkout_payment_initialization_uncertain",
+      {
+        p_session_id: session.id,
+        p_buyer_id: user.id,
+        p_attempt_id: initializationAttemptId,
+      },
+    );
 
-    if (cancelError) {
+    if (uncertainError) {
       await reportOperationalError(
-        "payments.checkout_cancel_failed_after_initialization_error",
-        cancelError,
+        "payments.initialization_uncertainty_marker_failed",
+        uncertainError,
         {
           component: "payments",
-          operation: "cancel-checkout-after-payment-failure",
+          operation: "mark-payment-initialization-uncertain",
           severity: "critical",
           route: "/api/payments/create-intent",
           actorId: user.id,
@@ -172,23 +233,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (error instanceof PaymentProviderUnavailableError) {
-      await reportOperationalError("payments.provider_unavailable", error, {
-        component: "payments",
-        operation: "initialize-payment",
-        route: "/api/payments/create-intent",
-        actorId: user.id,
-        recordId: session.id,
-      });
-      return NextResponse.json(
-        { error: error.message, code: "PAYMENT_PROVIDER_UNAVAILABLE" },
-        { status: 503 },
-      );
-    }
-
-    // The external provider may have accepted the payment while the network or
-    // local provider-reference persistence failed. Treat that ambiguity as a
-    // critical reconciliation condition without logging provider payloads/IDs.
     await reportOperationalError("payments.initialization_uncertain", error, {
       component: "payments",
       operation: "initialize-or-attach-payment",
@@ -199,7 +243,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: "Unable to initialize payment" },
+      {
+        error: "Payment initialization requires reconciliation before retry",
+        code: "PAYMENT_INITIALIZATION_UNCERTAIN",
+      },
       { status: 503 },
     );
   }
