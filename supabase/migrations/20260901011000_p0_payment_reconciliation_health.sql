@@ -7,6 +7,9 @@
 
 begin;
 
+-- `/api/health` calls this authority on every readiness probe. Keep both
+-- negative-path scans bounded to narrow active subsets so historical payment
+-- volume cannot turn a public health probe into a full payment-table scan.
 create index if not exists idx_payment_sessions_unbound_initialization_started
   on public.payment_sessions(payment_initialization_started_at)
   where payment_initialization_attempt_id is not null
@@ -14,6 +17,13 @@ create index if not exists idx_payment_sessions_unbound_initialization_started
     and provider_payment_id is null
     and stripe_payment_intent_id is null
     and status in ('pending', 'requires_payment');
+
+create index if not exists idx_payment_sessions_uncertain_initialization_started
+  on public.payment_sessions(payment_initialization_started_at)
+  where payment_initialization_attempt_id is not null
+    and payment_initialization_started_at is not null
+    and status in ('pending', 'requires_payment')
+    and metadata @> '{"payment_initialization_uncertain": true}'::jsonb;
 
 create or replace function public.service_payment_reconciliation_health(
   p_stale_minutes integer default 10
