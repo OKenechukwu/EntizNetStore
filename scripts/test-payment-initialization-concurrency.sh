@@ -257,3 +257,10 @@ end
 SQL
 
 echo "EntizNetStore concurrent payment initialization authority regression passed: one winner, seven conflicts"
+
+# Tear down the deterministic concurrency fixture before the reconciliation
+# health suite, which intentionally reuses fixed UUIDs for reproducibility.
+cleanup
+trap - EXIT
+
+psql "$DB" -v ON_ERROR_STOP=1 -f scripts/test-payment-reconciliation-health.sql
