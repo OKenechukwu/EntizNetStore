@@ -17,9 +17,21 @@ function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
 
+const pins = {
+  checkout: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+  setupNode: "820762786026740c76f36085b0efc47a31fe5020",
+  githubScript: "3a2844b7e9c422d3c10d287c895573f7108da1b3",
+  uploadArtifactV4: "ea165f8d65b6e75b540449e92b4886f43607fa02",
+  uploadArtifactV7: "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  supabaseCli: "ab058987d8d6c725971f6cf9d0b5c98467e30bd1",
+};
+
 const requiredWorkflows = [
   ".github/workflows/ci.yml",
+  ".github/workflows/deployed-authorization.yml",
   ".github/workflows/http-authorization.yml",
+  ".github/workflows/image-egress.yml",
+  ".github/workflows/product-media-authority.yml",
   ".github/workflows/production-monitor.yml",
   ".github/workflows/production-backup.yml",
   ".github/workflows/restore-rehearsal.yml",
@@ -52,55 +64,80 @@ const workflowFiles = fs.existsSync(workflowRoot)
       .map((name) => `.github/workflows/${name}`)
   : [];
 
-const deprecatedActionPatterns = [
-  {
-    label: "actions/checkout older than v7",
-    regex: /actions\/checkout@v([1-6])\b/g,
-  },
-  {
-    label: "actions/setup-node older than v7",
-    regex: /actions\/setup-node@v([1-6])\b/g,
-  },
-  {
-    label: "actions/github-script older than v9",
-    regex: /actions\/github-script@v([1-8])\b/g,
-  },
-];
-
-for (const workflow of workflowFiles) {
+function requireFragments(workflow, fragments) {
+  if (!exists(workflow)) return;
   const source = read(workflow);
-  for (const { label, regex } of deprecatedActionPatterns) {
-    regex.lastIndex = 0;
-    if (regex.test(source)) fail(`${label} found in ${workflow}`);
+  for (const fragment of fragments) {
+    if (!source.includes(fragment)) {
+      fail(`${workflow} lost required Actions/runtime control: ${fragment}`);
+    }
   }
 }
 
-for (const workflow of [
-  ".github/workflows/ci.yml",
-  ".github/workflows/http-authorization.yml",
-  ".github/workflows/production-backup.yml",
-  ".github/workflows/restore-rehearsal.yml",
-  ".github/workflows/production-capacity.yml",
-]) {
-  if (!exists(workflow)) continue;
-  const source = read(workflow);
-  if (!source.includes("actions/checkout@v7")) {
-    fail(`${workflow} must use actions/checkout@v7`);
-  }
-  if (!source.includes("actions/setup-node@v7")) {
-    fail(`${workflow} must use actions/setup-node@v7`);
-  }
-  if (!/node-version:\s*22\b/.test(source)) {
-    fail(`${workflow} must keep application jobs on canonical Node.js 22`);
-  }
-}
+const checkoutRef = `actions/checkout@${pins.checkout}`;
+const setupNodeRef = `actions/setup-node@${pins.setupNode}`;
+const supabaseRef = `supabase/setup-cli@${pins.supabaseCli}`;
+
+requireFragments(".github/workflows/ci.yml", [
+  checkoutRef,
+  setupNodeRef,
+  supabaseRef,
+  "persist-credentials: false",
+  "node-version: 22",
+]);
+
+requireFragments(".github/workflows/http-authorization.yml", [
+  checkoutRef,
+  setupNodeRef,
+  supabaseRef,
+  `actions/upload-artifact@${pins.uploadArtifactV4}`,
+  "persist-credentials: false",
+  "node-version: 22",
+]);
+
+requireFragments(".github/workflows/image-egress.yml", [
+  checkoutRef,
+  setupNodeRef,
+  "persist-credentials: false",
+  "node-version: 22",
+]);
+
+requireFragments(".github/workflows/product-media-authority.yml", [
+  checkoutRef,
+  supabaseRef,
+  "persist-credentials: false",
+]);
+
+requireFragments(".github/workflows/deployed-authorization.yml", [
+  checkoutRef,
+  setupNodeRef,
+  `actions/upload-artifact@${pins.uploadArtifactV7}`,
+  "persist-credentials: false",
+  "ref: ${{ inputs.expected_commit }}",
+  "node-version: 22",
+]);
+
+requireFragments(".github/workflows/production-backup.yml", [
+  checkoutRef,
+  setupNodeRef,
+  supabaseRef,
+  "persist-credentials: false",
+  "node-version: 22",
+]);
+
+requireFragments(".github/workflows/restore-rehearsal.yml", [
+  checkoutRef,
+  setupNodeRef,
+  "persist-credentials: false",
+  "node-version: 22",
+]);
 
 if (exists(".github/workflows/production-monitor.yml")) {
   const monitor = read(".github/workflows/production-monitor.yml");
   for (const fragment of [
-    "actions/checkout@v7",
-    "actions/setup-node@v7",
-    "actions/github-script@v9",
+    checkoutRef,
+    setupNodeRef,
+    `actions/github-script@${pins.githubScript}`,
     "persist-credentials: false",
     "node-version: 22",
     "if: github.ref == 'refs/heads/main'",
@@ -118,8 +155,11 @@ if (exists(".github/workflows/production-monitor.yml")) {
 if (exists(".github/workflows/production-capacity.yml")) {
   const capacity = read(".github/workflows/production-capacity.yml");
   for (const fragment of [
+    checkoutRef,
+    setupNodeRef,
     "workflow_dispatch:",
     "RUN_READ_ONLY_CAPACITY_GATE",
+    "CAPACITY_CONFIRMATION: ${{ inputs.confirmation }}",
     "persist-credentials: false",
     "if: github.ref == 'refs/heads/main'",
     "CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app",
@@ -209,5 +249,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `GitHub Actions foundation verification passed (${workflowFiles.length} workflow files scanned).`,
+  `GitHub Actions foundation verification passed (${workflowFiles.length} workflow files scanned; immutable action pins verified).`,
 );

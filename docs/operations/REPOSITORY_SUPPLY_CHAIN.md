@@ -1,6 +1,6 @@
 # EntizNetStore Repository Supply-Chain Controls
 
-Last reviewed: **2026-09-01**
+Last reviewed: **2026-09-02**
 
 This runbook defines repository-controlled protections that complement, but do not replace, GitHub branch protection/rulesets. `main` remains unprotected at the GitHub host level until P0-06's external governance action is completed and verified through GitHub read APIs.
 
@@ -21,6 +21,22 @@ Both ecosystems are deliberately bounded to five open update PRs so dependency m
 
 Dependabot PRs must pass the same repository tests as ordinary engineering PRs. They do not receive privileged production credentials merely because the author is Dependabot.
 
+## Immutable GitHub Actions
+
+Every remote `uses:` reference in `.github/workflows` must be pinned to a reviewed **full 40-character commit SHA**. Mutable tags and branches such as `@main`, `@v1`, `@v7` or `@latest` are not accepted release dependencies even when the corresponding upstream project is trusted.
+
+The repository currently allows only the reviewed action packages and commits frozen by `scripts/verify-repository-governance.mjs`:
+
+- `actions/checkout`;
+- `actions/setup-node`;
+- `actions/github-script`;
+- `actions/upload-artifact`;
+- `supabase/setup-cli`.
+
+Human-readable major-version comments may remain beside the SHA for maintenance context, but the executable reference is the immutable commit. Dependabot's `github-actions` ecosystem is the intended update path: a proposed Action revision must arrive as a PR, pass the complete release gate, and be reviewed as a supply-chain change before the allowlist is advanced.
+
+All `actions/checkout` steps must also set `persist-credentials: false`. The checked-out repository does not need a reusable Git credential for CI, database reproduction, browser tests, monitoring, backups, restore rehearsals, or capacity probes. Removing the credential prevents a later workflow step from silently inheriting repository-token access through local Git configuration.
+
 ## Workflow trust boundary
 
 This public repository must not use `pull_request_target` for application build/test execution. That event evaluates workflow code from the base repository while granting access to the base-repository security context and is too easy to misuse with untrusted pull-request content.
@@ -28,6 +44,12 @@ This public repository must not use `pull_request_target` for application build/
 Workflows must also not use `permissions: write-all` or `permissions: read-all`. Each workflow should declare only the GitHub token permissions required for its job. Existing production automation that needs a narrow write capability, such as incident issue creation, must keep that permission explicit and scoped.
 
 The repository foundation verifier scans all workflow YAML and fails if these broad-risk patterns are introduced.
+
+## Shell-expression isolation
+
+`workflow_dispatch inputs` and GitHub secrets must not be interpolated directly into `run:` shell source. GitHub expression expansion happens before the runner shell parses the script, so direct interpolation can turn a value into shell syntax if quoting is ever weakened or malformed.
+
+Pass workflow inputs and secrets through a step/job `env:` mapping, then reference the resulting shell variable normally. This rule applies especially to backup reasons, restore object keys/confirmation values, deployment URLs and operational capacity controls. The repository-governance verifier rejects direct `${{ inputs.* }}` and `${{ secrets.* }}` expressions inside shell commands or multiline shell blocks.
 
 ## Mandatory release contexts
 

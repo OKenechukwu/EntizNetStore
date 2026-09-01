@@ -35,12 +35,12 @@ jobs:
       AWS_DEFAULT_REGION: ${{ vars.BACKUP_S3_REGION }}
     steps:
       - name: Check out exact source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -49,7 +49,7 @@ jobs:
         run: npm ci
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1
         with:
           version: 2.111.0
 
@@ -98,6 +98,8 @@ jobs:
 
       - name: Create logical database and Storage backup
         shell: bash
+        env:
+          BACKUP_REASON: ${{ inputs.reason }}
         run: |
           set -euo pipefail
           umask 077
@@ -127,7 +129,7 @@ jobs:
             "sourceProjectRef": "${EXPECTED_SUPABASE_PROJECT_REF}",
             "gitSha": "${GITHUB_SHA}",
             "workflowRunId": "${GITHUB_RUN_ID}",
-            "reason": $(jq -Rn --arg value "${{ inputs.reason }}" '$value')
+            "reason": $(jq -Rn --arg value "$BACKUP_REASON" '$value')
           }
           JSON
 
