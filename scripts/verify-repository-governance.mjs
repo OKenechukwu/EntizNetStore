@@ -21,6 +21,20 @@ function requireFile(relativePath) {
   return fs.readFileSync(absolute, "utf8");
 }
 
+const ACTION_PINS = new Map([
+  ["actions/checkout", new Set(["3d3c42e5aac5ba805825da76410c181273ba90b1"])],
+  ["actions/setup-node", new Set(["820762786026740c76f36085b0efc47a31fe5020"])],
+  ["actions/github-script", new Set(["3a2844b7e9c422d3c10d287c895573f7108da1b3"])],
+  [
+    "actions/upload-artifact",
+    new Set([
+      "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    ]),
+  ],
+  ["supabase/setup-cli", new Set(["ab058987d8d6c725971f6cf9d0b5c98467e30bd1"])],
+]);
+
 const codeowners = requireFile(".github/CODEOWNERS");
 const dependabot = requireFile(".github/dependabot.yml");
 const protectionDoc = requireFile("docs/operations/MAIN_BRANCH_PROTECTION_GATE.md");
@@ -96,6 +110,9 @@ if (supplyChainDoc) {
     "pull_request_target",
     "write-all",
     "main` remains unprotected",
+    "full 40-character commit SHA",
+    "persist-credentials: false",
+    "workflow_dispatch inputs",
   ]) {
     if (!supplyChainDoc.includes(phrase)) {
       fail(`Repository supply-chain runbook lost required guidance: ${phrase}`);
@@ -107,6 +124,40 @@ const workflowDir = path.join(root, ".github", "workflows");
 const workflowNames = fs.existsSync(workflowDir)
   ? fs.readdirSync(workflowDir).filter((name) => /\.ya?ml$/.test(name))
   : [];
+
+function verifyRunBlocks(relativePath, source) {
+  const lines = source.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const inlineRun = line.match(/^(\s*)run:\s*(.+)$/);
+    if (inlineRun && !/[|>]\s*$/.test(inlineRun[2])) {
+      if (inlineRun[2].includes("${{ inputs.")) {
+        fail(`${relativePath}:${index + 1} must route workflow_dispatch inputs through env before shell execution`);
+      }
+      if (inlineRun[2].includes("${{ secrets.")) {
+        fail(`${relativePath}:${index + 1} must route secrets through env before shell execution`);
+      }
+      continue;
+    }
+
+    const blockRun = line.match(/^(\s*)run:\s*[|>]\s*$/);
+    if (!blockRun) continue;
+
+    const runIndent = blockRun[1].length;
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const candidate = lines[cursor];
+      if (candidate.trim() === "") continue;
+      const candidateIndent = candidate.match(/^\s*/)?.[0].length ?? 0;
+      if (candidateIndent <= runIndent) break;
+      if (candidate.includes("${{ inputs.")) {
+        fail(`${relativePath}:${cursor + 1} must route workflow_dispatch inputs through env before shell execution`);
+      }
+      if (candidate.includes("${{ secrets.")) {
+        fail(`${relativePath}:${cursor + 1} must route secrets through env before shell execution`);
+      }
+    }
+  }
+}
 
 for (const name of workflowNames) {
   const relativePath = `.github/workflows/${name}`;
@@ -123,6 +174,46 @@ for (const name of workflowNames) {
   if (/^\s*permissions\s*:\s*read-all\s*$/m.test(source)) {
     fail(`${relativePath} must declare only the permissions it actually needs, not read-all`);
   }
+
+  const lines = source.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^\s*uses:\s*([^\s#]+)(?:\s+#.*)?$/);
+    if (!match) continue;
+
+    const reference = match[1];
+    if (reference.startsWith("./")) continue;
+
+    const at = reference.lastIndexOf("@");
+    if (at <= 0) {
+      fail(`${relativePath}:${index + 1} has malformed remote Action reference: ${reference}`);
+      continue;
+    }
+
+    const action = reference.slice(0, at);
+    const pin = reference.slice(at + 1);
+    if (!/^[0-9a-f]{40}$/.test(pin)) {
+      fail(`${relativePath}:${index + 1} remote Action must use a full 40-character commit SHA: ${reference}`);
+      continue;
+    }
+
+    const allowedPins = ACTION_PINS.get(action);
+    if (!allowedPins) {
+      fail(`${relativePath}:${index + 1} uses unapproved remote Action package: ${action}`);
+      continue;
+    }
+    if (!allowedPins.has(pin)) {
+      fail(`${relativePath}:${index + 1} uses an unreviewed commit for ${action}: ${pin}`);
+    }
+
+    if (action === "actions/checkout") {
+      const lookahead = lines.slice(index + 1, index + 8).join("\n");
+      if (!/persist-credentials:\s*false\b/.test(lookahead)) {
+        fail(`${relativePath}:${index + 1} checkout must set persist-credentials: false`);
+      }
+    }
+  }
+
+  verifyRunBlocks(relativePath, source);
 }
 
 if (failures.length > 0) {
@@ -132,5 +223,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Repository governance verification passed (${workflowNames.length} workflow files scanned; ${requiredCheckContexts.length} required check contexts frozen).`,
+  `Repository governance verification passed (${workflowNames.length} workflow files scanned; ${requiredCheckContexts.length} required check contexts frozen; ${ACTION_PINS.size} approved Action packages pinned).`,
 );

@@ -5,6 +5,12 @@ const read = (file) => fs.readFileSync(file, "utf8");
 const exists = (file) => fs.existsSync(file);
 const fail = (message) => failures.push(message);
 
+const pins = {
+  checkout: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+  setupNode: "820762786026740c76f36085b0efc47a31fe5020",
+  supabaseCli: "ab058987d8d6c725971f6cf9d0b5c98467e30bd1",
+};
+
 const requiredFiles = [
   ".github/workflows/production-backup.yml",
   ".github/workflows/restore-rehearsal.yml",
@@ -21,8 +27,12 @@ if (exists(".github/workflows/production-backup.yml")) {
   const requiredFragments = [
     "workflow_dispatch:",
     "contents: read",
+    `actions/checkout@${pins.checkout}`,
+    `actions/setup-node@${pins.setupNode}`,
+    `supabase/setup-cli@${pins.supabaseCli}`,
     "persist-credentials: false",
-    "supabase/setup-cli@v1",
+    "BACKUP_REASON: ${{ inputs.reason }}",
+    "--arg value \"$BACKUP_REASON\"",
     "version: 2.111.0",
     "--role-only",
     "--data-only",
@@ -53,7 +63,12 @@ if (exists(".github/workflows/restore-rehearsal.yml")) {
   const source = read(".github/workflows/restore-rehearsal.yml");
   for (const fragment of [
     "workflow_dispatch:",
+    `actions/checkout@${pins.checkout}`,
+    `actions/setup-node@${pins.setupNode}`,
+    "persist-credentials: false",
     "confirm_recovery_target",
+    "CONFIRM_RECOVERY_TARGET: ${{ inputs.confirm_recovery_target }}",
+    "BACKUP_OBJECT_KEY: ${{ inputs.backup_object_key }}",
     "kllwwurklumhawfsilpd",
     "BACKUP_AGE_IDENTITY",
     "psql --single-transaction",
@@ -86,4 +101,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("Backup/recovery foundation verification passed.");
+console.log("Backup/recovery foundation verification passed with immutable Actions and input-to-env guards.");
