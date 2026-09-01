@@ -45,6 +45,7 @@ export async function GET() {
   let database: CheckStatus = 'unavailable'
   let storage: CheckStatus = 'unavailable'
   let operations: CheckStatus = 'unavailable'
+  let payments: CheckStatus = 'unavailable'
 
   try {
     const admin = getSupabaseAdmin()
@@ -92,15 +93,20 @@ export async function GET() {
     }
 
     if (database === 'ok') {
-      const { data: operationalHealth, error: operationalHealthError } = await admin.rpc(
-        'operational_event_health',
-        { p_window_minutes: 15, p_threshold: 5 },
-      )
+      const [operationalHealthResult, paymentHealthResult] = await Promise.all([
+        admin.rpc('operational_event_health', {
+          p_window_minutes: 15,
+          p_threshold: 5,
+        }),
+        admin.rpc('service_payment_reconciliation_health', {
+          p_stale_minutes: 10,
+        }),
+      ])
 
-      if (operationalHealthError) {
+      if (operationalHealthResult.error) {
         await reportOperationalError(
           'readiness.operational_event_health_failed',
-          operationalHealthError,
+          operationalHealthResult.error,
           {
             component: 'readiness',
             operation: 'operational-event-health-check',
@@ -108,8 +114,27 @@ export async function GET() {
           },
         )
       } else {
-        const row = Array.isArray(operationalHealth) ? operationalHealth[0] : operationalHealth
+        const row = Array.isArray(operationalHealthResult.data)
+          ? operationalHealthResult.data[0]
+          : operationalHealthResult.data
         operations = row?.status === 'degraded' ? 'degraded' : row?.status === 'ok' ? 'ok' : 'unavailable'
+      }
+
+      if (paymentHealthResult.error) {
+        await reportOperationalError(
+          'readiness.payment_reconciliation_health_failed',
+          paymentHealthResult.error,
+          {
+            component: 'payments',
+            operation: 'payment-reconciliation-health-check',
+            route: '/api/health',
+          },
+        )
+      } else {
+        const row = Array.isArray(paymentHealthResult.data)
+          ? paymentHealthResult.data[0]
+          : paymentHealthResult.data
+        payments = row?.status === 'degraded' ? 'degraded' : row?.status === 'ok' ? 'ok' : 'unavailable'
       }
     }
   } catch (error) {
@@ -120,8 +145,9 @@ export async function GET() {
     })
   }
 
-  const checks = { database, storage, operations }
-  const healthy = database === 'ok' && storage === 'ok' && operations === 'ok'
+  const checks = { database, storage, operations, payments }
+  const healthy =
+    database === 'ok' && storage === 'ok' && operations === 'ok' && payments === 'ok'
   const uploadScannerConfiguration = validateUploadScannerConfiguration()
 
   return NextResponse.json(

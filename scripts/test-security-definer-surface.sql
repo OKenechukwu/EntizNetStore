@@ -135,15 +135,17 @@ begin
 end;
 $$;
 
--- External payment initialization is service authority only. Browser roles can
--- select their own checkout through RLS, but cannot claim a processor attempt,
--- attach a provider identity or manipulate an ambiguous reconciliation state.
+-- External payment initialization and reconciliation health are service
+-- authority only. Browser roles can select their own checkout through RLS, but
+-- cannot claim a processor attempt, attach provider identity, manipulate an
+-- ambiguous reconciliation state, or inspect reconciliation counts.
 do $$
 declare
   service_fns regprocedure[] := array[
     'public.service_claim_checkout_payment_initialization(uuid,uuid,uuid)'::regprocedure,
     'public.service_attach_checkout_payment_reference(uuid,uuid,uuid,text,text)'::regprocedure,
-    'public.service_mark_checkout_payment_initialization_uncertain(uuid,uuid,uuid)'::regprocedure
+    'public.service_mark_checkout_payment_initialization_uncertain(uuid,uuid,uuid)'::regprocedure,
+    'public.service_payment_reconciliation_health(integer)'::regprocedure
   ];
   fn regprocedure;
   definition text;
