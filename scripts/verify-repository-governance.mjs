@@ -73,6 +73,34 @@ if (dependabot) {
   if (/open-pull-requests-limit:\s*(?:[6-9]|\d{2,})\b/.test(dependabot)) {
     fail("Dependabot pull-request concurrency must remain bounded at five or fewer per ecosystem");
   }
+
+  if (/open-pull-requests-limit:\s*0\b/.test(dependabot)) {
+    fail("Routine Dependabot patch/minor surveillance must remain enabled during launch hardening");
+  }
+
+  const ecosystemBlocks = dependabot
+    .split(/\n(?=\s*- package-ecosystem:)/)
+    .filter((block) => /package-ecosystem:/.test(block));
+
+  for (const ecosystem of ["npm", "github-actions"]) {
+    const block = ecosystemBlocks.find((candidate) =>
+      new RegExp(`package-ecosystem:\\s*["']?${ecosystem.replace("-", "\\-")}["']?\\s*$`, "m").test(candidate),
+    );
+    if (!block) {
+      fail(`Dependabot configuration lost ${ecosystem} update block`);
+      continue;
+    }
+
+    for (const fragment of [
+      "ignore:",
+      'dependency-name: "*"',
+      'update-types: ["version-update:semver-major"]',
+    ]) {
+      if (!block.includes(fragment)) {
+        fail(`Dependabot ${ecosystem} block must suppress routine major version updates: ${fragment}`);
+      }
+    }
+  }
 }
 
 const requiredCheckContexts = [
@@ -113,6 +141,8 @@ if (supplyChainDoc) {
     "full 40-character commit SHA",
     "persist-credentials: false",
     "workflow_dispatch inputs",
+    "Routine major-version version updates are suppressed",
+    "security updates are not treated as routine version-update majors",
   ]) {
     if (!supplyChainDoc.includes(phrase)) {
       fail(`Repository supply-chain runbook lost required guidance: ${phrase}`);
@@ -223,5 +253,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Repository governance verification passed (${workflowNames.length} workflow files scanned; ${requiredCheckContexts.length} required check contexts frozen; ${ACTION_PINS.size} approved Action packages pinned).`,
+  `Repository governance verification passed (${workflowNames.length} workflow files scanned; ${requiredCheckContexts.length} required check contexts frozen; ${ACTION_PINS.size} approved Action packages pinned; routine major version updates suppressed).`,
 );

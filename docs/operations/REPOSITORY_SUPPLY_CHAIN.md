@@ -19,6 +19,10 @@ CODEOWNERS is not itself an enforcement mechanism. Code-owner review becomes man
 
 Both ecosystems are deliberately bounded to five open update PRs so dependency maintenance cannot flood the release queue. Security fixes should still be prioritized independently of the weekly version-update cadence when GitHub raises them.
 
+Routine major-version version updates are suppressed for both npm and GitHub Actions during launch hardening. Patch and minor version updates remain visible, while framework/toolchain major upgrades such as TypeScript, Tailwind, Node typings or Action major migrations must be opened as deliberate engineering slices with migration notes and the full release gate.
+
+The major-version ignore entries use Dependabot's `version-update:semver-major` semantics. They govern routine version updates; security updates are not treated as routine version-update majors and must remain visible through the repository's Dependabot security-update path. A security update that requires a breaking major jump is therefore a security engineering event, not something to silence for launch convenience.
+
 Dependabot PRs must pass the same repository tests as ordinary engineering PRs. They do not receive privileged production credentials merely because the author is Dependabot.
 
 ## Immutable GitHub Actions
