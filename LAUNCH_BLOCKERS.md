@@ -1,6 +1,6 @@
 # EntizNetStore — Canonical Launch Blockers
 
-Last reviewed: **2026-08-31**
+Last reviewed: **2026-09-01**
 
 This file is the production launch-readiness source of truth. A feature is not launch-cleared because its UI works; launch gates require authorization, failure handling, operational ownership and reproducible evidence.
 
@@ -91,18 +91,29 @@ Still required:
 - secret rotation/revocation procedure for every privileged integration.
 
 ## P0-03 — Production payment processor E2E
-**Status: IN PROGRESS — INTERNAL COMMERCE AUTHORITY VERIFIED; EXTERNAL PROCESSOR PENDING**
+**Status: IN PROGRESS — PAYMENT AUTHORITY + RECONCILIATION DETECTION BUILT; EXTERNAL PROCESSOR PENDING**
 
-Verified: canonical trusted pricing/quote/checkout, inventory reservation, payment state machine, provider-neutral idempotency, webhook dedup/terminal rules and fail-closed `unconfigured` behavior.
+Verified engineering authority:
+
+- canonical trusted pricing/quote/checkout and inventory reservation;
+- provider-neutral payment state machine, webhook deduplication and terminal-state rules;
+- fail-closed `unconfigured` payment behavior;
+- PR #44 production payment-initialization authority: service-only durable processor claim, exact-attempt provider binding, provider-native idempotency contract, Buyer cancellation lockout after claim, retired direct provider-reference mutation, unique provider/reference identity and real 8-connection claim-race regression;
+- ambiguous processor outcomes remain reconciliation-locked rather than automatically releasing inventory or authorizing a retry;
+- PR #45 adds service-only reconciliation health: explicit uncertainty degrades immediately and an active claimed-but-unbound initialization degrades after a bounded 10-minute grace window, while provider-bound customer-action states and paid/failed/cancelled terminal sessions are excluded;
+- public readiness exposes only bounded payment status; diagnostic counts remain service-role only;
+- the exact-SHA production smoke requires payment reconciliation health to be `ok`, feeding the existing scheduled incident workflow.
+
+PR #44 production evidence: `docs/operations/PAYMENT_AUTHORITY_PRODUCTION_EVIDENCE_2026-09-01.md`.
 
 Still required:
 
 - select approved processor/legal entity;
-- implement the production adapter against the existing state machine;
-- deployed sandbox initialization;
+- implement/activate the production adapter against the existing authority model;
+- deployed sandbox initialization with the provider-native idempotency key;
 - signed callback retry/duplicate/out-of-order tests;
 - refund/partial-refund verification as launch scope requires;
-- reconciliation and money-movement alerting.
+- provider-specific reconciliation, settlement/money-movement alerting and operator rehearsal.
 
 ## P0-04 — Authorization/RLS deployed regression
 **Status: VERIFIED**
@@ -132,38 +143,49 @@ Verified/implemented:
 
 - Vercel project `entiznetstore` linked to the canonical GitHub repo;
 - Vercel team is on Pro;
-- exact-SHA deployment verification, DB/Storage/operations health and production runtime-log checks;
+- exact-SHA deployment verification, DB/Storage/operations/payment readiness and production runtime-log checks;
 - production smoke can fail on deployed-version drift rather than accepting a healthy stale release;
 - scheduled production monitor binds health to the exact `main` SHA and retries through a short deployment-convergence window;
 - manual-only bounded production read-capacity gate hard-bound to `main`, the canonical production origin and exact deployed SHA;
 - capacity probe is limited to `GET /` + `GET /api/health`, max concurrency 25 and max 500 total requests;
 - Node 22/npm lockfile/runtime controls;
 - noindex remains default until public-launch switch;
-- M4A and subsequent release-hardening production deployments healthy.
+- M4A and subsequent release-hardening production deployments healthy;
+- `docs/operations/MAIN_BRANCH_PROTECTION_GATE.md` records the observed unprotected state and exact six required GitHub check contexts instead of relying on workflow-display-name guesses.
 
 Still required:
 
 - enable GitHub `main` branch protection/ruleset so routine direct pushes, force pushes and branch deletion cannot bypass the PR/status-check release path;
+- verify the active rule through GitHub read APIs and prove one low-risk PR is actually blocked until required checks pass;
 - canonical owned launch domain + DNS/HTTPS;
 - execute and record the bounded capacity rehearsal at the approved launch envelope;
 - final environment-secret isolation/CSP review after external providers are selected;
 - final rollback/release rehearsal on the owned domain;
 - set `SITE_INDEXING_ENABLED=true` only at intentional public launch.
 
-Runbooks: `docs/operations/PRODUCTION_RELEASE.md` and `docs/operations/PRODUCTION_CAPACITY.md`.
+Runbooks: `docs/operations/PRODUCTION_RELEASE.md`, `docs/operations/PRODUCTION_CAPACITY.md` and `docs/operations/MAIN_BRANCH_PROTECTION_GATE.md`.
 
 ## P0-07 — Observability and commerce incident response
-**Status: IN PROGRESS — CORE MONITORING + RELEASE-DRIFT DETECTION VERIFIED; EXTERNAL ALERT OWNERSHIP PENDING**
+**Status: IN PROGRESS — CORE MONITORING + PAYMENT RECONCILIATION DETECTION BUILT; EXTERNAL ALERT OWNERSHIP PENDING**
 
-Verified: DB/Storage/operations health, bounded redacted operational events, 30-day private event ledger, 15-minute production monitor, exact-main deployment-drift detection, convergence retries, GitHub incident automation, incident runbook and production runtime error inspection.
+Verified engineering:
+
+- DB/Storage/operations health;
+- bounded redacted operational events and 30-day private event ledger;
+- 15-minute production monitor, exact-main deployment-drift detection, convergence retries and GitHub incident automation;
+- incident runbook and production runtime error inspection;
+- PR #45 extends readiness with a service-only payment reconciliation detector and bounded public `checks.payments` status, so explicit uncertainty or a stale unbound initialization makes the canonical smoke fail without leaking payment identifiers;
+- incident guidance explicitly forbids clearing/replacing a durable claim or blindly repeating provider creation while external side effects are uncertain.
 
 Still required:
 
 - external alert/log-drain/SIEM destination and ownership;
 - final escalation/on-call path;
-- payment/refund/payout reconciliation alerts after provider selection;
+- provider-specific payment/refund/payout settlement/reconciliation alerts after provider selection;
 - EntizNet signing/integration failure alerts after production signing;
 - recorded incident + recovery rehearsal on final launch configuration.
+
+Runbook: `docs/operations/INCIDENT_RESPONSE.md`.
 
 ## P0-08 — EntizNet identity/capability production integration
 **Status: IN PROGRESS — CONTRACT VERIFIED; PRODUCTION SIGNING/E2E PENDING**
@@ -220,7 +242,7 @@ Finalize launch terms/privacy, returns/refunds, Seller policies, prohibited/rest
 6. **P0-06:** enable `main` protection, execute bounded capacity evidence, configure owned domain, perform final provider-aware CSP/env audit, rollback rehearsal and indexing switch.
 7. **P0-02:** closes as the secret/rotation ownership gate across the integrations above.
 
-P0-04 and P0-10 are now reusable regression gates, not unresolved feature defects. M4A is production-complete.
+P0-04 and P0-10 are reusable regression gates, not unresolved feature defects. M4A is production-complete. Internal payment initialization/reconciliation authority is now substantially hardened; real provider activation remains intentionally blocked until P0-03's external requirements are satisfied.
 
 # Verification discipline
 
