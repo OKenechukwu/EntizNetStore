@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shouldSendNoIndex } from "@/lib/launch/publicIndexing";
-import { evaluateRequestIntegrity } from "@/lib/security/requestIntegrity";
+import { evaluateRequestIntegrity, resolveRequestOrigin } from "@/lib/security/requestIntegrity";
 import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
   const integrity = evaluateRequestIntegrity({
     method: request.method,
     pathname: request.nextUrl.pathname,
-    requestOrigin: request.nextUrl.origin,
+    requestOrigin: resolveRequestOrigin({
+      requestOrigin: request.nextUrl.origin,
+      hostHeader: request.headers.get("host"),
+    }),
     originHeader: request.headers.get("origin"),
     secFetchSite: request.headers.get("sec-fetch-site"),
   });
