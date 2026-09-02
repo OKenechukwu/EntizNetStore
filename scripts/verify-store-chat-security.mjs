@@ -28,10 +28,17 @@ for (const required of [
   if (!migration.includes(required)) fail(`migration is missing: ${required}`);
 }
 
-if (/p_recipient|recipient[_ ]?id/i.test(migration.match(/create or replace function public\.send_store_message[\s\S]*?\$\$;/)?.[0] ?? "")) {
-  fail("send_store_message must not accept or derive authority from a caller-supplied recipient");
+const sendSignature = migration.match(
+  /create or replace function public\.send_store_message\(([\s\S]*?)\)\nreturns uuid/i,
+)?.[1];
+if (!sendSignature) fail("unable to inspect send_store_message signature");
+if (/recipient|order[_ ]?id/i.test(sendSignature)) {
+  fail("send_store_message must not accept caller-supplied recipient/order authority");
 }
-if (!migration.includes("v_recipient := v_conversation.participant2_id") || !migration.includes("v_recipient := v_conversation.participant1_id")) {
+if (
+  !migration.includes("v_recipient := v_conversation.participant2_id") ||
+  !migration.includes("v_recipient := v_conversation.participant1_id")
+) {
   fail("send_store_message must derive the recipient from canonical conversation participants");
 }
 
