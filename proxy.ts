@@ -1,8 +1,35 @@
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { shouldSendNoIndex } from "@/lib/launch/publicIndexing";
+import { evaluateRequestIntegrity } from "@/lib/security/requestIntegrity";
 import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
+  const integrity = evaluateRequestIntegrity({
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    requestOrigin: request.nextUrl.origin,
+    originHeader: request.headers.get("origin"),
+    secFetchSite: request.headers.get("sec-fetch-site"),
+  });
+
+  // Reject cross-origin browser mutations before session refresh or route code
+  // can perform an authenticated side effect. Signed/provider ingress has a
+  // deliberately small exact-path exemption list in requestIntegrity.ts.
+  if (!integrity.allowed) {
+    const response = NextResponse.json(
+      { error: "Forbidden" },
+      {
+        status: 403,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    return response;
+  }
+
   // Preserve the exact response returned by the Supabase session refresher so
   // rotated auth cookies remain synchronized between browser and server.
   const response = await updateSupabaseSession(request);

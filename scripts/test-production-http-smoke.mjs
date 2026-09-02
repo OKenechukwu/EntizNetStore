@@ -103,6 +103,36 @@ await request('/api/kyc/status', 401, (body) => {
 await request('/api/integrations/entiznet/admin/health', 401)
 await request('/api/integrations/entiznet/admin/accounts', 401)
 
+// Prove the deployed cross-site mutation request-integrity boundary without a
+// session or any mutation-capable payload. If the proxy guard disappears this
+// route falls through to 401; the release gate requires a proxy-level 403.
+let crossSiteMutationResponse
+try {
+  crossSiteMutationResponse = await fetch(new URL('/api/buyer/profile', baseUrl), {
+    method: 'PATCH',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'EntizNetStore-release-smoke/1.0',
+      'Content-Type': 'application/json',
+      Origin: 'https://csrf.invalid',
+    },
+    body: '{}',
+  })
+} catch (error) {
+  fail(`/api/buyer/profile cross-site mutation probe failed: ${error instanceof Error ? error.message : 'unknown fetch error'}`)
+}
+
+if (crossSiteMutationResponse) {
+  if (crossSiteMutationResponse.status !== 403) {
+    fail(`/api/buyer/profile cross-site mutation expected HTTP 403, got ${crossSiteMutationResponse.status}`)
+  }
+  expectNoStore(crossSiteMutationResponse, '/api/buyer/profile cross-site mutation')
+  const body = await crossSiteMutationResponse.json().catch(() => null)
+  if (body?.error !== 'Forbidden') {
+    fail('/api/buyer/profile cross-site mutation did not fail at the request-integrity boundary')
+  }
+}
+
 const rootResponse = await fetch(new URL('/', baseUrl), {
   redirect: 'manual',
   headers: { 'User-Agent': 'EntizNetStore-release-smoke/1.0' },
