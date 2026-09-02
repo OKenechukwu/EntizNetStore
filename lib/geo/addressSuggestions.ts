@@ -7,10 +7,11 @@ const UPSTREAM_TIMEOUT_MS = 3_500;
 
 export type AddressSuggestionProvider = "photon_demo" | "deterministic";
 
-type AddressSuggestionEnvironment = Pick<
-  NodeJS.ProcessEnv,
-  "ADDRESS_SUGGEST_PROVIDER" | "CI" | "VERCEL_ENV"
->;
+type AddressSuggestionEnvironment = {
+  ADDRESS_SUGGEST_PROVIDER?: string;
+  CI?: string;
+  VERCEL_ENV?: string;
+};
 
 type PhotonFeature = {
   properties?: {
@@ -119,7 +120,7 @@ export async function fetchAddressSuggestions(
   const query = normalizeAddressQuery(rawQuery);
   if (!query) return [];
 
-  const env = options.env ?? process.env;
+  const env: AddressSuggestionEnvironment = options.env ?? process.env;
   const provider = options.provider ?? configuredAddressSuggestionProvider(env);
   if (provider === "deterministic") return deterministicSuggestions(query, env);
 
