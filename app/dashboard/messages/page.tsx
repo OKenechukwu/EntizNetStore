@@ -16,24 +16,42 @@ type MessageAttachment = {
 
 type Message = {
   id: string;
-  sender_id: string;
-  recipient_id: string;
+  conversationId: string;
+  senderId: string;
+  recipientId: string;
   content: string;
-  created_at: string;
-  attachments?: MessageAttachment[];
+  createdAt: string;
+  readAt: string | null;
+  attachments: MessageAttachment[];
+};
+
+type Counterpart = {
+  id: string;
+  role: "shopper" | "seller" | "business_buyer" | "business_supplier";
+  displayName: string;
+  kind: "shopper" | "seller" | "business";
+  logoUrl: string | null;
+  storeSlug: string | null;
+  businessKind: string | null;
 };
 
 type Conversation = {
-  other_user: {
+  id: string;
+  subject: string | null;
+  status: "active" | "closed";
+  context: {
+    type: "product" | "storefront" | "order" | "wholesale_offer";
     id: string;
-    email: string;
   };
-  last_message: {
+  counterpart: Counterpart;
+  lastMessage: {
     id: string;
     content: string;
-    created_at: string;
-  };
-  unread_count: number;
+    createdAt: string;
+    fromMe: boolean;
+  } | null;
+  unreadCount: number;
+  updatedAt: string | null;
 };
 
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
@@ -49,9 +67,10 @@ export default function MessagesPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
+  const initialConversationHandled = useRef(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -73,10 +92,10 @@ export default function MessagesPage() {
     if (!user) return;
     const interval = window.setInterval(() => {
       void loadConversations(false);
-      if (selectedConversation) void loadMessages(selectedConversation, false);
+      if (selectedConversationId) void loadMessages(selectedConversationId, false);
     }, 12000);
     return () => window.clearInterval(interval);
-  }, [user, selectedConversation]);
+  }, [user, selectedConversationId]);
 
   async function loadConversations(showLoading = true) {
     if (!user) return;
@@ -85,30 +104,57 @@ export default function MessagesPage() {
       const response = await fetch("/api/messages/conversations", { cache: "no-store" });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Unable to load conversations");
-      setConversations(Array.isArray(result.conversations) ? result.conversations : []);
+      const next = Array.isArray(result.conversations) ? (result.conversations as Conversation[]) : [];
+      setConversations(next);
+
+      if (!initialConversationHandled.current) {
+        initialConversationHandled.current = true;
+        const requested = new URLSearchParams(window.location.search).get("conversation");
+        if (requested && next.some((conversation) => conversation.id === requested)) {
+          setSelectedConversationId(requested);
+          void loadMessages(requested);
+        }
+      }
     } catch (caught) {
-      console.error("Conversation loading failed:", caught);
       setError(caught instanceof Error ? caught.message : "Unable to load conversations");
     } finally {
       if (showLoading) setIsLoading(false);
     }
   }
 
-  async function loadMessages(otherUserId: string, showLoading = true) {
+  async function loadMessages(conversationId: string, showLoading = true) {
     if (!user) return;
     if (showLoading) setConversationLoading(true);
     try {
-      const response = await fetch(`/api/messages/conversation/${otherUserId}`, { cache: "no-store" });
+      const response = await fetch(`/api/messages/conversations/${conversationId}`, {
+        cache: "no-store",
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Unable to load messages");
       setMessages(Array.isArray(result.messages) ? result.messages : []);
       void loadConversations(false);
     } catch (caught) {
-      console.error("Message loading failed:", caught);
       setError(caught instanceof Error ? caught.message : "Unable to load messages");
     } finally {
       if (showLoading) setConversationLoading(false);
     }
+  }
+
+  function selectConversation(conversationId: string) {
+    setError(null);
+    setSelectedConversationId(conversationId);
+    const url = new URL(window.location.href);
+    url.searchParams.set("conversation", conversationId);
+    window.history.replaceState({}, "", url.pathname + url.search);
+    void loadMessages(conversationId);
+  }
+
+  function closeConversation() {
+    setSelectedConversationId(null);
+    setMessages([]);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("conversation");
+    window.history.replaceState({}, "", url.pathname + url.search);
   }
 
   function selectFile(file: File | undefined) {
@@ -117,11 +163,7 @@ export default function MessagesPage() {
       setSelectedFile(null);
       return;
     }
-    if (
-      !ATTACHMENT_TYPES.has(file.type.toLowerCase()) ||
-      file.size <= 0 ||
-      file.size > MAX_ATTACHMENT_BYTES
-    ) {
+    if (!ATTACHMENT_TYPES.has(file.type.toLowerCase()) || file.size <= 0 || file.size > MAX_ATTACHMENT_BYTES) {
       setSelectedFile(null);
       if (fileInput.current) fileInput.current.value = "";
       setError("Attachments must be PDF, JPEG, PNG, or WebP and no larger than 15MB.");
@@ -131,7 +173,7 @@ export default function MessagesPage() {
   }
 
   async function sendMessage() {
-    if (!selectedConversation || isSending) return;
+    if (!selectedConversationId || isSending) return;
     const text = newMessage.trim();
     if (!text && !selectedFile) return;
 
@@ -142,7 +184,7 @@ export default function MessagesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipientId: selectedConversation,
+          conversationId: selectedConversationId,
           content: text || "Shared an attachment",
           messageType: "text",
         }),
@@ -163,8 +205,7 @@ export default function MessagesPage() {
         const attachmentResult = await attachmentResponse.json().catch(() => ({}));
         if (!attachmentResponse.ok) {
           throw new Error(
-            attachmentResult.error ||
-              "The message was sent, but its attachment could not be uploaded.",
+            attachmentResult.error || "The message was sent, but its attachment could not be uploaded.",
           );
         }
       }
@@ -173,13 +214,12 @@ export default function MessagesPage() {
       setSelectedFile(null);
       if (fileInput.current) fileInput.current.value = "";
       await Promise.all([
-        loadMessages(selectedConversation, false),
+        loadMessages(selectedConversationId, false),
         loadConversations(false),
       ]);
     } catch (caught) {
-      console.error("Message sending failed:", caught);
       setError(caught instanceof Error ? caught.message : "Unable to send message");
-      if (selectedConversation) void loadMessages(selectedConversation, false);
+      if (selectedConversationId) void loadMessages(selectedConversationId, false);
     } finally {
       setIsSending(false);
     }
@@ -205,20 +245,16 @@ export default function MessagesPage() {
   }
 
   const activeConversation = useMemo(
-    () => conversations.find((item) => item.other_user.id === selectedConversation),
-    [conversations, selectedConversation],
+    () => conversations.find((item) => item.id === selectedConversationId) ?? null,
+    [conversations, selectedConversationId],
   );
-
-  const activeName = activeConversation
-    ? activeConversation.other_user.email?.split("@")[0] || "Member"
-    : "";
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center" aria-live="polite">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="opacity-80">Loading messages...</p>
+          <p className="opacity-80">Loading messages…</p>
         </div>
       </div>
     );
@@ -236,14 +272,18 @@ export default function MessagesPage() {
 
       <div className="h-[calc(100vh-210px)] min-h-[520px] flex glass-card overflow-hidden">
         <aside
-          className={`${selectedConversation ? "hidden md:flex" : "flex"} w-full md:w-1/3 border-r border-accent-gold/20 flex-col`}
+          aria-label="Conversations"
+          className={`${selectedConversationId ? "hidden md:flex" : "flex"} w-full md:w-1/3 border-r border-accent-gold/20 flex-col`}
         >
           <div className="p-4 border-b border-accent-gold/20 flex items-center justify-between gap-3">
-            <h1 className="font-serif text-xl font-bold text-accent-gold">Messages</h1>
+            <div>
+              <h1 className="font-serif text-xl font-bold text-accent-gold">Messages</h1>
+              <p className="mt-1 text-xs opacity-60">Marketplace conversations only</p>
+            </div>
             <button
               type="button"
               onClick={() => void loadConversations()}
-              className="text-xs opacity-70 hover:opacity-100"
+              className="min-h-11 rounded-md px-3 text-xs opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold"
             >
               Refresh
             </button>
@@ -252,42 +292,42 @@ export default function MessagesPage() {
           <div className="flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
               <div className="p-6 text-center">
-                <p className="opacity-60 mb-4">No conversations yet</p>
+                <p className="opacity-60 mb-4">No conversations yet.</p>
+                <p className="text-sm opacity-60 mb-4">Start from a product, store, wholesale offer, or order.</p>
                 <Link href="/store" className="luxury-button-outline px-4 py-2">
                   Browse Products
                 </Link>
               </div>
             ) : (
               conversations.map((conversation) => {
-                const isActive = selectedConversation === conversation.other_user.id;
-                const name = conversation.other_user.email?.split("@")[0] || "Member";
+                const isActive = selectedConversationId === conversation.id;
                 return (
                   <button
-                    key={conversation.other_user.id}
+                    key={conversation.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedConversation(conversation.other_user.id);
-                      void loadMessages(conversation.other_user.id);
-                    }}
-                    className={`w-full text-left p-4 border-b border-accent-gold/10 hover:bg-accent-gold/5 transition-colors ${
+                    onClick={() => selectConversation(conversation.id)}
+                    className={`w-full min-h-20 text-left p-4 border-b border-accent-gold/10 hover:bg-accent-gold/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-gold ${
                       isActive ? "bg-accent-gold/10" : ""
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h2 className="font-medium truncate">{name}</h2>
-                          {conversation.unread_count > 0 && (
-                            <span className="bg-accent-gold text-primary-black text-xs px-2 py-0.5 rounded-full">
-                              {conversation.unread_count}
+                          <h2 className="font-medium truncate">{conversation.counterpart.displayName}</h2>
+                          {conversation.unreadCount > 0 && (
+                            <span className="bg-accent-gold text-primary-black text-xs px-2 py-0.5 rounded-full" aria-label={`${conversation.unreadCount} unread messages`}>
+                              {conversation.unreadCount}
                             </span>
                           )}
                         </div>
+                        <p className="mt-1 text-xs opacity-55 capitalize">
+                          {conversation.context.type.replace("_", " ")}
+                        </p>
                         <p className="text-sm opacity-70 truncate mt-1">
-                          {conversation.last_message?.content || "Message"}
+                          {conversation.lastMessage?.content || "No messages yet"}
                         </p>
                         <p className="text-xs opacity-50 mt-1">
-                          {formatMessageTime(conversation.last_message?.created_at)}
+                          {formatMessageTime(conversation.lastMessage?.createdAt || conversation.updatedAt)}
                         </p>
                       </div>
                     </div>
@@ -298,61 +338,50 @@ export default function MessagesPage() {
           </div>
         </aside>
 
-        <section className={`${selectedConversation ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
-          {selectedConversation ? (
+        <section className={`${selectedConversationId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`} aria-label="Conversation">
+          {selectedConversationId && activeConversation ? (
             <>
               <div className="p-4 border-b border-accent-gold/20 flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedConversation(null);
-                    setMessages([]);
-                  }}
-                  className="md:hidden luxury-button-outline px-3 py-1.5"
+                  onClick={closeConversation}
+                  className="md:hidden luxury-button-outline px-3 py-2 min-h-11"
                 >
                   Back
                 </button>
                 <div className="min-w-0">
-                  <h2 className="font-semibold truncate">{activeName}</h2>
-                  <p className="text-xs opacity-55">Private conversation</p>
+                  <h2 className="font-semibold truncate">{activeConversation.counterpart.displayName}</h2>
+                  <p className="text-xs opacity-55">
+                    {activeConversation.subject || "Private marketplace conversation"}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4" aria-live="polite">
                 {conversationLoading ? (
                   <div className="h-full flex items-center justify-center opacity-60">Loading conversation…</div>
                 ) : messages.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-center opacity-60">
-                    Start the conversation below.
-                  </div>
+                  <div className="h-full flex items-center justify-center text-center opacity-60">Start the conversation below.</div>
                 ) : (
                   messages.map((message) => {
-                    const fromMe = message.sender_id === user.id;
+                    const fromMe = message.senderId === user.id;
                     return (
-                      <div
-                        key={message.id}
-                        className={`flex ${fromMe ? "justify-end" : "justify-start"}`}
-                      >
+                      <div key={message.id} className={`flex ${fromMe ? "justify-end" : "justify-start"}`}>
                         <div
                           className={`max-w-[85%] sm:max-w-md px-4 py-3 rounded-xl ${
-                            fromMe
-                              ? "bg-accent-gold text-primary-black"
-                              : "bg-charcoal/20 border border-accent-gold/20"
+                            fromMe ? "bg-accent-gold text-primary-black" : "bg-charcoal/20 border border-accent-gold/20"
                           }`}
                         >
                           <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
-
-                          {(message.attachments ?? []).length > 0 && (
+                          {message.attachments.length > 0 && (
                             <div className="mt-3 space-y-2">
-                              {(message.attachments ?? []).map((attachment) => (
+                              {message.attachments.map((attachment) => (
                                 <button
                                   key={attachment.id}
                                   type="button"
                                   onClick={() => void openAttachment(attachment)}
                                   className={`block w-full rounded-lg border px-3 py-2 text-left text-xs ${
-                                    fromMe
-                                      ? "border-black/20 bg-black/5 hover:bg-black/10"
-                                      : "border-accent-gold/20 bg-black/10 hover:bg-black/20"
+                                    fromMe ? "border-black/20 bg-black/5 hover:bg-black/10" : "border-accent-gold/20 bg-black/10 hover:bg-black/20"
                                   }`}
                                 >
                                   <span className="block font-medium break-all">{attachment.file_name}</span>
@@ -364,10 +393,7 @@ export default function MessagesPage() {
                               ))}
                             </div>
                           )}
-
-                          <p className="text-xs opacity-65 mt-2">
-                            {formatMessageTime(message.created_at)}
-                          </p>
+                          <p className="text-xs opacity-65 mt-2">{formatMessageTime(message.createdAt)}</p>
                         </div>
                       </div>
                     );
@@ -388,7 +414,7 @@ export default function MessagesPage() {
                         setSelectedFile(null);
                         if (fileInput.current) fileInput.current.value = "";
                       }}
-                      className="text-xs underline"
+                      className="min-h-11 px-2 text-xs underline"
                     >
                       Remove
                     </button>
@@ -398,9 +424,9 @@ export default function MessagesPage() {
                 <div className="flex gap-2 items-end">
                   <button
                     type="button"
-                    disabled={isSending}
+                    disabled={isSending || activeConversation.status !== "active"}
                     onClick={() => fileInput.current?.click()}
-                    className="luxury-button-outline px-3 py-2 disabled:opacity-50"
+                    className="luxury-button-outline min-h-11 px-3 py-2 disabled:opacity-50"
                     aria-label="Attach a file"
                     title="Attach PDF or image"
                   >
@@ -424,28 +450,30 @@ export default function MessagesPage() {
                       }
                     }}
                     maxLength={10000}
-                    placeholder="Type a message…"
-                    className="flex-1 resize-none px-4 py-2 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none"
+                    disabled={activeConversation.status !== "active"}
+                    placeholder={activeConversation.status === "active" ? "Type a message…" : "This conversation is closed"}
+                    aria-label="Message"
+                    className="flex-1 min-h-11 resize-none px-4 py-2 rounded-lg bg-charcoal/20 border border-accent-gold/30 focus:border-accent-gold focus:outline-none focus:ring-2 focus:ring-accent-gold/30 disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={() => void sendMessage()}
-                    disabled={(!newMessage.trim() && !selectedFile) || isSending}
-                    className="luxury-button px-4 py-2 disabled:opacity-50"
+                    disabled={activeConversation.status !== "active" || (!newMessage.trim() && !selectedFile) || isSending}
+                    className="luxury-button min-h-11 px-4 py-2 disabled:opacity-50"
                   >
                     {isSending ? "Sending…" : "Send"}
                   </button>
                 </div>
                 <p className="text-xs opacity-50">
-                  Attachments are private. PDF/JPEG/PNG/WebP only, up to 15MB. Press Shift+Enter for a new line.
+                  The original message is preserved securely. Translation controls will never replace the original text.
                 </p>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center opacity-60 px-6">
+            <div className="flex-1 flex items-center justify-center text-center px-6">
+              <div>
                 <p className="text-lg font-medium">Select a conversation</p>
-                <p className="text-sm mt-2">Messages and private attachments will appear here.</p>
+                <p className="mt-2 text-sm opacity-60">Your authorized marketplace conversations appear on the left.</p>
               </div>
             </div>
           )}
@@ -455,15 +483,16 @@ export default function MessagesPage() {
   );
 }
 
-function formatMessageTime(timestamp?: string) {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-  if (diffInHours < 24 && date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return date.toLocaleDateString([], { month: "short", day: "numeric", year: date.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+function formatMessageTime(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function formatFileSize(bytes: number) {
