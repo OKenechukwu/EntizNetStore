@@ -10,12 +10,13 @@
     "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-upload-safety-foundation.mjs && node scripts/verify-public-launch-foundation.mjs && node scripts/verify-request-integrity-foundation.mjs && npm run test:request-integrity && node scripts/verify-image-egress-foundation.mjs && node scripts/verify-browser-egress-service-boundary.mjs && node scripts/verify-address-suggestion-boundary.mjs && npm run test:address-suggestions && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs && node scripts/verify-actions-foundation.mjs && node scripts/verify-repository-governance.mjs && node scripts/verify-backup-recovery-foundation.mjs && node scripts/test-m4a-hosted-guard-contract.mjs",
+    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-upload-safety-foundation.mjs && node scripts/verify-public-launch-foundation.mjs && node scripts/verify-request-integrity-foundation.mjs && npm run test:request-integrity && node scripts/verify-image-egress-foundation.mjs && node scripts/verify-browser-egress-service-boundary.mjs && node scripts/verify-address-suggestion-boundary.mjs && npm run test:address-suggestions && node scripts/verify-store-chat-security.mjs && npm run test:message-crypto && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs && node scripts/verify-actions-foundation.mjs && node scripts/verify-repository-governance.mjs && node scripts/verify-backup-recovery-foundation.mjs && node scripts/test-m4a-hosted-guard-contract.mjs",
     "test:storage-recovery": "node --experimental-strip-types --test tests/storage-compensation.test.mts",
     "test:upload-scanner": "node --experimental-strip-types --test tests/upload-scanner.test.mts tests/upload-scanner-network-policy.test.mts",
     "test:launch-indexing": "node --experimental-strip-types --test tests/public-launch-indexing.test.mts",
     "test:request-integrity": "node --experimental-strip-types --test tests/request-integrity.test.mts",
     "test:address-suggestions": "node --experimental-strip-types --test tests/address-suggestions.test.mts",
+    "test:message-crypto": "node --experimental-strip-types --test tests/message-crypto.test.mts",
     "test:public-media-source": "node --experimental-strip-types --test tests/public-media-source.test.mts",
     "test:image-egress-config": "node --test tests/image-egress-config.test.mjs",
     "test:image-optimizer-egress": "node scripts/test-image-optimizer-egress.mjs",
@@ -51,7 +52,7 @@
     "autoprefixer": "^10.0.1",
     "eslint": "9.39.5",
     "eslint-config-next": "^16.3.1",
-    "postcss": "^8.0.0",
+    "postcss": "^10.0.1",
     "tailwindcss": "^3.3.0",
     "typescript": "^5.0.0"
   }
