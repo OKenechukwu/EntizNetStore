@@ -1,0 +1,59 @@
+name: Store Chat Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-chat-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  store-chat-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify static Store Chat authority boundary
+        run: node scripts/verify-store-chat-security.mjs
+
+      - name: Run message cryptography and rotation regression
+        run: npm run test:message-crypto
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1
+        with:
+          version: 2.111.0
+
+      - name: Start fresh local Supabase stack
+        run: supabase start
+
+      - name: Reproduce schema from repository migrations
+        run: supabase db reset --local
+
+      - name: Run canonical Store Chat database authority regression
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m5-store-chat-authority.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
