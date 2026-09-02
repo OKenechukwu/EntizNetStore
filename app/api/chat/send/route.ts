@@ -1,48 +1,21 @@
-// app/api/chat/send/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  try {
-    const { text, threadId, recipientId } = await req.json();
-
-    if (!text?.trim() || !threadId || !recipientId) {
-      return NextResponse.json(
-        { error: "text, threadId and recipientId are required" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const { data: message, error } = await supabase
-      .from("messages")
-      .insert({
-        sender_id: user.id,
-        recipient_id: recipientId,
-        content: text.trim(),
-        conversation_id: threadId,
-      })
-      .select("id, content")
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      ok: true,
-      messageId: message.id,
-      original: text.trim(),
-      translated: message.content,
-    });
-  } catch (error) {
-    console.error("Failed to send message:", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 }
-    );
-  }
+/**
+ * Retired legacy endpoint.
+ *
+ * This route previously accepted a caller-supplied recipientId and inserted
+ * plaintext message content directly into public.messages. Canonical Store Chat
+ * now uses POST /api/messages/send with a database-authorized conversationId.
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: "Legacy chat sending has been retired. Open a marketplace conversation before sending.",
+      code: "legacy_chat_send_retired",
+    },
+    {
+      status: 410,
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
 }
