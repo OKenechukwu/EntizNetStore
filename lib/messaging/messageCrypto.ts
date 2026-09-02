@@ -21,7 +21,7 @@ type WrappingKey = {
   key: Buffer;
 };
 
-type EnvelopeRow = {
+export type MessageKeyEnvelope = {
   conversation_id: string;
   wrapped_key: string;
   wrap_iv: string;
@@ -46,7 +46,9 @@ function deriveWrappingKey(secret: string) {
   if (secret.length < 24) {
     throw new Error("Message key-encryption material is too short");
   }
-  return Buffer.from(hkdfSync("sha256", Buffer.from(secret, "utf8"), HKDF_SALT, HKDF_INFO, KEY_BYTES));
+  return Buffer.from(
+    hkdfSync("sha256", Buffer.from(secret, "utf8"), HKDF_SALT, HKDF_INFO, KEY_BYTES),
+  );
 }
 
 function addCandidate(
@@ -85,9 +87,8 @@ function wrappingKeys(): WrappingKey[] {
 
   // Controlled rollout fallback: current production may still have only the
   // legacy service-role credential. Both Supabase server credential generations
-  // are retained as unwrap candidates so adding SUPABASE_SECRET_KEY does not
-  // strand envelopes created before the key migration. A dedicated message KEK
-  // should be installed and envelopes rewrapped before either fallback is removed.
+  // remain unwrap candidates so an incremental key migration cannot strand
+  // existing envelopes. Rewrap before removing an old fallback credential.
   addCandidate(candidates, process.env.SUPABASE_SECRET_KEY, undefined, "supabase-secret");
   addCandidate(
     candidates,
@@ -141,17 +142,22 @@ function decryptBuffer(payload: string, ivValue: string, key: Buffer, aad: Buffe
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
-function wrapDataKey(conversationId: string, dataKey: Buffer) {
+export function wrapConversationDataKey(conversationId: string, dataKey: Buffer) {
+  if (dataKey.length !== KEY_BYTES) {
+    throw new Error("Conversation data key must be 256 bits");
+  }
   const wrappingKey = primaryWrappingKey();
   const encrypted = encryptBuffer(dataKey, wrappingKey.key, envelopeAad(conversationId));
   return {
-    wrappedKey: encrypted.payload,
-    wrapIv: encrypted.iv,
-    kekId: wrappingKey.id,
-  };
+    conversation_id: conversationId,
+    wrapped_key: encrypted.payload,
+    wrap_iv: encrypted.iv,
+    kek_id: wrappingKey.id,
+    key_wrap_version: MESSAGE_KEY_WRAP_VERSION,
+  } satisfies MessageKeyEnvelope;
 }
 
-function unwrapDataKey(row: EnvelopeRow) {
+export function unwrapConversationDataKey(row: MessageKeyEnvelope) {
   if (row.key_wrap_version !== MESSAGE_KEY_WRAP_VERSION) {
     throw new Error("Unsupported conversation key-wrap version");
   }
@@ -179,22 +185,18 @@ async function readEnvelope(conversationId: string) {
     .eq("conversation_id", conversationId)
     .maybeSingle();
   if (error) throw new Error("Unable to load conversation key envelope");
-  return (data as EnvelopeRow | null) ?? null;
+  return (data as MessageKeyEnvelope | null) ?? null;
 }
 
 export async function getOrCreateConversationDataKey(conversationId: string) {
   const existing = await readEnvelope(conversationId);
-  if (existing) return unwrapDataKey(existing);
+  if (existing) return unwrapConversationDataKey(existing);
 
   const dataKey = randomBytes(KEY_BYTES);
-  const envelope = wrapDataKey(conversationId, dataKey);
+  const envelope = wrapConversationDataKey(conversationId, dataKey);
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("message_key_envelopes").insert({
-    conversation_id: conversationId,
-    wrapped_key: envelope.wrappedKey,
-    wrap_iv: envelope.wrapIv,
-    kek_id: envelope.kekId,
-    key_wrap_version: MESSAGE_KEY_WRAP_VERSION,
+    ...envelope,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -206,12 +208,12 @@ export async function getOrCreateConversationDataKey(conversationId: string) {
 
   const raced = await readEnvelope(conversationId);
   if (!raced) throw new Error("Conversation key initialization race could not be recovered");
-  return unwrapDataKey(raced);
+  return unwrapConversationDataKey(raced);
 }
 
 export async function getConversationDataKey(conversationId: string) {
   const envelope = await readEnvelope(conversationId);
-  return envelope ? unwrapDataKey(envelope) : null;
+  return envelope ? unwrapConversationDataKey(envelope) : null;
 }
 
 export function encryptConversationMessage(
@@ -219,6 +221,9 @@ export function encryptConversationMessage(
   plaintext: string,
   dataKey: Buffer,
 ) {
+  if (dataKey.length !== KEY_BYTES) {
+    throw new Error("Conversation data key must be 256 bits");
+  }
   const encrypted = encryptBuffer(
     Buffer.from(plaintext, "utf8"),
     dataKey,
@@ -237,6 +242,9 @@ export function decryptConversationMessage(
   iv: string,
   dataKey: Buffer,
 ) {
+  if (dataKey.length !== KEY_BYTES) {
+    throw new Error("Conversation data key must be 256 bits");
+  }
   return decryptBuffer(ciphertext, iv, dataKey, messageAad(conversationId)).toString("utf8");
 }
 
