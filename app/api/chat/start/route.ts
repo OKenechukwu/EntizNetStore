@@ -60,11 +60,10 @@ export async function POST(request: NextRequest) {
 
     logOperationalError("store_chat_open_failed", error || new Error(message), {
       component: "messaging",
-      operation: "open-store-conversation",
+      operation: `open-store-conversation:${context.contextType}`,
       route: "/api/chat/start",
       actorId: user.id,
       recordId: context.contextId,
-      metadata: { contextType: context.contextType },
     });
     return NextResponse.json({ error: "Unable to open conversation" }, { status: 500 });
   }
