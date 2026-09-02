@@ -1,8 +1,46 @@
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { shouldSendNoIndex } from "@/lib/launch/publicIndexing";
+import { evaluateRequestIntegrity, resolveRequestOrigin } from "@/lib/security/requestIntegrity";
 import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
+  const integrity = evaluateRequestIntegrity({
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    requestOrigin: resolveRequestOrigin({
+      requestOrigin: request.nextUrl.origin,
+      hostHeader: request.headers.get("host"),
+    }),
+    originHeader: request.headers.get("origin"),
+    secFetchSite: request.headers.get("sec-fetch-site"),
+  });
+
+  // Reject cross-origin browser mutations before session refresh or route code
+  // can perform an authenticated side effect. Signed/provider ingress has a
+  // deliberately small exact-path exemption list in requestIntegrity.ts.
+  if (!integrity.allowed) {
+    // Keep rejection telemetry useful but non-sensitive: never log cookies,
+    // bearer material, Origin values, query strings or request bodies here.
+    console.warn("[request-integrity] rejected API mutation", {
+      method: request.method,
+      pathname: request.nextUrl.pathname,
+      reason: integrity.reason,
+    });
+
+    const response = NextResponse.json(
+      { error: "Forbidden" },
+      {
+        status: 403,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    return response;
+  }
+
   // Preserve the exact response returned by the Supabase session refresher so
   // rotated auth cookies remain synchronized between browser and server.
   const response = await updateSupabaseSession(request);
