@@ -16,6 +16,14 @@ export async function proxy(request: NextRequest) {
   // can perform an authenticated side effect. Signed/provider ingress has a
   // deliberately small exact-path exemption list in requestIntegrity.ts.
   if (!integrity.allowed) {
+    // Keep rejection telemetry useful but non-sensitive: never log cookies,
+    // bearer material, Origin values, query strings or request bodies here.
+    console.warn("[request-integrity] rejected API mutation", {
+      method: request.method,
+      pathname: request.nextUrl.pathname,
+      reason: integrity.reason,
+    });
+
     const response = NextResponse.json(
       { error: "Forbidden" },
       {
