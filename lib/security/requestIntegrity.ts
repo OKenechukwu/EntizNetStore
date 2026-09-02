@@ -49,6 +49,48 @@ function normalizeOrigin(value: string) {
 }
 
 /**
+ * Next.js can internally canonicalize a request URL host (for example to
+ * localhost) even when the browser connected through another equivalent local
+ * hostname. Browser JavaScript cannot set the Host header, so use that header
+ * to reconstruct the browser-facing origin while preserving the runtime
+ * protocol. Invalid or ambiguous Host values fail back to the runtime origin.
+ */
+export function resolveRequestOrigin(input: {
+  requestOrigin: string;
+  hostHeader?: string | null;
+}) {
+  let runtimeOrigin: URL;
+  try {
+    runtimeOrigin = new URL(input.requestOrigin);
+  } catch {
+    return input.requestOrigin;
+  }
+
+  const rawHost = input.hostHeader?.trim();
+  if (!rawHost || rawHost.includes(",") || /[\s/@?#\\]/.test(rawHost)) {
+    return runtimeOrigin.origin;
+  }
+
+  try {
+    const candidate = new URL(`${runtimeOrigin.protocol}//${rawHost}`);
+    const canonicalHost = rawHost.toLowerCase();
+    if (
+      candidate.username ||
+      candidate.password ||
+      candidate.pathname !== "/" ||
+      candidate.search ||
+      candidate.hash ||
+      candidate.host !== canonicalHost
+    ) {
+      return runtimeOrigin.origin;
+    }
+    return candidate.origin;
+  } catch {
+    return runtimeOrigin.origin;
+  }
+}
+
+/**
  * Enforces browser request integrity for cookie-authenticated API mutations.
  *
  * Browser requests must prove same-origin through Fetch Metadata and/or the
