@@ -16,6 +16,27 @@ export type MarketplaceConversationIdentity = {
   businessKind: string | null;
 };
 
+type BuyerIdentityRow = {
+  id: string;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+type SellerIdentityRow = {
+  id: string;
+  storefront_name: string | null;
+  logo_url: string | null;
+  store_slug: string | null;
+};
+
+type BusinessIdentityRow = {
+  id: string;
+  display_name: string | null;
+  logo_url: string | null;
+  business_kind: string | null;
+};
+
 function safeName(value: unknown) {
   if (typeof value !== "string") return null;
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -25,7 +46,9 @@ function safeName(value: unknown) {
 export async function resolveMarketplaceConversationIdentities(
   participants: Array<{ id: string; role: MarketplaceConversationRole }>,
 ) {
-  const unique = new Map(participants.map((participant) => [participant.id, participant]));
+  const unique = new Map<string, { id: string; role: MarketplaceConversationRole }>(
+    participants.map((participant) => [participant.id, participant] as const),
+  );
   const ids = [...unique.keys()];
   const result = new Map<string, MarketplaceConversationIdentity>();
   if (!ids.length) return result;
@@ -44,28 +67,37 @@ export async function resolveMarketplaceConversationIdentities(
           .from("profiles_buyer")
           .select("id, display_name, first_name, last_name")
           .in("id", buyerIds)
-      : Promise.resolve({ data: [], error: null }),
+      : Promise.resolve({ data: [] as BuyerIdentityRow[], error: null }),
     sellerIds.length
       ? admin
           .from("profiles_seller")
           .select("id, storefront_name, logo_url, store_slug")
           .in("id", sellerIds)
-      : Promise.resolve({ data: [], error: null }),
+      : Promise.resolve({ data: [] as SellerIdentityRow[], error: null }),
     businessIds.length
       ? admin
           .from("profiles_business")
           .select("id, display_name, logo_url, business_kind")
           .in("id", businessIds)
-      : Promise.resolve({ data: [], error: null }),
+      : Promise.resolve({ data: [] as BusinessIdentityRow[], error: null }),
   ]);
 
   if (buyers.error || sellers.error || businesses.error) {
     throw new Error("Unable to resolve marketplace conversation identity");
   }
 
-  const buyerMap = new Map((buyers.data ?? []).map((row) => [row.id, row]));
-  const sellerMap = new Map((sellers.data ?? []).map((row) => [row.id, row]));
-  const businessMap = new Map((businesses.data ?? []).map((row) => [row.id, row]));
+  const buyerRows = (buyers.data ?? []) as BuyerIdentityRow[];
+  const sellerRows = (sellers.data ?? []) as SellerIdentityRow[];
+  const businessRows = (businesses.data ?? []) as BusinessIdentityRow[];
+  const buyerMap = new Map<string, BuyerIdentityRow>(
+    buyerRows.map((row) => [row.id, row] as const),
+  );
+  const sellerMap = new Map<string, SellerIdentityRow>(
+    sellerRows.map((row) => [row.id, row] as const),
+  );
+  const businessMap = new Map<string, BusinessIdentityRow>(
+    businessRows.map((row) => [row.id, row] as const),
+  );
 
   for (const participant of roles) {
     if (participant.role === "shopper") {
