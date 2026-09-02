@@ -18,8 +18,11 @@ function trustedSupabaseStorageBinding() {
 
     if (!isManagedSupabase && !isLoopbackSupabase) return null
 
+    const socketProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+
     return {
       origin: url.origin,
+      socketOrigin: `${socketProtocol}//${url.host}`,
       remotePatterns: PUBLIC_IMAGE_BUCKETS.map((bucket) => ({
         protocol: url.protocol.slice(0, -1),
         hostname: url.hostname,
@@ -40,18 +43,13 @@ if (!isProduction) scriptSources.push("'unsafe-eval'")
 const imageSources = ["'self'", 'data:', 'blob:']
 if (supabaseStorageBinding?.origin) imageSources.push(supabaseStorageBinding.origin)
 
-const connectSources = ["'self'", 'wss:', 'https:']
-try {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (supabaseUrl) {
-    const url = new URL(supabaseUrl)
-    connectSources.push(url.origin)
-    const socketProtocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : null
-    if (socketProtocol) connectSources.push(`${socketProtocol}//${url.host}`)
-  }
-} catch {
-  // Environment validation remains responsible for malformed service URLs.
-  // CSP falls back to the restrictive production defaults above.
+// Browser network egress is intentionally deny-by-default. The application
+// talks to its own Route Handlers and to its configured Supabase project for
+// SSR-auth/realtime. Payment providers are initialized server-side and use
+// top-level redirects, so they do not require connect-src access.
+const connectSources = ["'self'"]
+if (supabaseStorageBinding?.origin) {
+  connectSources.push(supabaseStorageBinding.origin, supabaseStorageBinding.socketOrigin)
 }
 
 const contentSecurityPolicy = [
