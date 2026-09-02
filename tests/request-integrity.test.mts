@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   evaluateRequestIntegrity,
   REQUEST_INTEGRITY_EXEMPT_PATHS,
+  resolveRequestOrigin,
 } from "../lib/security/requestIntegrity.ts";
 
 const requestOrigin = "https://store.example.com";
@@ -27,6 +28,48 @@ test("safe API methods are unaffected by cross-site browser metadata", () => {
 
 test("same-origin browser mutations are allowed", () => {
   assert.deepEqual(evaluate(), { allowed: true, protected: true, exempt: false });
+});
+
+test("browser-facing Host resolves a Next.js runtime host alias without weakening exact-origin proof", () => {
+  const browserFacingOrigin = resolveRequestOrigin({
+    requestOrigin: "http://localhost:3000",
+    hostHeader: "127.0.0.1:3000",
+  });
+  assert.equal(browserFacingOrigin, "http://127.0.0.1:3000");
+  assert.deepEqual(
+    evaluate({
+      requestOrigin: browserFacingOrigin,
+      originHeader: "http://127.0.0.1:3000",
+      secFetchSite: "same-origin",
+    }),
+    { allowed: true, protected: true, exempt: false },
+  );
+});
+
+test("malformed or ambiguous Host input cannot create a permissive origin target", () => {
+  for (const hostHeader of [
+    "store.example.com,attacker.example",
+    "user@store.example.com",
+    "store.example.com/path",
+    "store.example.com?x=1",
+  ]) {
+    assert.equal(
+      resolveRequestOrigin({ requestOrigin, hostHeader }),
+      requestOrigin,
+      hostHeader,
+    );
+  }
+
+  const decision = evaluate({
+    requestOrigin: resolveRequestOrigin({
+      requestOrigin,
+      hostHeader: "store.example.com,attacker.example",
+    }),
+    originHeader: "https://attacker.example",
+    secFetchSite: "same-origin",
+  });
+  assert.equal(decision.allowed, false);
+  if (!decision.allowed) assert.equal(decision.reason, "origin_mismatch");
 });
 
 test("cross-site browser mutations are rejected before route authentication", () => {
