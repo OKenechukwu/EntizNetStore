@@ -24,6 +24,14 @@ type PhotonPayload = {
   features?: unknown;
 };
 
+function runtimeAddressSuggestionEnvironment(): AddressSuggestionEnvironment {
+  return {
+    ADDRESS_SUGGEST_PROVIDER: process.env.ADDRESS_SUGGEST_PROVIDER,
+    CI: process.env.CI,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  };
+}
+
 export function normalizeAddressQuery(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -32,7 +40,7 @@ export function normalizeAddressQuery(value: unknown): string | null {
 }
 
 export function configuredAddressSuggestionProvider(
-  env: AddressSuggestionEnvironment = process.env,
+  env: AddressSuggestionEnvironment = runtimeAddressSuggestionEnvironment(),
 ): AddressSuggestionProvider {
   const configured = env.ADDRESS_SUGGEST_PROVIDER?.trim().toLowerCase();
   if (!configured || configured === "photon_demo") return "photon_demo";
@@ -120,7 +128,7 @@ export async function fetchAddressSuggestions(
   const query = normalizeAddressQuery(rawQuery);
   if (!query) return [];
 
-  const env: AddressSuggestionEnvironment = options.env ?? process.env;
+  const env = options.env ?? runtimeAddressSuggestionEnvironment();
   const provider = options.provider ?? configuredAddressSuggestionProvider(env);
   if (provider === "deterministic") return deterministicSuggestions(query, env);
 
