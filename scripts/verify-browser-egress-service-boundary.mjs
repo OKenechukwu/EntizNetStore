@@ -29,6 +29,12 @@ const privilegedNames = [
   "SUPABASE_SECRET_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
+const privilegedImportFragments = [
+  "/lib/supabase/admin",
+  "@/lib/supabase/admin",
+  "/lib/supabase/server",
+  "@/lib/supabase/server",
+];
 
 for (const relativePath of ["app", "components", "lib"].flatMap(walk)) {
   if (!/\.[cm]?[jt]sx?$/.test(relativePath)) continue;
@@ -38,6 +44,12 @@ for (const relativePath of ["app", "components", "lib"].flatMap(walk)) {
   for (const secretName of privilegedNames) {
     if (source.includes(secretName)) {
       fail(`Client module ${relativePath} references privileged environment name ${secretName}`);
+    }
+  }
+
+  for (const importFragment of privilegedImportFragments) {
+    if (source.includes(importFragment)) {
+      fail(`Client module ${relativePath} imports server-only module ${importFragment}`);
     }
   }
 }
@@ -120,12 +132,21 @@ try {
 
 const staticChunks = path.join(root, ".next", "static", "chunks");
 if (fs.existsSync(staticChunks)) {
+  const secretValues = privilegedNames
+    .map((name) => process.env[name])
+    .filter((value) => typeof value === "string" && value.length >= 16);
+
   for (const relativePath of walk(path.relative(root, staticChunks))) {
     if (!/\.js$/.test(relativePath)) continue;
     const source = read(relativePath);
     for (const secretName of privilegedNames) {
       if (source.includes(secretName)) {
         fail(`Built browser chunk ${relativePath} contains privileged environment name ${secretName}`);
+      }
+    }
+    for (const secretValue of secretValues) {
+      if (source.includes(secretValue)) {
+        fail(`Built browser chunk ${relativePath} contains a privileged Supabase credential value`);
       }
     }
   }
