@@ -1,4 +1,4 @@
-// Server-only Supabase Admin client (service role).
+// Server-only Supabase privileged client.
 // Must NEVER be imported from Client Components or any browser bundle.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
@@ -12,17 +12,19 @@ export function getSupabaseAdmin(): SupabaseClient {
   if (cached) return cached
 
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  // Intentionally server-only: never read a NEXT_PUBLIC_* variable for the service role.
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // Prefer Supabase's current backend-only secret key. Keep the legacy service
+  // role fallback during the controlled key migration; neither value may ever
+  // use a NEXT_PUBLIC_* name or enter a browser bundle.
+  const privilegedKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url) {
     throw new Error('Supabase URL is not configured')
   }
-  if (!serviceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured (server secret required)')
+  if (!privilegedKey) {
+    throw new Error('SUPABASE_SECRET_KEY or legacy SUPABASE_SERVICE_ROLE_KEY is required on the server')
   }
 
-  cached = createClient(url, serviceRoleKey, {
+  cached = createClient(url, privilegedKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

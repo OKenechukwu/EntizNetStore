@@ -4,130 +4,150 @@ Status: canonical production environment contract.
 
 ## Principles
 
-- Git contains names and placeholders only. Real credentials must live in the deployment platform, CI secret store, or an approved local `.env.local` file.
+- Git contains names and placeholders only. Real credentials live in the deployment platform, CI secret store, or an approved local `.env.local` file.
 - Any variable beginning with `NEXT_PUBLIC_` is browser-visible and must never contain a secret.
-- `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_SCANNER_TOKEN`, and every payment/payout-provider secret or signing key are server-only. They must never be imported into Client Components, logged, returned by APIs, embedded in build artifacts, or copied into mobile clients.
-- Local, preview, staging, and production environments use separate credentials/projects where supported.
+- `SUPABASE_SECRET_KEY`, legacy `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_SCANNER_TOKEN`, and every payment/payout-provider secret or signing key are server-only. They must never be imported into Client Components, logged, returned by APIs, embedded in browser/static artifacts, or copied into mobile clients.
+- Local, preview, staging, and production use separate credentials/projects where supported.
 - Rotate a credential immediately if it is committed, pasted into a public location, logged, or otherwise suspected of exposure.
 - EntizNetStore must remain safe when no payment or payout processor is configured. Processor onboarding is a launch gate, not a reason to ship mock money authorization.
-- EntizNetStore must also remain safe if malware scanning is unavailable. Uploads fail closed in quarantine; they must never be promoted to final storage merely because a scanner is missing or unhealthy.
-- Search indexing remains fail-closed until the intentional public Web V1 launch. A single environment-variable edit is not sufficient to make previews or production indexable.
+- Uploads fail closed when malware scanning is missing or unhealthy; quarantine objects are never promoted merely because a scanner is unavailable.
+- Search indexing remains fail-closed until the intentional public Web V1 launch.
+- Browser network egress is deny-by-default. A new browser SDK must justify and explicitly declare each external origin rather than widening CSP to a scheme such as `https:` or `wss:`.
 
 ## Required core variables
 
 | Variable | Scope | Required for | Notes |
 | --- | --- | --- | --- |
 | `SITE_INDEXING_ENABLED` | server/build configuration | public search indexing | Keep `false` until intentional public launch. Does not enable indexing by itself. |
-| `PUBLIC_LAUNCH_CONFIRMATION` | server/build configuration, non-secret | second public-launch interlock | Keep `NOT_CONFIRMED`; production indexing additionally requires exact `ENTIZNETSTORE_PUBLIC_WEB_V1` and Vercel `VERCEL_ENV=production`. |
-| `NEXT_PUBLIC_SUPABASE_URL` | browser/server, public | auth + data clients | Supabase project URL. Safe to expose. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser/server, public | RLS-protected Supabase access | Public anon key; authorization still relies on RLS. |
-| `SUPABASE_URL` | server | privileged server client | Normally the same project URL. Kept server-scoped to avoid privileged modules depending on browser config. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server secret** | trusted admin/payment/payout/upload operations | Bypasses RLS. Never expose to browsers/mobile clients. |
+| `PUBLIC_LAUNCH_CONFIRMATION` | server/build configuration, non-secret | second public-launch interlock | Keep `NOT_CONFIRMED`; production indexing additionally requires exact `ENTIZNETSTORE_PUBLIC_WEB_V1` and `VERCEL_ENV=production`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | browser/server, public | auth + RLS-protected Supabase access | Canonical project URL. Safe to expose. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser/server, public | **preferred** browser/SSR Supabase credential | Preferred current key for shipped clients. Authorization still relies on Auth/RLS/server authority. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser/server, public | legacy rollout fallback | Retained only while environments migrate to the publishable key. Remove after verified cutover. |
+| `SUPABASE_URL` | server, non-secret | privileged server client | Normally the same project URL. Keeps privileged modules independent from browser config. |
+| `SUPABASE_SECRET_KEY` | **server secret** | **preferred** privileged DB/storage/auth operations | Backend-only. Never expose through `NEXT_PUBLIC_*`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server secret** | legacy privileged-key fallback | Bypasses RLS. Retained only for controlled migration/rollback; remove after preferred key is proven. |
 | `UPLOAD_SCANNER_MODE` | server configuration | upload safety | Production value is `remote`. `deterministic` is CI/local regression only and is rejected in production outside CI. |
-| `UPLOAD_SCANNER_URL` | server configuration | remote malware scanner | Required for production upload acceptance. Must use HTTPS in production; credentials/query/fragment/redirect drift are refused. |
-| `UPLOAD_SCANNER_ALLOWED_ORIGINS` | server configuration | scanner egress pinning | Mandatory in production. Exact HTTPS origin allowlist; no path/query. Scanner URL must match before bytes/token leave the application. |
-| `UPLOAD_SCANNER_TOKEN` | **server secret** | authenticate remote scanner calls | Required in production remote mode. Sent only as a bearer token to the configured allowlisted scanner origin. |
-| `UPLOAD_SCANNER_TIMEOUT_MS` | server configuration | scanner timeout | Optional. Application bounds it to 1000–30000ms; default 12000ms. |
+| `UPLOAD_SCANNER_URL` | server configuration | remote malware scanner | Required for production upload acceptance; production requires HTTPS. |
+| `UPLOAD_SCANNER_ALLOWED_ORIGINS` | server configuration | scanner egress pinning | Mandatory in production. Exact HTTPS origin allowlist; no path/query. |
+| `UPLOAD_SCANNER_TOKEN` | **server secret** | authenticate remote scanner calls | Required in production remote mode. |
+| `UPLOAD_SCANNER_TIMEOUT_MS` | server configuration | scanner timeout | Optional; bounded to 1000–30000ms, default 12000ms. |
 | `PAYMENT_PROVIDER` | server configuration | buyer-payment adapter selection | Defaults to `unconfigured` until an approved processor is connected. |
-| `NEXT_PUBLIC_PAYMENT_PROVIDER` | browser, public | checkout UX capability state | Defaults to `unconfigured`; contains only a provider identifier, never credentials. |
-| `PAYOUT_PROVIDER` | server configuration | seller-payout adapter selection | Defaults to `unconfigured`; never causes an external transfer in that state. |
-| `PAYOUT_HOLD_DAYS` | server configuration | seller escrow release policy | Required only when a real payout adapter is enabled. Integer `0..365`; intentionally has no production default. |
+| `NEXT_PUBLIC_PAYMENT_PROVIDER` | browser, public | checkout UX capability state | Provider identifier only; never credentials. |
+| `PAYOUT_PROVIDER` | server configuration | seller-payout adapter selection | Defaults to `unconfigured`. |
+| `PAYOUT_HOLD_DAYS` | server configuration | seller escrow release policy | Required only when a real payout adapter is enabled. Integer `0..365`; no production default. |
 
-`VERCEL_ENV` is supplied by Vercel and is not a manually invented launch flag. The public-indexing interlock requires its exact value to be `production`, so copied launch variables cannot make a Preview deployment indexable.
+`VERCEL_ENV` is supplied by Vercel. It is not a manually invented launch flag.
 
-No Stripe credential is part of the canonical EntizNetStore environment contract while processor selection is deferred. Legacy Stripe code/database compatibility may remain temporarily during migration, but new application code must use the provider-neutral boundary in ADR-0002.
+Detailed Supabase key rollout and browser-egress procedure: `docs/operations/SUPABASE_KEY_MIGRATION_AND_BROWSER_EGRESS.md`.
 
-When a buyer-payment or seller-payout processor is approved, its adapter documentation must add the exact provider-specific variables here. Secret API keys, merchant credentials, webhook signing secrets and payout credentials must remain server-only and must not use `NEXT_PUBLIC_*` names.
+## Supabase key migration contract
 
-No DeepL credential is part of the production contract. The legacy dynamic-translation proxy/cache path was removed in M0; EntizNetStore currently uses repository-backed static localization.
+Browser/SSR code resolves credentials in this order:
 
-## Public launch/indexing configuration
+1. `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
+2. legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` fallback.
 
-Search discoverability is governed by `lib/launch/publicIndexing.ts`, not by ad-hoc checks scattered through routes. Indexing is enabled only when all three conditions hold:
+Privileged server code resolves credentials in this order:
 
-- `VERCEL_ENV=production`;
-- `SITE_INDEXING_ENABLED=true`;
-- `PUBLIC_LAUNCH_CONFIRMATION=ENTIZNETSTORE_PUBLIC_WEB_V1`.
+1. `SUPABASE_SECRET_KEY`;
+2. legacy `SUPABASE_SERVICE_ROLE_KEY` fallback.
 
-Before that state, root metadata, application response headers and `/robots.txt` remain noindex/disallow. Private route families remain non-indexable even after public launch. The confirmation value is intentionally non-secret; it is a deliberate second activation switch, not an authentication credential.
+The fallbacks are migration controls, not permanent dual-key policy. Migrate Preview/Staging/Production independently, verify the exact deployment, then remove/revoke legacy credentials according to the operational runbook. Never remove a working production legacy key before the preferred-key deployment has been verified.
 
-Detailed procedure: `docs/operations/PUBLIC_LAUNCH_INTERLOCK.md`.
+`scripts/verify-browser-egress-service-boundary.mjs` prevents Client Components from referencing privileged Supabase variables or importing privileged Supabase modules and checks browser artifacts for privileged names/values when chunks are present.
 
-## Local setup
+## Browser egress / CSP
 
-1. Copy `.env.example` to `.env.local`.
-2. Keep `SITE_INDEXING_ENABLED=false` and `PUBLIC_LAUNCH_CONFIRMATION=NOT_CONFIRMED`; local development is never a public-indexing environment.
-3. Fill the public Supabase values for the intended non-production project.
-4. Add `SUPABASE_URL` and a non-production service-role key only when testing trusted server operations that require it.
-5. For upload-safety work, use `UPLOAD_SCANNER_MODE=deterministic` only in local/CI regression, or configure a dedicated non-production remote scanner. Never treat deterministic mode as antivirus protection.
-6. Keep `PAYMENT_PROVIDER=unconfigured`, `NEXT_PUBLIC_PAYMENT_PROVIDER=unconfigured`, and `PAYOUT_PROVIDER=unconfigured` until intentionally testing approved adapters.
-7. Add `PAYOUT_HOLD_DAYS` only when testing a payout adapter and an explicit hold policy has been chosen for that environment.
-8. Run `npm ci`, `npm run typecheck`, and `npm run build` before considering the environment reproducible.
+Production `connect-src` is restricted to:
 
-`.env`, `.env.local`, and `.env.*.local` are gitignored. `.env.example` is intentionally committed and contains placeholders only.
+- `'self'` for EntizNetStore Route Handlers and same-origin APIs;
+- the exact configured Supabase HTTP(S) origin;
+- the exact corresponding Supabase WebSocket origin.
 
-## Upload quarantine and malware-scanner configuration
+Scheme-wide `https:`, `http:`, `wss:` and `ws:` browser-connect permissions are forbidden. Current checkout initializes payment through same-origin APIs and follows an approved top-level provider redirect; it therefore does not require generic payment-provider `connect-src` access.
 
-All untrusted KYC documents, product media, Seller branding and message attachments pass through the private `upload-quarantine` bucket before promotion. The trusted server validates file signatures and declared MIME, calculates SHA-256, obtains a scanner verdict, records the bounded result, and promotes only a clean object into its final bucket.
+If a future browser integration genuinely requires another external origin, the change must add that exact origin, document why server-side mediation is unsuitable, and add regression coverage. Do not broaden CSP merely to silence a browser error.
 
-Production rules:
+## Payment-provider configuration
 
-- `UPLOAD_SCANNER_MODE=remote`;
-- `UPLOAD_SCANNER_URL` must be an HTTPS URL without embedded credentials, query strings or URL fragments;
-- `UPLOAD_SCANNER_ALLOWED_ORIGINS` must explicitly contain the scanner's exact HTTPS origin;
-- production refuses local/private hostname patterns and IP-literal scanner destinations before egress;
-- `UPLOAD_SCANNER_TOKEN` is mandatory, bounded/validated and stays server-only;
-- outgoing bytes are independently SHA-256 hashed; supplied digest metadata must match before the network request;
-- scanner HTTP redirects are rejected;
-- timeout, transport failure, non-2xx response, oversized/malformed/non-JSON response or unknown verdict means `unavailable` and the upload is not promoted;
-- blocked or invalid files are removed from quarantine;
-- no API returns a public product/branding URL or accepted KYC/message reference before the clean promotion finishes.
+No Stripe credential is part of the canonical EntizNetStore environment contract while processor selection is deferred. Legacy package/database compatibility may remain temporarily during migration, but new application code uses the provider-neutral boundary in `docs/architecture/ADR-0002-payment-provider-boundary.md`.
 
-The remote scanner contract receives raw bytes with `Content-Type: application/octet-stream`, an `X-EntizNetStore-Content-Type` header, an `X-EntizNetStore-SHA256` header, scanner protocol version and bearer authorization. It does not receive filenames, Storage paths, signed URLs, user IDs or application-record IDs. It returns a bounded JSON body with `verdict: "clean" | "blocked"` plus sanitized scanner/version/code identifiers. Raw provider response payloads are never persisted or logged.
-
-`UPLOAD_SCANNER_MODE=deterministic` exists exclusively to prove clean/blocked behavior with EICAR inside local/CI regression. The application rejects that mode in an ordinary production runtime, so it cannot silently become the public-launch malware defense.
-
-## Buyer payment-provider configuration
-
-The marketplace commerce engine owns checkout idempotency, server-side pricing, inventory reservations, orders, normalized payment outcomes and escrow. External processors are adapters as defined in `docs/architecture/ADR-0002-payment-provider-boundary.md`.
+When a buyer-payment processor is approved, its adapter documentation must add the exact provider-specific variables here. Secret API keys, merchant credentials and webhook signing secrets remain server-only and must not use `NEXT_PUBLIC_*` names.
 
 With `PAYMENT_PROVIDER=unconfigured`:
 
 - checkout presents a clear payment-activation-pending state;
-- payment initialization and webhook routes fail closed with a controlled unavailable response;
+- payment initialization and webhook routes fail closed;
 - no external charge/payment request is attempted;
 - no public fake-payment bypass is enabled;
 - CI exercises provider-neutral success/failure/replay semantics against a disposable local database.
 
-A provider may be enabled only after its legal/underwriting approval and adapter verification are complete. Provider-specific test/staging credentials must be different from production whenever the provider supports environment separation.
-
-## Seller payout-provider configuration
+## Payout-provider configuration
 
 The marketplace owns payout idempotency, escrow claims, normalized payout outcomes and reconciliation state as defined in `docs/architecture/ADR-0003-payout-provider-boundary.md`.
 
 With `PAYOUT_PROVIDER=unconfigured`:
 
-- the payout request route fails closed before reserving escrow;
-- the payout webhook route fails closed;
+- payout requests fail closed before reserving escrow;
+- payout webhooks fail closed;
 - no external payout is initialized;
 - held escrow is never marked released by a mock/fallback path;
-- CI still exercises the complete internal payout ledger, terminal/retry behavior and concurrent escrow claiming against the disposable local database.
+- CI still exercises the internal payout ledger, terminal/retry behavior and concurrent escrow claiming.
 
-When a payout adapter is enabled, `PAYOUT_HOLD_DAYS` becomes mandatory. It controls the trusted-server eligibility cutoff; the database additionally requires paid + delivered + fulfilled orders, held escrow and no dispute. There is intentionally no built-in hold-period default because that duration is a marketplace business/risk decision.
+When a payout adapter is enabled, `PAYOUT_HOLD_DAYS` becomes mandatory. Payout destination data stays server-side in Seller-private storage and must never be returned or logged.
 
-Payout destination data stays in `profiles_seller_private` and is passed only to server-side adapters. It must never be returned by payout APIs or logged. A real adapter must use the internal `payoutRequestId` as its provider-side idempotency reference so ambiguous network timeouts can be retried without creating a duplicate disbursement.
+## Upload quarantine and malware scanning
 
-## Deployment configuration
+All untrusted KYC documents, product media, Seller branding and message attachments pass through the private `upload-quarantine` bucket before promotion. The trusted server validates file signatures and declared MIME, calculates SHA-256, obtains a scanner verdict, records bounded evidence, and promotes only a clean object into its final bucket.
 
-Production deploys must fail closed when a server secret needed by a requested feature is absent. Do not substitute mock credentials or bypass authorization to make a deployment appear healthy.
+Production rules:
 
-Recommended separation:
+- `UPLOAD_SCANNER_MODE=remote`;
+- scanner URL must be HTTPS without embedded credentials, query strings or fragments;
+- `UPLOAD_SCANNER_ALLOWED_ORIGINS` must contain the scanner's exact HTTPS origin;
+- local/private hostname patterns and IP-literal scanner destinations are refused before egress;
+- scanner token stays server-only;
+- outgoing bytes are independently SHA-256 hashed;
+- redirects are rejected;
+- timeout, transport failure, non-2xx, oversized/malformed response or unknown verdict means unavailable and the upload is not promoted;
+- blocked/invalid files are removed from quarantine;
+- no API returns a final/public object reference before clean promotion finishes.
 
-- **Preview:** non-production Supabase project/branch where available; public indexing remains blocked by `VERCEL_ENV=preview`; deterministic scanner only in CI/local regression, otherwise a dedicated non-production scanner; payment and payout providers unconfigured unless isolated test accounts are deliberately attached.
-- **Staging:** isolated staging Supabase project/branch; indexing remains blocked; dedicated authenticated remote scanner; approved payment/payout adapters using dedicated test/sandbox credentials and an explicitly chosen test hold period.
-- **Production:** canonical production Supabase project; indexing remains blocked until the explicit final launch interlock is activated; authenticated allowlisted HTTPS remote scanner required before accepting public uploads; payment and payout providers remain unconfigured until their launch gates are approved, then receive production-only credentials and the approved payout hold policy.
+The deterministic scanner exists only to prove clean/blocked behavior (including EICAR) in local/CI regression. It is not production antivirus protection.
 
-The production service-role key must be available only to server runtimes that need it. It is not a general application configuration value. Scanner/provider secrets must follow the same least-privilege rule.
+## Translation configuration
+
+No dynamic message-translation provider credential is currently part of the production contract. Repository-backed static localization is the active baseline. When the V1 in-chat translation feature is implemented, its provider credential must be server-only and the provider contract must preserve the encrypted/canonical original message, use bounded outbound payloads, record provider/version metadata without exposing message plaintext in logs, and never make translated text the canonical dispute/moderation record.
+
+## Public launch/indexing configuration
+
+Search discoverability is governed by `lib/launch/publicIndexing.ts`. Indexing is enabled only when all three conditions hold:
+
+- `VERCEL_ENV=production`;
+- `SITE_INDEXING_ENABLED=true`;
+- `PUBLIC_LAUNCH_CONFIRMATION=ENTIZNETSTORE_PUBLIC_WEB_V1`.
+
+Before that state, root metadata, application response headers and `/robots.txt` remain noindex/disallow. Private route families remain non-indexable after public launch. Detailed procedure: `docs/operations/PUBLIC_LAUNCH_INTERLOCK.md`.
+
+## Local setup
+
+1. Copy `.env.example` to `.env.local`.
+2. Keep indexing blocked locally.
+3. Fill `NEXT_PUBLIC_SUPABASE_URL` and the publishable key for the intended non-production project; use the legacy anon key only when testing migration fallback.
+4. Add `SUPABASE_URL` and a non-production secret key only when trusted server operations require it; use the legacy service-role key only for migration fallback.
+5. For upload-safety work, use deterministic scanner mode only in local/CI regression or configure a dedicated non-production remote scanner.
+6. Keep payment/payout providers unconfigured until intentionally testing approved adapters.
+7. Run `npm ci`, `npm run verify:foundation`, `npm run typecheck`, and `npm run build` before treating the environment as reproducible.
+
+`.env`, `.env.local`, and `.env.*.local` are gitignored. `.env.example` contains placeholders only.
+
+## Deployment separation
+
+- **Preview:** non-production Supabase project/branch where available; indexing blocked; payment/payout unconfigured unless isolated test accounts are deliberately attached.
+- **Staging:** isolated staging Supabase project/branch; indexing blocked; dedicated authenticated remote scanner; approved payment/payout adapters use sandbox credentials.
+- **Production:** canonical production Supabase project; indexing blocked until explicit launch interlock; authenticated allowlisted scanner required before public upload acceptance; payment/payout remain unconfigured until approved.
+
+Privileged Supabase credentials must be available only to trusted server runtimes that need them. They are not general application configuration values.
 
 ## Rotation procedure
 
@@ -136,22 +156,24 @@ For server secrets:
 1. Create/rotate the credential at the provider.
 2. Update the deployment secret store without committing the value.
 3. Redeploy/restart affected server workloads.
-4. Verify the relevant protected flow.
+4. Verify the relevant protected flow and exact deployment.
 5. Revoke the old credential.
-6. Record the rotation date and operator in the operational change record, never the secret itself.
+6. Record the rotation date/operator without recording the secret.
 
-For a suspected service-role leak, treat it as a high-severity incident because the key bypasses RLS. Rotate it first, then investigate logs/build artifacts and verify database authorization controls.
+Treat a suspected Supabase secret/service-role leak as high severity because privileged credentials bypass ordinary RLS boundaries. Rotate first, then investigate logs/build artifacts and re-verify database authorization controls.
 
-For a suspected upload-scanner token leak, rotate the token at the scanner, update the deployment secret store and verify a clean and blocked test fixture through the non-production quarantine flow before resuming upload acceptance. Never put the EICAR regression fixture into production user storage.
-
-For a suspected payment/payout-provider secret or signing-key leak, disable or rotate the credential at the provider, update the deployment secret store, redeploy, and verify callback/webhook authentication before restoring money movement.
+For scanner/payment/payout secret leaks, disable or rotate at the provider, update the secret store, redeploy, and verify authenticated callbacks/flows before restoring the affected operation.
 
 ## CI
 
-CI intentionally uses placeholder browser-safe Supabase values for compile/build validation and explicitly selects the `unconfigured` payment and payout adapters. CI must not require production service-role, live scanner, or live provider secrets to type-check/build the application. CI also leaves the public launch interlock blocked.
+CI uses placeholder browser-safe Supabase values for compile/build validation and explicitly selects unconfigured payment/payout adapters. CI must not require production privileged Supabase credentials, live scanner credentials, or live provider secrets to type-check/build.
 
-Upload-safety CI selects `UPLOAD_SCANNER_MODE=deterministic` and uses disposable local Supabase plus the standard EICAR test signature to prove clean promotion, blocked-file rejection, MIME-spoof rejection, cross-account isolation, private quarantine and ledger invariants. The deterministic engine is test infrastructure only.
+CI additionally proves:
 
-Public-launch CI proves that one launch flag is insufficient, preview/development cannot become indexable through copied values, exact production confirmation is required and private route families remain non-indexable after activation.
-
-Payment and payout behavior tests use disposable local database fixtures and normalized simulated provider references/events. They verify the internal money-state contracts without external network calls or production-accessible fake money endpoints. Payout CI additionally runs two concurrent database sessions against the same eligible escrow row to prove it cannot be claimed twice.
+- browser egress remains exact-origin rather than scheme-wide;
+- Client Components cannot reference/import privileged Supabase boundaries;
+- upload quarantine/scanning fail closed;
+- public indexing remains blocked without all interlocks;
+- provider-neutral payment/payout state transitions remain authoritative;
+- fresh migrations reproduce identity, catalogue, wholesale, cart/order, financial and RLS/security invariants;
+- authenticated HTTP/Chromium/WCAG gates cover critical launch flows.

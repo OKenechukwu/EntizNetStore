@@ -17,11 +17,9 @@ type Mode = 'signin' | 'signup';
 type Variant = 'combined' | 'signin';
 type AuthField = 'email' | 'password' | 'phone' | 'address';
 
-type PhotonFeature = {
-  properties?: {
-    label?: string;
-    name?: string;
-  };
+type AddressSuggestionResponse = {
+  suggestions?: unknown;
+  available?: unknown;
 };
 
 function safeInternalNext(value: string | null): string | null {
@@ -114,12 +112,16 @@ export default function AuthCard({ variant = 'combined' as Variant }) {
       return;
     }
     try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+      const res = await fetch('/api/geo/address-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
       if (!res.ok) throw new Error('address_lookup_failed');
-      const data = (await res.json()) as { features?: PhotonFeature[] };
-      const list = (data.features || [])
-        .map((feature) => feature.properties?.label || feature.properties?.name)
-        .filter((value): value is string => Boolean(value));
+      const data = (await res.json()) as AddressSuggestionResponse;
+      const list = Array.isArray(data.suggestions)
+        ? data.suggestions.filter((value): value is string => typeof value === 'string')
+        : [];
       setAddrSuggestions(list);
       setActiveSuggestion(-1);
       setAddrOpen(list.length > 0);

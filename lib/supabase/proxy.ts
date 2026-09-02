@@ -1,6 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function publicSupabaseKey(): string {
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error(
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or legacy NEXT_PUBLIC_SUPABASE_ANON_KEY is required",
+    );
+  }
+  return key;
+}
+
 /**
  * Refresh the request's Supabase auth session and return the response carrying
  * any rotated cookies. This function deliberately does not perform route-level
@@ -9,36 +21,34 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export async function updateSupabaseSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is required");
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
+  const supabase = createServerClient(url, publicSupabaseKey(), {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
 
-          response = NextResponse.next({ request });
+        response = NextResponse.next({ request });
 
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
 
-          // The pinned @supabase/ssr release predates the newer setAll(...,
-          // headers) callback. Preserve the same cache-safety invariant
-          // explicitly whenever auth cookies are rotated.
-          response.headers.set("Cache-Control", "private, no-store, max-age=0");
-          response.headers.set("Pragma", "no-cache");
-          response.headers.set("Expires", "0");
-        },
+        // The pinned @supabase/ssr release predates the newer setAll(...,
+        // headers) callback. Preserve the same cache-safety invariant
+        // explicitly whenever auth cookies are rotated.
+        response.headers.set("Cache-Control", "private, no-store, max-age=0");
+        response.headers.set("Pragma", "no-cache");
+        response.headers.set("Expires", "0");
       },
     },
-  );
+  });
 
   // Validate/refresh the token immediately after creating the SSR client. The
   // proxy never trusts getSession() for authorization decisions.
