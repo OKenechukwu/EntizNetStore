@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import englishDictionary from '@/locales/en.json';
 
 type Dict = Record<string, any>;
 
@@ -10,12 +11,13 @@ type I18nContextType = {
   currency: string;
   setLocale: (l: string) => void;
   setCurrency: (c: string) => void;
-  t: (k: string) => string;
+  t: (k: string, fallback?: string) => string;
   dict: Dict;
   fx?: Record<string, number>;
 };
 
 const I18nContext = createContext<I18nContextType | null>(null);
+const ENGLISH_DICTIONARY = englishDictionary as Dict;
 
 /* -------------------- helpers -------------------- */
 function getCookie(name: string): string | undefined {
@@ -44,18 +46,35 @@ const DEFAULT_FX: Record<string, number> = {
   PHP: 58,
 };
 
-/** ✅ Simpler & SSR-safe locale loader: JSON only, fallback to en */
+function mergeDictionary(base: Dict, override: Dict): Dict {
+  const merged: Dict = { ...base };
+  for (const [key, value] of Object.entries(override || {})) {
+    const current = merged[key];
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      current &&
+      typeof current === 'object' &&
+      !Array.isArray(current)
+    ) {
+      merged[key] = mergeDictionary(current as Dict, value as Dict);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+/** SSR-safe locale loader. Every locale inherits the canonical English baseline. */
 async function loadLocaleDict(locale: string): Promise<Dict> {
+  if (locale === 'en') return ENGLISH_DICTIONARY;
   try {
     const mod = await import(`@/locales/${locale}.json`);
-    return (mod as any).default ?? mod ?? {};
+    const localized = ((mod as any).default ?? mod ?? {}) as Dict;
+    return mergeDictionary(ENGLISH_DICTIONARY, localized);
   } catch {
-    try {
-      const en = await import(`@/locales/en.json`);
-      return (en as any).default ?? en ?? {};
-    } catch {
-      return {};
-    }
+    return ENGLISH_DICTIONARY;
   }
 }
 
@@ -64,6 +83,14 @@ function resolveDictValue(dict: Dict, key: string): unknown {
     if (!value || typeof value !== 'object') return undefined;
     return (value as Dict)[segment];
   }, dict);
+}
+
+function humanizeKey(key: string) {
+  const last = key.split('.').pop() || key;
+  return last
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_\.]/g, ' ')
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 /* -------------------- Provider -------------------- */
@@ -102,18 +129,19 @@ export default function I18nProvider({
     return (fromProp || fromCookie || fromLS || 'USD').toUpperCase();
   });
 
-  const [dict, setDict] = useState<Dict>({});
+  // Never begin with an empty dictionary. The server/client first render gets
+  // meaningful English copy until a requested locale has loaded.
+  const [dict, setDict] = useState<Dict>(ENGLISH_DICTIONARY);
   const [fx, setFx] = useState<Record<string, number>>(initialFx || DEFAULT_FX);
 
   useEffect(() => setMounted(true), []);
 
-  // Load dictionary when locale changes
   useEffect(() => {
     let alive = true;
     (async () => {
       const d = await loadLocaleDict(locale);
       if (!alive) return;
-      setDict(d || {});
+      setDict(d);
     })();
     return () => {
       alive = false;
@@ -121,11 +149,12 @@ export default function I18nProvider({
   }, [locale]);
 
   const setLocale = (l: string) => {
-    const next = l.toLowerCase();
+    const requested = l.trim().toLowerCase();
+    const next = supported.has(requested) ? requested : 'en';
     setLocaleState(next);
     try {
       if (mounted) localStorage.setItem('entiz_locale', next);
-      document.cookie = `entiz_locale=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}`;
+      document.cookie = `entiz_locale=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
     } catch {}
   };
 
@@ -134,20 +163,25 @@ export default function I18nProvider({
     setCurrencyState(next);
     try {
       if (mounted) localStorage.setItem('entiz_currency', next);
-      document.cookie = `entiz_currency=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}`;
+      document.cookie = `entiz_currency=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
     } catch {}
   };
 
-  /** Humanized fallback so raw keys never show */
+  /**
+   * Critical controls can provide a semantic fallback. This prevents loading or
+   * missing-dictionary states from exposing humanized implementation keys such
+   * as "Aria" or "Placeholder" to users and assistive technology.
+   */
   const t = useMemo(() => {
-    return (k: string) => {
-      const v = resolveDictValue(dict, k);
-      if (typeof v === 'string') return v;
-      const last = k.split('.').pop() || k;
-      return last
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .replace(/[_\.]/g, ' ')
-        .replace(/\b\w/g, (m) => m.toUpperCase());
+    return (k: string, fallback?: string) => {
+      const translated = resolveDictValue(dict, k);
+      if (typeof translated === 'string' && translated.trim()) return translated;
+
+      const english = resolveDictValue(ENGLISH_DICTIONARY, k);
+      if (typeof english === 'string' && english.trim()) return english;
+
+      if (fallback?.trim()) return fallback;
+      return humanizeKey(k);
     };
   }, [dict]);
 
@@ -176,9 +210,8 @@ export function T({
   fallback?: string;
   vars?: Record<string, string | number>;
 }) {
-  const { t, dict } = useI18n();
-  const translated = resolveDictValue(dict, k);
-  let txt = typeof translated === 'string' ? translated : fallback || t(k) || '';
+  const { t } = useI18n();
+  let txt = t(k, fallback);
   if (vars) {
     for (const [key, val] of Object.entries(vars)) {
       txt = txt.split(`{${key}}`).join(String(val));
