@@ -157,6 +157,15 @@ jobs:
               exit "$status"
             }
 
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-globalization-accessibility-browser.mjs || {
+              status=$?
+              echo "Globalization/accessibility DOM regression failed; server log follows"
+              cat /tmp/entiznetstore-http.log
+              exit "$status"
+            }
+
           mkdir -p artifacts/web-responsive
           PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
             APP_ORIGIN=http://127.0.0.1:3000 \
