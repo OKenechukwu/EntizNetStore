@@ -10,6 +10,9 @@ const fail = (message) => {
 const migration = read("supabase/migrations/20260902070000_m5_canonical_store_chat_authority.sql");
 const keySurfaceMigration = read("supabase/migrations/20260902071500_m5_key_envelope_surface_canonicalization.sql");
 const privateAuthorityMigration = read("supabase/migrations/20260902072000_m5_store_chat_private_authority_wrappers.sql");
+const creatorIndexMigration = read("supabase/migrations/20260903033000_m5_conversation_created_by_index.sql");
+const structuralInvariants = read("scripts/test-m5-store-chat-structural-invariants.sql");
+const storeChatWorkflow = read(".github/workflows/store-chat-security.yml");
 const sendRoute = read("app/api/messages/send/route.ts");
 const listRoute = read("app/api/messages/conversations/route.ts");
 const legacySend = read("app/api/chat/send/route.ts");
@@ -72,6 +75,32 @@ for (const privateFn of [
   if (!privateAuthorityMigration.includes(`revoke all on function ${privateFn}`)) {
     fail(`private authority ${privateFn} must explicitly revoke default execution`);
   }
+}
+
+if (
+  !creatorIndexMigration.includes("create index if not exists idx_conversations_created_by") ||
+  !creatorIndexMigration.includes("on public.conversations(created_by)")
+) {
+  fail("advisor-discovered conversations.created_by covering index migration is missing");
+}
+
+for (const required of [
+  "idx_conversations_created_by",
+  "security_invoker=true",
+  "public_base_table_count changed",
+  "browser key-envelope privilege leaked",
+  "public Store Chat wrapper became SECURITY DEFINER",
+]) {
+  if (!structuralInvariants.includes(required)) {
+    fail(`hosted structural invariant is missing: ${required}`);
+  }
+}
+
+if (
+  !storeChatWorkflow.includes("scripts/test-m5-store-chat-structural-invariants.sql") ||
+  !storeChatWorkflow.includes("scripts/test-m5-store-chat-authority.sql")
+) {
+  fail("Store Chat workflow must run structural and adversarial database regressions");
 }
 
 const sendSignature = migration.match(
