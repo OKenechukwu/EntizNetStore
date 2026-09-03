@@ -51,6 +51,9 @@ jobs:
       - name: Reproduce schema from repository migrations
         run: supabase db reset --local
 
+      - name: Verify hosted Store Chat structural invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m5-store-chat-structural-invariants.sql
+
       - name: Run canonical Store Chat database authority regression
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-m5-store-chat-authority.sql
 
