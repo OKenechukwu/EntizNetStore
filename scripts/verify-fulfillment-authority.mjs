@@ -7,6 +7,7 @@ const files = {
   legacyRoute: "app/api/orders/fulfillment/route.ts",
   buyerOrders: "app/dashboard/buyer/orders/page.tsx",
   sellerOrders: "app/dashboard/orders/page.tsx",
+  sellerActions: "components/seller/SellerOrderActions.tsx",
   timeline: "components/orders/OrderFulfillmentTimeline.tsx",
   payout: "supabase/migrations/20260822070107_payout_ledger_foundation.sql",
 };
@@ -30,6 +31,11 @@ mustContain("migration", /for update/i, "fulfillment authority must row-lock the
 mustContain("migration", /insert into public\.order_fulfillment_events/i, "transition must append timeline evidence");
 mustContain("migration", /insert into public\.notifications/i, "transition must atomically notify the buyer");
 mustContain("migration", /trg_order_fulfillment_events_immutable/i, "timeline immutability trigger missing");
+mustContain("migration", /revoke all on table public\.order_fulfillment_events[\s\S]*?service_role/i, "fulfillment ledger must revoke default service-role mutations");
+mustContain("migration", /grant select on table public\.order_fulfillment_events[\s\S]*?authenticated, service_role/i, "fulfillment ledger must be read-only over the API surface");
+mustContain("migration", /bool_or\(coalesce\(oi\.requires_shipping, true\)\)/i, "shipping requirement must be derived from order items");
+mustContain("migration", /shipping_not_required_for_order/i, "digital-only orders must reject fabricated shipping transitions");
+mustContain("migration", /v_order\.status = 'processing' and not v_requires_shipping/i, "digital-only processing -> delivered path missing");
 mustNotContain("migration", /update\s+public\.escrow_transactions/i, "seller fulfillment must never update escrow");
 mustNotContain("migration", /delete\s+from\s+public\.escrow_transactions/i, "seller fulfillment must never delete escrow");
 
@@ -38,6 +44,7 @@ mustNotContain("canonicalRoute", /\.from\(["'](?:orders|order_items|escrow_trans
 mustNotContain("canonicalRoute", /error\.message\s*\|\|/i, "canonical route must not blindly expose raw DB error text");
 mustNotContain("canonicalRoute", /code\s*:\s*error\.message/i, "canonical route must never return raw DB error text as a public code");
 mustContain("canonicalRoute", /Object\.hasOwn\(publicValidationMessages, candidate\)/i, "canonical route must allowlist database validation messages before exposing a code");
+mustContain("canonicalRoute", /shipping_not_required_for_order/i, "canonical route must normalize digital shipping rejection");
 mustContain("canonicalRoute", /invalid_fulfillment_update/i, "canonical route must collapse unknown validation failures to a fixed public code");
 
 mustContain("legacyRoute", /status:\s*410/i, "legacy fulfillment route must be retired with 410");
@@ -50,6 +57,10 @@ for (const key of ["buyerOrders", "sellerOrders"]) {
   mustContain(key, /<Price\s+amount=/i, `${key} must use canonical display currency formatting`);
   mustNotContain(key, /<main\b/i, `${key} must rely on the root layout's single global main landmark`);
 }
+mustContain("sellerOrders", /requires_shipping/i, "seller order query must load authoritative item shipping facts");
+mustContain("sellerOrders", /requiresShipping=\{requiresShipping\}/i, "seller UI must pass item-derived shipping requirements to actions");
+mustContain("sellerActions", /requiresShipping\s*\?/i, "seller actions must branch physical versus digital fulfillment");
+mustContain("sellerActions", /\? "shipped"\s*:\s*"delivered"/i, "digital-only orders must skip shipping in seller UI");
 mustNotContain("timeline", /href=|https?:\/\//i, "tracking timeline must not turn seller-provided data into arbitrary links");
 
 mustContain("payout", /update public\.escrow_transactions[\s\S]*?status = 'released'/i, "payout settlement must remain the escrow release authority");
