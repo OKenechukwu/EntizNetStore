@@ -79,8 +79,8 @@ export async function POST(
     return noStoreJson({ error: "Authentication required", code: "authentication_required" }, 401);
   }
 
-  // The RPC derives buyer authority from auth.uid() and the canonical Order row.
-  // No buyer_id, seller_id, payout cutoff or money-state input is accepted here.
+  // Identity and financial authority are derived from auth.uid() plus the canonical Order.
+  // The request body carries only retry identity; no counterparty or money-state authority.
   const { data, error } = await supabase.rpc("confirm_buyer_order_receipt", {
     p_order_id: orderId.data,
     p_idempotency_key: input.data.idempotencyKey,
