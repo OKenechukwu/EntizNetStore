@@ -1,0 +1,119 @@
+name: Fulfillment Authority Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fulfillment-authority-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fulfillment-authority-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      SITE_INDEXING_ENABLED: "false"
+      SHIPPING_QUOTE_PROVIDER: unconfigured
+      TAX_QUOTE_PROVIDER: unconfigured
+      PAYMENT_PROVIDER: unconfigured
+      NEXT_PUBLIC_PAYMENT_PROVIDER: unconfigured
+      PAYOUT_PROVIDER: unconfigured
+      UPLOAD_SCANNER_MODE: deterministic
+      ADDRESS_SUGGEST_PROVIDER: deterministic
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify static fulfillment authority boundary
+        run: npm run test:fulfillment-foundation
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1
+        with:
+          version: 2.111.0
+
+      - name: Install isolated Chromium browser tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX=/tmp/entiznetstore-playwright
+          rm -rf "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.62.1 axe-core@4.13.0
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Start fresh local Supabase stack
+        run: supabase start
+
+      - name: Reproduce schema from repository migrations
+        run: supabase db reset --local
+
+      - name: Verify fulfillment structural invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-fulfillment-structural-invariants.sql
+
+      - name: Run adversarial atomic fulfillment regression
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-fulfillment-authority.sql
+
+      - name: Run concurrent duplicate-transition regression
+        run: DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" bash scripts/test-fulfillment-concurrency.sh
+
+      - name: Build, boot and exercise authenticated seller/buyer fulfillment UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+
+          npm run build
+          PORT=3000 npm start > /tmp/entiznetstore-fulfillment.log 2>&1 &
+          APP_PID=$!
+          cleanup() { kill "$APP_PID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1:3000/; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js server did not become ready"
+            cat /tmp/entiznetstore-fulfillment.log
+            exit 1
+          fi
+
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-fulfillment-browser.mjs || {
+              status=$?
+              echo "Fulfillment browser regression failed; server log follows"
+              cat /tmp/entiznetstore-fulfillment.log
+              exit "$status"
+            }
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: command -v supabase >/dev/null 2>&1 && supabase stop --no-backup || true
