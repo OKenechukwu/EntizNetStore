@@ -51,7 +51,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','c2000000-0000-0000-0000-000000000002',true);
 select set_config(
   'request.jwt.claims',
-  '{"sub":"c2000000-0000-0000-0000-000000000002","role":"authenticated"}',
+  '{"sub":"c2000000-0000-0000-000000000002","role":"authenticated"}',
   true
 );
 
@@ -87,6 +87,12 @@ select * from public.transition_seller_order(
   'd1000000-0000-0000-0000-000000000001',
   'delivered', null, null
 );
+
+-- Fulfillment transitions above deliberately execute as the Seller so their RLS
+-- boundary is covered. Cross-user transaction-completeness assertions below run
+-- as the trusted test observer; otherwise notification RLS correctly hides the
+-- Buyer's notification and turns a successful transaction into a false negative.
+reset role;
 
 do $$
 declare
@@ -143,7 +149,6 @@ end
 $$;
 
 -- Service role may inspect the ledger but cannot manufacture evidence directly.
-reset role;
 set local role service_role;
 do $$
 begin
