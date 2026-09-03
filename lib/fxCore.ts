@@ -1,7 +1,10 @@
 export class FxPolicyError extends Error {
-  constructor(public readonly code: string) {
+  readonly code: string;
+
+  constructor(code: string) {
     super(code);
     this.name = "FxPolicyError";
+    this.code = code;
   }
 }
 

@@ -6,9 +6,12 @@ export const FX_UPSTREAM_TIMEOUT_MS = 5_000;
 export const FX_UPSTREAM_MAX_BYTES = 64 * 1024;
 
 export class FxProviderError extends Error {
-  constructor(public readonly code: string) {
+  readonly code: string;
+
+  constructor(code: string) {
     super(code);
     this.name = "FxProviderError";
+    this.code = code;
   }
 }
 
