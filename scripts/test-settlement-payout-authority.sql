@@ -117,6 +117,32 @@ select public.confirm_buyer_order_receipt(
   '98300000-0000-0000-0000-000000000008'
 );
 
+-- The Buyer can inspect settlement through the scoped RPC, but direct access to
+-- the hidden financial evidence table remains forbidden.
+do $$
+declare
+  v_count integer;
+  v_source text;
+begin
+  select count(*), min(authority_type) into v_count,v_source
+  from public.get_order_settlement_confirmation('95000000-0000-0000-0000-000000000005');
+  if v_count<>1 or v_source<>'buyer' then
+    raise exception 'Participant settlement read wrapper failed: %, %',v_count,v_source;
+  end if;
+
+  begin
+    perform 1
+    from private.order_settlement_confirmations
+    where order_id='95000000-0000-0000-0000-000000000005';
+    raise exception 'Authenticated Buyer directly read private settlement evidence';
+  exception when insufficient_privilege then null;
+  end;
+end
+$$;
+
+-- Cross-user notification and private-ledger evidence assertions use the trusted
+-- database-test observer, never broader browser-role grants.
+reset role;
 do $$
 declare
   v_count integer;
@@ -137,7 +163,6 @@ end
 $$;
 
 -- Active dispute blocks trusted confirmation for a second Order.
-reset role;
 insert into public.order_disputes(
   id,order_id,raised_by,raised_by_role,reason_code,status
 ) values (
