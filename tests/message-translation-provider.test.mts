@@ -191,4 +191,4 @@ test("provider response parsing rejects non-json, oversized and malformed transl
     ),
     { ok: false, code: "translation_provider_response_too_large" },
   );
-}
+});
