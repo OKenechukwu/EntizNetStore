@@ -21,13 +21,51 @@ export default async function SellerOrdersPage() {
     .maybeSingle();
   if (!seller) redirect("/dashboard");
 
+  // Keep the base read deployable against the pre-ledger schema. The separate
+  // event read doubles as the UI authority-readiness probe: if the migration is
+  // not visible yet, existing order state remains readable but mutation controls
+  // are suppressed rather than falling through to the legacy RPC implementation.
   const { data: orders, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents, requires_shipping), order_fulfillment_events(id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at)",
+      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents, requires_shipping)",
     )
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
+
+  const eventsByOrder = new Map<string, OrderFulfillmentEvent[]>();
+  let fulfillmentAuthorityReady = true;
+  if (!error && orders?.length) {
+    const { data: fulfillmentEvents, error: fulfillmentEventsError } = await supabase
+      .from("order_fulfillment_events")
+      .select(
+        "id, order_id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at",
+      )
+      .in(
+        "order_id",
+        orders.map((order) => order.id),
+      )
+      .order("occurred_at", { ascending: true });
+
+    if (fulfillmentEventsError) {
+      fulfillmentAuthorityReady = false;
+    } else {
+      for (const event of fulfillmentEvents ?? []) {
+        const timelineEvent: OrderFulfillmentEvent = {
+          id: event.id,
+          from_status: event.from_status,
+          to_status: event.to_status,
+          fulfillment_status: event.fulfillment_status,
+          shipping_carrier: event.shipping_carrier,
+          tracking_number: event.tracking_number,
+          occurred_at: event.occurred_at,
+        };
+        const list = eventsByOrder.get(event.order_id) ?? [];
+        list.push(timelineEvent);
+        eventsByOrder.set(event.order_id, list);
+      }
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -43,6 +81,15 @@ export default async function SellerOrdersPage() {
         </Link>
       </div>
 
+      {!error && !fulfillmentAuthorityReady && (
+        <p
+          className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100"
+          role="status"
+        >
+          Fulfillment updates are temporarily unavailable while the tracking authority is being prepared. Existing order status remains visible and no order state has been changed.
+        </p>
+      )}
+
       {error ? (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-red-200" role="alert">
           Unable to load seller orders right now. Please refresh and try again.
@@ -54,7 +101,7 @@ export default async function SellerOrdersPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => {
-            const events = (order.order_fulfillment_events ?? []) as OrderFulfillmentEvent[];
+            const events = eventsByOrder.get(order.id) ?? [];
             const requiresShipping = (order.order_items ?? []).some(
               (item) => item.requires_shipping !== false,
             );
@@ -102,12 +149,14 @@ export default async function SellerOrdersPage() {
                     trackingNumber: order.tracking_number,
                   }}
                 />
-                <SellerOrderActions
-                  orderId={order.id}
-                  status={order.status || "pending"}
-                  paymentStatus={order.payment_status || "pending"}
-                  requiresShipping={requiresShipping}
-                />
+                {fulfillmentAuthorityReady && (
+                  <SellerOrderActions
+                    orderId={order.id}
+                    status={order.status || "pending"}
+                    paymentStatus={order.payment_status || "pending"}
+                    requiresShipping={requiresShipping}
+                  />
+                )}
               </article>
             );
           })}
