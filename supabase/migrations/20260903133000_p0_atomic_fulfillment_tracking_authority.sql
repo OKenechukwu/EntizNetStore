@@ -20,6 +20,7 @@ create table public.order_fulfillment_events (
   constraint order_fulfillment_events_transition_check check (
     (from_status = 'confirmed' and to_status = 'processing')
     or (from_status = 'processing' and to_status = 'shipped')
+    or (from_status = 'processing' and to_status = 'delivered')
     or (from_status = 'shipped' and to_status = 'delivered')
   ),
   constraint order_fulfillment_events_fulfillment_status_check
@@ -54,9 +55,12 @@ using (
   )
 );
 
-revoke all on table public.order_fulfillment_events from public, anon, authenticated;
-grant select on table public.order_fulfillment_events to authenticated;
-grant select, insert, update, delete on table public.order_fulfillment_events to service_role;
+-- The ledger is API-read-only, including for service_role. The trusted private
+-- authority runs as its postgres owner and is the only application write path.
+revoke all on table public.order_fulfillment_events
+  from public, anon, authenticated, service_role;
+grant select on table public.order_fulfillment_events
+  to authenticated, service_role;
 
 create or replace function app_private.reject_order_fulfillment_event_mutation()
 returns trigger
@@ -68,6 +72,9 @@ begin
   raise exception 'order_fulfillment_events_are_immutable' using errcode = '55000';
 end;
 $$;
+
+revoke all on function app_private.reject_order_fulfillment_event_mutation()
+  from public, anon, authenticated, service_role;
 
 create trigger trg_order_fulfillment_events_immutable
 before update or delete on public.order_fulfillment_events
@@ -104,6 +111,8 @@ declare
   v_notification_type text;
   v_notification_title text;
   v_notification_message text;
+  v_item_count integer;
+  v_requires_shipping boolean;
 begin
   if v_actor is null then
     raise exception 'authentication_required' using errcode = '28000';
@@ -128,6 +137,16 @@ begin
   end if;
   if v_order.payment_status <> 'paid' then
     raise exception 'only_paid_orders_can_be_fulfilled' using errcode = '22023';
+  end if;
+
+  select count(*)::integer,
+         coalesce(bool_or(coalesce(oi.requires_shipping, true)), false)
+    into v_item_count, v_requires_shipping
+  from public.order_items oi
+  where oi.order_id = p_order_id;
+
+  if v_item_count = 0 then
+    raise exception 'order_has_no_items' using errcode = '22023';
   end if;
 
   -- Safe retry after a lost HTTP response. The order lock serializes concurrent
@@ -168,6 +187,9 @@ begin
     v_notification_message := 'Your order ' || v_order.order_number || ' is being prepared by the seller.';
 
   elsif v_next_status = 'shipped' and v_order.status = 'processing' then
+    if not v_requires_shipping then
+      raise exception 'shipping_not_required_for_order' using errcode = '22023';
+    end if;
     if v_tracking is null or v_carrier is null then
       raise exception 'carrier_and_tracking_required' using errcode = '22023';
     end if;
@@ -191,7 +213,11 @@ begin
     v_notification_title := 'Order shipped';
     v_notification_message := 'Your order ' || v_order.order_number || ' has shipped with ' || v_carrier || '.';
 
-  elsif v_next_status = 'delivered' and v_order.status = 'shipped' then
+  elsif v_next_status = 'delivered'
+        and (
+          v_order.status = 'shipped'
+          or (v_order.status = 'processing' and not v_requires_shipping)
+        ) then
     update public.orders
     set status = 'delivered',
         fulfillment_status = 'fulfilled',
@@ -204,9 +230,15 @@ begin
     where order_id = p_order_id
       and fulfillment_status <> 'fulfilled';
 
-    v_notification_type := 'shipping';
-    v_notification_title := 'Order delivered';
-    v_notification_message := 'Your order ' || v_order.order_number || ' is marked as delivered.';
+    if v_requires_shipping then
+      v_notification_type := 'shipping';
+      v_notification_title := 'Order delivered';
+      v_notification_message := 'Your order ' || v_order.order_number || ' is marked as delivered.';
+    else
+      v_notification_type := 'order';
+      v_notification_title := 'Order fulfilled';
+      v_notification_message := 'Your digital order ' || v_order.order_number || ' is marked as fulfilled.';
+    end if;
 
   else
     raise exception 'invalid_fulfillment_transition' using errcode = '22023';
@@ -234,7 +266,10 @@ begin
     v_actor,
     v_order.shipping_carrier,
     v_order.tracking_number,
-    jsonb_build_object('authority_version', 1),
+    jsonb_build_object(
+      'authority_version', 2,
+      'requires_shipping', v_requires_shipping
+    ),
     now()
   )
   returning id into v_event_id;
