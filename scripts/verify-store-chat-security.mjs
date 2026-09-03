@@ -8,6 +8,8 @@ const fail = (message) => {
 };
 
 const migration = read("supabase/migrations/20260902070000_m5_canonical_store_chat_authority.sql");
+const keySurfaceMigration = read("supabase/migrations/20260902071500_m5_key_envelope_surface_canonicalization.sql");
+const privateAuthorityMigration = read("supabase/migrations/20260902072000_m5_store_chat_private_authority_wrappers.sql");
 const sendRoute = read("app/api/messages/send/route.ts");
 const listRoute = read("app/api/messages/conversations/route.ts");
 const legacySend = read("app/api/chat/send/route.ts");
@@ -25,7 +27,51 @@ for (const required of [
   "revoke all on public.messages from anon, authenticated",
   "grant select on public.messages to authenticated",
 ]) {
-  if (!migration.includes(required)) fail(`migration is missing: ${required}`);
+  if (!migration.includes(required)) fail(`authority migration is missing: ${required}`);
+}
+
+for (const required of [
+  "legacy_conversation_keys_must_be_empty_before_m5_envelope_transition",
+  "message_key_envelopes_must_be_empty_before_m5_surface_transition",
+  "drop table public.message_key_envelopes",
+  "rename column encrypted_key to wrapped_key",
+  "create view public.message_key_envelopes",
+  "security_invoker = true",
+  "revoke all on public.conversation_keys from public, anon, authenticated",
+  "revoke all on public.message_key_envelopes from public, anon, authenticated",
+]) {
+  if (!keySurfaceMigration.includes(required)) fail(`key-surface migration is missing: ${required}`);
+}
+
+for (const required of [
+  "alter function public.open_store_conversation(text,uuid)",
+  "alter function public.send_store_message(uuid,text,text,text,text)",
+  "alter function public.mark_store_conversation_read(uuid)",
+  "set schema app_private",
+  "rename to open_store_conversation_authority",
+  "rename to send_store_message_authority",
+  "rename to mark_store_conversation_read_authority",
+  "create function public.open_store_conversation",
+  "create function public.send_store_message",
+  "create function public.mark_store_conversation_read",
+  "security invoker",
+  "revoke all on function public.open_store_conversation(text,uuid)",
+  "revoke all on function public.send_store_message(uuid,text,text,text,text)",
+  "revoke all on function public.mark_store_conversation_read(uuid)",
+]) {
+  if (!privateAuthorityMigration.includes(required)) {
+    fail(`private-authority migration is missing: ${required}`);
+  }
+}
+
+for (const privateFn of [
+  "app_private.open_store_conversation_authority(text,uuid)",
+  "app_private.send_store_message_authority(uuid,text,text,text,text)",
+  "app_private.mark_store_conversation_read_authority(uuid)",
+]) {
+  if (!privateAuthorityMigration.includes(`revoke all on function ${privateFn}`)) {
+    fail(`private authority ${privateFn} must explicitly revoke default execution`);
+  }
 }
 
 const sendSignature = migration.match(
@@ -40,6 +86,14 @@ if (
   !migration.includes("v_recipient := v_conversation.participant1_id")
 ) {
   fail("send_store_message must derive the recipient from canonical conversation participants");
+}
+
+const publicWrapperSignature = privateAuthorityMigration.match(
+  /create function public\.send_store_message\(([\s\S]*?)\)\nreturns uuid/i,
+)?.[1];
+if (!publicWrapperSignature) fail("unable to inspect public send_store_message wrapper signature");
+if (/recipient|order[_ ]?id/i.test(publicWrapperSignature)) {
+  fail("public send wrapper must not accept caller-supplied recipient/order authority");
 }
 
 if (!sendRoute.includes('conversationId: z.string().uuid()')) {
