@@ -16,7 +16,8 @@ begin
   where table_schema = 'public'
     and table_type = 'BASE TABLE';
 
-  if public_table_count <> 49 then
+  -- Message translation adds one intentionally server-only encrypted cache table.
+  if public_table_count <> 50 then
     raise exception 'canonical public physical table count changed: %', public_table_count;
   end if;
 
