@@ -7,10 +7,12 @@ export default function SellerOrderActions({
   orderId,
   status,
   paymentStatus,
+  requiresShipping,
 }: {
   orderId: string;
   status: string;
   paymentStatus: string;
+  requiresShipping: boolean;
 }) {
   const router = useRouter();
   const [carrier, setCarrier] = useState("");
@@ -25,7 +27,9 @@ export default function SellerOrderActions({
     status === "confirmed"
       ? "processing"
       : status === "processing"
-        ? "shipped"
+        ? requiresShipping
+          ? "shipped"
+          : "delivered"
         : status === "shipped"
           ? "delivered"
           : null;
@@ -42,8 +46,8 @@ export default function SellerOrderActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: next,
-          shippingCarrier: carrier.trim() || undefined,
-          trackingNumber: tracking.trim() || undefined,
+          shippingCarrier: next === "shipped" ? carrier.trim() || undefined : undefined,
+          trackingNumber: next === "shipped" ? tracking.trim() || undefined : undefined,
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -57,7 +61,9 @@ export default function SellerOrderActions({
             ? "Order moved to processing."
             : next === "shipped"
               ? "Shipment and tracking were recorded."
-              : "Delivery was recorded. Payout release follows the separate payout eligibility process.",
+              : requiresShipping
+                ? "Delivery was recorded. Payout release follows the separate payout eligibility process."
+                : "Digital fulfillment was recorded. Payout release follows the separate payout eligibility process.",
       );
       router.refresh();
     } catch (caught) {
@@ -116,7 +122,9 @@ export default function SellerOrderActions({
             ? "Start processing"
             : next === "shipped"
               ? "Mark shipped"
-              : "Mark delivered"}
+              : requiresShipping
+                ? "Mark delivered"
+                : "Mark fulfilled"}
       </button>
     </div>
   );
