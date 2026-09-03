@@ -60,7 +60,7 @@ for (const key of ["buyerOrders", "sellerOrders"]) {
 mustContain("sellerOrders", /requires_shipping/i, "seller order query must load authoritative item shipping facts");
 mustContain("sellerOrders", /requiresShipping=\{requiresShipping\}/i, "seller UI must pass item-derived shipping requirements to actions");
 mustContain("sellerActions", /requiresShipping\s*\?/i, "seller actions must branch physical versus digital fulfillment");
-mustContain("sellerActions", /\? "shipped"\s*:\s*"delivered"/i, "digital-only orders must skip shipping in seller UI");
+mustContain("sellerActions", /\?\s*"shipped"\s*:\s*"delivered"/i, "digital-only orders must skip shipping in seller UI");
 mustNotContain("timeline", /href=|https?:\/\//i, "tracking timeline must not turn seller-provided data into arbitrary links");
 
 mustContain("payout", /update public\.escrow_transactions[\s\S]*?status = 'released'/i, "payout settlement must remain the escrow release authority");
