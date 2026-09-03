@@ -25,6 +25,10 @@
     "signIn": "Sign in",
     "profile": "Profile"
   },
+  "search": {
+    "placeholder": "Search products, brands, and stores",
+    "aria": "Search EntizNetStore"
+  },
   "home": {
     "welcome": "Welcome to EntizNet",
     "heroSubtitle": "Discover premium intimate products designed for your pleasure and wellbeing.",
