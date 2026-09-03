@@ -70,17 +70,30 @@ function boundedIdentifier(value: string | undefined, max = 80) {
   return candidate;
 }
 
+/**
+ * Normalize the bounded BCP-47 subset accepted at the translation boundary
+ * without depending on optional Intl type-library declarations in the build.
+ * Language is lower-case, script TitleCase, region upper-case; other validated
+ * subtags are lower-case. This keeps server/client contracts deterministic.
+ */
 export function normalizeTranslationLanguage(value: string) {
-  const candidate = value.trim();
+  const candidate = value.trim().replace(/_/g, "-");
   if (!candidate || candidate.length > 35) return null;
-  try {
-    const canonical = Intl.getCanonicalLocales(candidate)[0];
-    if (!canonical || canonical.length > 35) return null;
-    if (!/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/.test(canonical)) return null;
-    return canonical;
-  } catch {
-    return null;
-  }
+
+  const parts = candidate.split("-");
+  if (!/^[A-Za-z]{2,3}$/.test(parts[0] || "") || parts.length > 4) return null;
+  if (parts.slice(1).some((part) => !/^[A-Za-z0-9]{2,8}$/.test(part))) return null;
+
+  const canonical = parts.map((part, index) => {
+    if (index === 0) return part.toLowerCase();
+    if (/^[A-Za-z]{4}$/.test(part)) {
+      return `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`;
+    }
+    if (/^[A-Za-z]{2}$/.test(part) || /^\d{3}$/.test(part)) return part.toUpperCase();
+    return part.toLowerCase();
+  }).join("-");
+
+  return canonical.length <= 35 ? canonical : null;
 }
 
 function productionHostnameBlocked(hostname: string) {
@@ -139,9 +152,7 @@ export function validateMessageTranslationConfiguration(
 ): MessageTranslationConfiguration {
   const mode = (env.MESSAGE_TRANSLATION_MODE || "disabled").trim().toLowerCase();
 
-  if (mode === "disabled") {
-    return { ok: false, code: "translation_disabled" };
-  }
+  if (mode === "disabled") return { ok: false, code: "translation_disabled" };
 
   if (mode === "deterministic") {
     if (env.NODE_ENV === "production" && env.CI !== "true") {
@@ -156,9 +167,7 @@ export function validateMessageTranslationConfiguration(
     };
   }
 
-  if (mode !== "remote") {
-    return { ok: false, code: "translation_mode_unsupported" };
-  }
+  if (mode !== "remote") return { ok: false, code: "translation_mode_unsupported" };
 
   const rawUrl = env.MESSAGE_TRANSLATION_URL?.trim();
   if (!rawUrl) return { ok: false, code: "translation_endpoint_missing" };
@@ -275,11 +284,7 @@ export async function executeMessageTranslation(
         Accept: "application/json",
         "X-EntizNetStore-Translation-Protocol": "1",
       },
-      body: JSON.stringify({
-        text: input.text,
-        targetLanguage,
-        sourceLanguage: "auto",
-      }),
+      body: JSON.stringify({ text: input.text, targetLanguage, sourceLanguage: "auto" }),
       signal: AbortSignal.timeout(configuration.timeoutMs),
       cache: "no-store",
       redirect: "error",
@@ -294,9 +299,8 @@ export async function executeMessageTranslation(
     };
   }
 
-  if (!response.ok) {
-    return { ok: false, code: `translation_provider_http_${response.status}` };
-  }
+  if (!response.ok) return { ok: false, code: `translation_provider_http_${response.status}` };
+
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
   if (!/^application\/(?:json|[a-z0-9.+-]+\+json)(?:\s*;|$)/.test(contentType)) {
     return { ok: false, code: "translation_provider_content_type_invalid" };
@@ -312,8 +316,7 @@ export async function executeMessageTranslation(
     return { ok: false, code: "translation_provider_response_invalid" };
   }
 
-  const translatedText =
-    typeof payload.translatedText === "string" ? payload.translatedText.trim() : "";
+  const translatedText = typeof payload.translatedText === "string" ? payload.translatedText.trim() : "";
   if (!translatedText || translatedText.length > MAX_TRANSLATED_CHARS) {
     return { ok: false, code: "translation_provider_translation_invalid" };
   }
