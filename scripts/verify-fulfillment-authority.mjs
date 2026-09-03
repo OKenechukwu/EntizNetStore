@@ -9,6 +9,8 @@ const files = {
   sellerOrders: "app/dashboard/orders/page.tsx",
   sellerActions: "components/seller/SellerOrderActions.tsx",
   timeline: "components/orders/OrderFulfillmentTimeline.tsx",
+  rolloutInterlock: "scripts/test-fulfillment-rollout-interlock.mjs",
+  workflow: ".github/workflows/fulfillment-authority-security.yml",
   payout: "supabase/migrations/20260822070107_payout_ledger_foundation.sql",
 };
 
@@ -77,6 +79,16 @@ mustContain("sellerOrders", /requiresShipping=\{requiresShipping\}/i, "seller UI
 mustContain("sellerActions", /requiresShipping\s*\?/i, "seller actions must branch physical versus digital fulfillment");
 mustContain("sellerActions", /\?\s*"shipped"\s*:\s*"delivered"/i, "digital-only orders must skip shipping in seller UI");
 mustNotContain("timeline", /href=|https?:\/\//i, "tracking timeline must not turn seller-provided data into arbitrary links");
+
+mustContain("rolloutInterlock", /Fulfillment updates are temporarily unavailable/i, "rollout interlock must verify the seller fallback state");
+mustContain("rolloutInterlock", /mutation\.status,\s*503/i, "rollout interlock must require mutation fail-closed HTTP 503");
+mustContain("rolloutInterlock", /persistedOrder\.status,\s*"confirmed"/i, "rollout interlock must prove order state is unchanged");
+mustContain("rolloutInterlock", /events\.length,\s*0/i, "rollout interlock must prove no evidence was partially written");
+mustContain("rolloutInterlock", /notices\.length,\s*0/i, "rollout interlock must prove no notification was partially written");
+mustContain("rolloutInterlock", /escrow\.status,\s*"held"/i, "rollout interlock must prove escrow is unchanged");
+mustContain("workflow", /revoke select on table public\.order_fulfillment_events from authenticated/i, "dedicated workflow must simulate migration-not-ready state");
+mustContain("workflow", /test-fulfillment-rollout-interlock\.mjs/i, "dedicated workflow must execute the real-app rollout interlock");
+mustContain("workflow", /grant select on table public\.order_fulfillment_events to authenticated/i, "dedicated workflow must restore ledger reads before the normal browser flow");
 
 mustContain("payout", /update public\.escrow_transactions[\s\S]*?status = 'released'/i, "payout settlement must remain the escrow release authority");
 mustContain("payout", /o\.status = 'delivered'[\s\S]*?o\.fulfillment_status = 'fulfilled'/i, "payout eligibility must remain delivery + fulfillment gated");
