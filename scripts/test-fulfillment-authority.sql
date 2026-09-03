@@ -83,21 +83,30 @@ do $$ begin
   end;
 end $$;
 
--- First transition and exact retry are idempotent.
+-- First transition and exact retry are idempotent as the authenticated seller.
 select * from public.transition_seller_order('b1000000-0000-0000-0000-000000000001','processing',null,null);
 select * from public.transition_seller_order('b1000000-0000-0000-0000-000000000001','processing',null,null);
 
+-- Cross-table atomicity is inspected outside seller RLS so the buyer's private
+-- notification is observable without weakening the actual notification policy.
+reset role;
 do $$
 declare v_events integer; v_notifications integer; v_item text; v_escrow text;
 begin
   select count(*) into v_events from public.order_fulfillment_events where order_id='b1000000-0000-0000-0000-000000000001';
-  select count(*) into v_notifications from public.notifications where metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
+  select count(*) into v_notifications from public.notifications
+    where user_id='a1000000-0000-0000-0000-000000000001'
+      and metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
   select fulfillment_status into v_item from public.order_items where order_id='b1000000-0000-0000-0000-000000000001';
   select status into v_escrow from public.escrow_transactions where order_id='b1000000-0000-0000-0000-000000000001';
   if v_events <> 1 or v_notifications <> 1 or v_item <> 'unfulfilled' or v_escrow <> 'held' then
     raise exception 'processing atomic/idempotent invariant failed: events %, notifications %, item %, escrow %', v_events,v_notifications,v_item,v_escrow;
   end if;
 end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a2000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claims','{"sub":"a2000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
 
 -- Shipping validates bounded, single-line carrier/tracking data.
 do $$ begin
@@ -127,13 +136,16 @@ do $$ begin
   end;
 end $$;
 
+reset role;
 do $$
 declare v_status text; v_fulfillment text; v_item text; v_events integer; v_notifications integer; v_escrow text;
 begin
   select status, fulfillment_status into v_status,v_fulfillment from public.orders where id='b1000000-0000-0000-0000-000000000001';
   select fulfillment_status into v_item from public.order_items where order_id='b1000000-0000-0000-0000-000000000001';
   select count(*) into v_events from public.order_fulfillment_events where order_id='b1000000-0000-0000-0000-000000000001';
-  select count(*) into v_notifications from public.notifications where metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
+  select count(*) into v_notifications from public.notifications
+    where user_id='a1000000-0000-0000-0000-000000000001'
+      and metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
   select status into v_escrow from public.escrow_transactions where order_id='b1000000-0000-0000-0000-000000000001';
   if v_status <> 'shipped' or v_fulfillment <> 'partial' or v_item <> 'fulfilled' or v_events <> 2 or v_notifications <> 2 or v_escrow <> 'held' then
     raise exception 'shipped invariant failed: status %, fulfillment %, item %, events %, notifications %, escrow %', v_status,v_fulfillment,v_item,v_events,v_notifications,v_escrow;
@@ -141,15 +153,21 @@ begin
 end $$;
 
 -- Delivery completes fulfillment but deliberately leaves escrow held.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a2000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claims','{"sub":"a2000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
 select * from public.transition_seller_order('b1000000-0000-0000-0000-000000000001','delivered',null,null);
 select * from public.transition_seller_order('b1000000-0000-0000-0000-000000000001','delivered',null,null);
 
+reset role;
 do $$
 declare v_status text; v_fulfillment text; v_events integer; v_notifications integer; v_escrow text; v_delivered timestamptz;
 begin
   select status, fulfillment_status, delivered_at into v_status,v_fulfillment,v_delivered from public.orders where id='b1000000-0000-0000-0000-000000000001';
   select count(*) into v_events from public.order_fulfillment_events where order_id='b1000000-0000-0000-0000-000000000001';
-  select count(*) into v_notifications from public.notifications where metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
+  select count(*) into v_notifications from public.notifications
+    where user_id='a1000000-0000-0000-0000-000000000001'
+      and metadata->>'order_id'='b1000000-0000-0000-0000-000000000001';
   select status into v_escrow from public.escrow_transactions where order_id='b1000000-0000-0000-0000-000000000001';
   if v_status <> 'delivered' or v_fulfillment <> 'fulfilled' or v_delivered is null or v_events <> 3 or v_notifications <> 3 or v_escrow <> 'held' then
     raise exception 'delivered invariant failed: status %, fulfillment %, events %, notifications %, escrow %',v_status,v_fulfillment,v_events,v_notifications,v_escrow;
@@ -157,6 +175,7 @@ begin
 end $$;
 
 -- Timeline is participant-readable but not visible to an unrelated account.
+set local role authenticated;
 select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claims','{"sub":"a1000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
 do $$ declare v_count integer; begin
@@ -207,19 +226,30 @@ begin
   select status, tracking_number into v_status,v_tracking from public.orders where id='b3000000-0000-0000-0000-000000000003';
   select fulfillment_status into v_item from public.order_items where order_id='b3000000-0000-0000-0000-000000000003';
   select count(*) into v_events from public.order_fulfillment_events where order_id='b3000000-0000-0000-0000-000000000003';
-  select count(*) into v_notifications from public.notifications where metadata->>'order_id'='b3000000-0000-0000-0000-000000000003';
+  select count(*) into v_notifications from public.notifications
+    where user_id='a1000000-0000-0000-0000-000000000001'
+      and metadata->>'order_id'='b3000000-0000-0000-0000-000000000003';
   select status into v_escrow from public.escrow_transactions where order_id='b3000000-0000-0000-0000-000000000003';
   if v_status <> 'processing' or v_tracking is not null or v_item <> 'unfulfilled' or v_events <> 1 or v_notifications <> 1 or v_escrow <> 'held' then
     raise exception 'transaction rollback failed: status %, tracking %, item %, events %, notifications %, escrow %',v_status,v_tracking,v_item,v_events,v_notifications,v_escrow;
   end if;
 end $$;
 
--- Even service_role cannot rewrite immutable history.
+-- service_role cannot mutate the append-only ledger because it has no UPDATE
+-- grant. The table owner is independently blocked by the immutability trigger.
 set local role service_role;
 do $$ begin
   begin
     update public.order_fulfillment_events set metadata='{"tampered":true}' where order_id='b1000000-0000-0000-0000-000000000001';
-    raise exception 'immutable fulfillment history was mutable';
+    raise exception 'service_role unexpectedly mutated immutable fulfillment history';
+  exception when sqlstate '42501' then null; end;
+end $$;
+
+reset role;
+do $$ begin
+  begin
+    update public.order_fulfillment_events set metadata='{"tampered":true}' where order_id='b1000000-0000-0000-0000-000000000001';
+    raise exception 'table owner unexpectedly mutated immutable fulfillment history';
   exception when sqlstate '55000' then null; end;
 end $$;
 
