@@ -123,6 +123,23 @@ An environment flag by itself therefore cannot make health report translation as
 ready before its database dependency exists. A blocked optional feature must not
 make browsing or checkout globally unhealthy.
 
+## Migration identity and reconciliation
+
+The repository migration is
+`supabase/migrations/20260903034500_m5_message_translation_cache.sql`.
+Production release evidence must record both that repository identity and the
+Supabase management-recorded live migration version. Supabase management-applied
+timestamps may differ from repository filename timestamps; reconciliation is by
+migration name/identity and reviewed SQL content, never by renaming or rewriting
+an already-applied migration to make timestamps look identical.
+
+Before applying this migration, prove that the live database still has 49 public
+base tables, 49 RLS-enabled public base tables, 10 intentional deny-by-default
+public tables and no `public.message_translations`. After application, prove 50,
+50 and 11 respectively, plus the exact browser/service-role privilege and
+constraint/index contracts. Any partial or unexpected shape blocks application
+promotion.
+
 ## Promotion gate
 
 Do not expose Translate / Show original until all of the following are true:
