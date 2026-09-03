@@ -87,7 +87,7 @@ if (
 for (const required of [
   "idx_conversations_created_by",
   "security_invoker=true",
-  "public_base_table_count changed",
+  "canonical public physical table count changed",
   "browser key-envelope privilege leaked",
   "public Store Chat wrapper became SECURITY DEFINER",
 ]) {
