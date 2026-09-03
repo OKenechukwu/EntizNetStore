@@ -22,13 +22,50 @@ export default async function BuyerOrdersPage() {
 
   if (!buyer) redirect("/dashboard");
 
+  // Keep the base order read compatible with the pre-ledger production schema.
+  // Fulfillment events are loaded separately and degrade to the legacy order
+  // status fields during a controlled migration/deployment convergence window.
   const { data: orders, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents), order_fulfillment_events(id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at)",
+      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents)",
     )
     .eq("buyer_id", user.id)
     .order("created_at", { ascending: false });
+
+  const eventsByOrder = new Map<string, OrderFulfillmentEvent[]>();
+  let detailedTimelineAvailable = true;
+  if (!error && orders?.length) {
+    const { data: fulfillmentEvents, error: fulfillmentEventsError } = await supabase
+      .from("order_fulfillment_events")
+      .select(
+        "id, order_id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at",
+      )
+      .in(
+        "order_id",
+        orders.map((order) => order.id),
+      )
+      .order("occurred_at", { ascending: true });
+
+    if (fulfillmentEventsError) {
+      detailedTimelineAvailable = false;
+    } else {
+      for (const event of fulfillmentEvents ?? []) {
+        const timelineEvent: OrderFulfillmentEvent = {
+          id: event.id,
+          from_status: event.from_status,
+          to_status: event.to_status,
+          fulfillment_status: event.fulfillment_status,
+          shipping_carrier: event.shipping_carrier,
+          tracking_number: event.tracking_number,
+          occurred_at: event.occurred_at,
+        };
+        const list = eventsByOrder.get(event.order_id) ?? [];
+        list.push(timelineEvent);
+        eventsByOrder.set(event.order_id, list);
+      }
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -43,6 +80,15 @@ export default async function BuyerOrdersPage() {
           Back to profile
         </Link>
       </div>
+
+      {!error && !detailedTimelineAvailable && (
+        <p
+          className="mb-4 rounded-lg border border-border bg-white/5 p-3 text-sm text-foreground/80"
+          role="status"
+        >
+          Detailed shipment history is temporarily unavailable. Your current order status remains visible below.
+        </p>
+      )}
 
       {error ? (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-red-200" role="alert">
@@ -60,7 +106,7 @@ export default async function BuyerOrdersPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => {
-            const events = (order.order_fulfillment_events ?? []) as OrderFulfillmentEvent[];
+            const events = eventsByOrder.get(order.id) ?? [];
             return (
               <article key={order.id} className="rounded-xl border border-border bg-background p-5 text-foreground">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
