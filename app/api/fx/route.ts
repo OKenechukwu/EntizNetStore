@@ -1,72 +1,94 @@
-// app/api/fx/route.ts
 import { NextResponse } from "next/server";
+import {
+  BASE_CURRENCY,
+  SUPPORTED_CURRENCIES,
+  isValidFxRates,
+  type CurrencyCode,
+  type FxRates,
+} from "@/lib/currency";
 
-// Optional (safe): ensure this route is treated as dynamic and can revalidate
 export const dynamic = "force-dynamic";
 
-/**
- * Proxy for live FX rates (base = USD).
- * Uses Frankfurter (free) and returns a trimmed set of currencies.
- * Adds caching headers for CDN/browser and server revalidation.
- */
-export async function GET() {
-  try {
-    const res = await fetch("https://api.frankfurter.app/latest?from=USD", {
-      // Server-side revalidation window (3 hours)
-      next: { revalidate: 60 * 60 * 3 },
-    });
+const FX_ORIGIN = "https://api.frankfurter.dev";
+const FX_MAX_RESPONSE_BYTES = 32 * 1024;
+const FX_TIMEOUT_MS = 4_000;
+const QUOTES = SUPPORTED_CURRENCIES.filter((currency) => currency !== BASE_CURRENCY);
 
-    if (!res.ok) {
-      throw new Error(`FX upstream error: ${res.status}`);
+type FrankfurterRate = {
+  date?: string;
+  base?: string;
+  quote?: string;
+  rate?: number;
+};
+
+function failure(status = 503) {
+  return NextResponse.json(
+    { error: "FX rates temporarily unavailable" },
+    { status, headers: { "Cache-Control": "no-store, max-age=0" } },
+  );
+}
+
+export async function GET() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FX_TIMEOUT_MS);
+  try {
+    const url = new URL("/v2/rates", FX_ORIGIN);
+    url.searchParams.set("base", BASE_CURRENCY);
+    url.searchParams.set("quotes", QUOTES.join(","));
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) return failure();
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) return failure();
+    const declaredLength = Number(response.headers.get("content-length") || 0);
+    if (declaredLength > FX_MAX_RESPONSE_BYTES) return failure();
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > FX_MAX_RESPONSE_BYTES) return failure();
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!Array.isArray(payload)) return failure();
+
+    const rates = { USD: 1 } as Partial<Record<CurrencyCode, number>>;
+    let asOf: string | undefined;
+    for (const row of payload as FrankfurterRate[]) {
+      if (row.base !== BASE_CURRENCY || typeof row.quote !== "string") return failure();
+      if (!QUOTES.includes(row.quote as CurrencyCode)) continue;
+      if (typeof row.rate !== "number" || !Number.isFinite(row.rate) || row.rate <= 0) return failure();
+      rates[row.quote as CurrencyCode] = row.rate;
+      if (row.date && (!asOf || row.date < asOf)) asOf = row.date;
     }
 
-    // Example response: { amount, base, date, rates: { EUR: 0.93, ... } }
-    const data = (await res.json()) as {
-      base?: string;
-      date?: string;
-      rates?: Record<string, number>;
-    };
+    const candidate = {
+      ...rates,
+      __base: BASE_CURRENCY,
+      __asOf: asOf,
+      __source: "live",
+    } as FxRates;
+    if (!isValidFxRates(candidate)) return failure();
 
-    // Keep only currencies we actually use (plus USD=1)
-    const wanted = [
-      "USD",
-      "EUR",
-      "GBP",
-      "PHP",
-      "JPY",
-      "KRW",
-      "AUD",
-      "CAD",
-      "NGN",
-    ];
-    const pick = (obj: Record<string, number> = {}, keys: string[]) =>
-      keys.reduce(
-        (acc, k) => {
-          if (k === "USD") acc[k] = 1;
-          else if (obj[k] != null) acc[k] = obj[k];
-          return acc;
+    return NextResponse.json(
+      {
+        base: BASE_CURRENCY,
+        rates: Object.fromEntries(SUPPORTED_CURRENCIES.map((currency) => [currency, candidate[currency]])),
+        date: asOf,
+        source: "frankfurter-v2",
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=10800, stale-while-revalidate=21600, max-age=900",
+          "X-Content-Type-Options": "nosniff",
         },
-        {} as Record<string, number>,
-      );
-
-    const rates = pick(data.rates, wanted);
-
-    return NextResponse.json(
-      { base: "USD", rates, date: data.date },
-      {
-        // CDN 3h, browser 30m (server revalidates every 3h via `next.revalidate`)
-        headers: { "Cache-Control": "public, s-maxage=10800, max-age=1800" },
       },
     );
-  } catch (err) {
-    // Graceful fallback — client can decide to use static rates
-    return NextResponse.json(
-      {
-        base: "USD",
-        rates: null,
-        error: (err as Error)?.message ?? "FX fetch failed",
-      },
-      { status: 200 },
-    );
+  } catch {
+    return failure();
+  } finally {
+    clearTimeout(timeout);
   }
 }
