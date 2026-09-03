@@ -31,8 +31,14 @@ begin
   if position('SET search_path TO ''''' in v_private_definition) = 0 then
     raise exception 'private fulfillment authority must pin an empty search_path';
   end if;
-  if v_private_definition ~* 'update[[:space:]]+public\.escrow_transactions' then
+  if v_private_definition ~* 'update[[:space:]]+public\.escrow_transactions'
+     or v_private_definition ~* 'delete[[:space:]]+from[[:space:]]+public\.escrow_transactions' then
     raise exception 'fulfillment authority must never release or mutate escrow';
+  end if;
+  if v_private_definition not ilike '%bool_or(coalesce(oi.requires_shipping, true))%'
+     or v_private_definition not ilike '%shipping_not_required_for_order%'
+     or v_private_definition not ilike '%v_order.status = ''processing'' and not v_requires_shipping%' then
+    raise exception 'digital-only fulfillment branch is missing or no longer item-derived';
   end if;
 
   if has_function_privilege('anon', 'public.transition_seller_order(uuid,text,text,text)', 'EXECUTE') then
@@ -59,13 +65,23 @@ begin
   if has_table_privilege('anon', 'public.order_fulfillment_events', 'SELECT') then
     raise exception 'anon has timeline SELECT privilege';
   end if;
-  if not has_table_privilege('authenticated', 'public.order_fulfillment_events', 'SELECT') then
-    raise exception 'authenticated participants need timeline SELECT privilege';
+  if not has_table_privilege('authenticated', 'public.order_fulfillment_events', 'SELECT')
+     or not has_table_privilege('service_role', 'public.order_fulfillment_events', 'SELECT') then
+    raise exception 'authenticated/service roles need read-only timeline SELECT privilege';
   end if;
+
   if has_table_privilege('authenticated', 'public.order_fulfillment_events', 'INSERT')
      or has_table_privilege('authenticated', 'public.order_fulfillment_events', 'UPDATE')
-     or has_table_privilege('authenticated', 'public.order_fulfillment_events', 'DELETE') then
+     or has_table_privilege('authenticated', 'public.order_fulfillment_events', 'DELETE')
+     or has_table_privilege('authenticated', 'public.order_fulfillment_events', 'TRUNCATE') then
     raise exception 'authenticated users must not mutate fulfillment events directly';
+  end if;
+
+  if has_table_privilege('service_role', 'public.order_fulfillment_events', 'INSERT')
+     or has_table_privilege('service_role', 'public.order_fulfillment_events', 'UPDATE')
+     or has_table_privilege('service_role', 'public.order_fulfillment_events', 'DELETE')
+     or has_table_privilege('service_role', 'public.order_fulfillment_events', 'TRUNCATE') then
+    raise exception 'service_role must not forge, change, erase or truncate fulfillment evidence';
   end if;
 
   select count(*) into v_trigger_count
