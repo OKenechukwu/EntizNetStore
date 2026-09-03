@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { publicIndexingLaunchStatus } from '@/lib/launch/publicIndexing'
+import {
+  messageTranslationLaunchStatus,
+  storeChatLaunchStatus,
+} from '@/lib/launch/messagingReadiness'
 import { reportOperationalError } from '@/lib/observability/operationalEventSink'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { validateUploadScannerConfiguration } from '@/lib/storage/uploadScanner'
@@ -46,6 +50,7 @@ export async function GET() {
   let storage: CheckStatus = 'unavailable'
   let operations: CheckStatus = 'unavailable'
   let payments: CheckStatus = 'unavailable'
+  let messageTranslationGate = messageTranslationLaunchStatus()
 
   try {
     const admin = getSupabaseAdmin()
@@ -93,6 +98,26 @@ export async function GET() {
     }
 
     if (database === 'ok') {
+      if (messageTranslationGate === 'configured') {
+        const translationCacheResult = await admin
+          .from('message_translations')
+          .select('id')
+          .limit(1)
+
+        if (translationCacheResult.error) {
+          messageTranslationGate = 'blocked'
+          await reportOperationalError(
+            'readiness.message_translation_cache_unavailable',
+            translationCacheResult.error,
+            {
+              component: 'messaging',
+              operation: 'message-translation-cache-readiness-check',
+              route: '/api/health',
+            },
+          )
+        }
+      }
+
       const [operationalHealthResult, paymentHealthResult] = await Promise.all([
         admin.rpc('operational_event_health', {
           p_window_minutes: 15,
@@ -136,8 +161,11 @@ export async function GET() {
           : paymentHealthResult.data
         payments = row?.status === 'degraded' ? 'degraded' : row?.status === 'ok' ? 'ok' : 'unavailable'
       }
+    } else if (messageTranslationGate === 'configured') {
+      messageTranslationGate = 'blocked'
     }
   } catch (error) {
+    if (messageTranslationGate === 'configured') messageTranslationGate = 'blocked'
     await reportOperationalError('readiness.check_failed', error, {
       component: 'readiness',
       operation: 'readiness-check',
@@ -158,6 +186,8 @@ export async function GET() {
       launchGates: {
         uploadSafety: uploadScannerConfiguration.ok ? 'configured' : 'blocked',
         indexing: publicIndexingLaunchStatus(),
+        storeChat: storeChatLaunchStatus(),
+        messageTranslation: messageTranslationGate,
       },
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
       backendBinding: serverSupabaseBinding(),
