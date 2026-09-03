@@ -87,13 +87,21 @@ if (
 for (const required of [
   "idx_conversations_created_by",
   "security_invoker=true",
-  "canonical public physical table count changed",
+  "Store Chat physical tables missing or changed kind",
+  "conversation_keys",
+  "conversations",
+  "message_attachments",
+  "message_translations",
+  "messages",
   "browser key-envelope privilege leaked",
   "public Store Chat wrapper became SECURITY DEFINER",
 ]) {
   if (!structuralInvariants.includes(required)) {
     fail(`hosted structural invariant is missing: ${required}`);
   }
+}
+if (/canonical public physical table count changed/i.test(structuralInvariants)) {
+  fail("Store Chat structural invariants must not couple to marketplace-wide table count");
 }
 
 if (
