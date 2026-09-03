@@ -21,11 +21,14 @@ declare
     'mark_all_notifications_read()',
     'mark_conversation_read(uuid)',
     'mark_notification_read(uuid)',
+    'mark_store_conversation_read(uuid)',
     'open_order_dispute(uuid,text,text)',
+    'open_store_conversation(text,uuid)',
     'seller_delete_product(uuid)',
     'seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])',
     'seller_set_product_publication(uuid,boolean)',
     'seller_submit_product_for_review(uuid)',
+    'send_store_message(uuid,text,text,text,text)',
     'submit_marketplace_report(text,uuid,text,text)',
     'transition_seller_order(uuid,text,text,text)'
   ];
@@ -87,6 +90,71 @@ begin
 
   if cardinality(unscoped) > 0 then
     raise exception 'authenticated SECURITY DEFINER RPC(s) lost auth.uid() scoping: %', unscoped;
+  end if;
+end;
+$$;
+
+-- M5 Store Chat deliberately adds three browser-callable SECURITY DEFINER RPCs.
+-- Audit their exact signatures and invariants here instead of treating the
+-- allowlist entry as sufficient evidence. The browser never supplies a message
+-- recipient: open derives counterparties from commerce context and send derives
+-- its recipient from the already-authorized canonical conversation.
+do $$
+declare
+  open_fn regprocedure := 'public.open_store_conversation(text,uuid)'::regprocedure;
+  send_fn regprocedure := 'public.send_store_message(uuid,text,text,text,text)'::regprocedure;
+  read_fn regprocedure := 'public.mark_store_conversation_read(uuid)'::regprocedure;
+  fn regprocedure;
+  definition text;
+  arguments text;
+begin
+  foreach fn in array array[open_fn, send_fn, read_fn] loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'Store Chat RPC privilege contract changed for %', fn;
+    end if;
+
+    select pg_get_functiondef(fn::oid), pg_get_function_arguments(fn::oid)
+      into definition, arguments;
+
+    if definition not ilike '%security definer%'
+       or definition not ilike '%auth.uid()%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog''%'
+         or definition ilike '%set search_path = pg_catalog%'
+       ) then
+      raise exception 'Store Chat RPC % lost SECURITY DEFINER/auth.uid/search_path hardening', fn;
+    end if;
+
+    if arguments ilike '%recipient%' then
+      raise exception 'Store Chat RPC % unexpectedly accepts caller-supplied recipient authority', fn;
+    end if;
+  end loop;
+
+  select pg_get_functiondef(open_fn::oid) into definition;
+  if definition not ilike '%p_context_type%'
+     or definition not ilike '%p_context_id%'
+     or definition not ilike '%store_chat_role_is_active%'
+     or definition not ilike '%participant1_id%'
+     or definition not ilike '%participant2_id%' then
+    raise exception 'open_store_conversation lost context/capability-derived participant authority';
+  end if;
+
+  select pg_get_functiondef(send_fn::oid) into definition;
+  if definition not ilike '%v_recipient := v_conversation.participant2_id%'
+     or definition not ilike '%v_recipient := v_conversation.participant1_id%'
+     or definition not ilike '%store_chat_role_is_active%'
+     or definition not ilike '%message_key_envelopes%'
+     or definition not ilike '%is_encrypted%'
+     or definition not ilike '%encryption_version%' then
+    raise exception 'send_store_message lost canonical recipient/capability/encryption authority';
+  end if;
+
+  select pg_get_functiondef(read_fn::oid) into definition;
+  if definition not ilike '%recipient_id = v_actor%'
+     or definition not ilike '%conversation_id = p_conversation_id%' then
+    raise exception 'mark_store_conversation_read lost recipient/conversation scoping';
   end if;
 end;
 $$;
