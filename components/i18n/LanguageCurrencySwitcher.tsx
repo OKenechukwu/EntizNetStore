@@ -1,7 +1,7 @@
 // components/i18n/LanguageCurrencySwitcher.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useBrand } from "@/components/providers/BrandProvider";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { SUPPORTED_CURRENCIES, type CurrencyCode } from "@/lib/currency";
@@ -28,9 +28,14 @@ type Props = {
 
 export default function LanguageCurrencySwitcher({ showLabels = false, className = "" }: Props) {
   const { currency, setCurrency } = useBrand();
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, t } = useI18n();
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>(currency);
   const [localLang, setLocalLang] = useState<string>(locale || "en");
+  const instanceId = useId();
+  const languageId = `${instanceId}-language`;
+  const currencyId = `${instanceId}-currency`;
+  const languageLabel = t("common.language", "Language");
+  const currencyLabel = t("common.currency", "Currency");
 
   useEffect(() => {
     setLocalCurrency(currency);
@@ -54,33 +59,43 @@ export default function LanguageCurrencySwitcher({ showLabels = false, className
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <select
-        id="language-select"
-        value={localLang}
-        onChange={onChangeLanguage}
-        className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-        aria-label="Language"
-      >
-        {SUPPORTED_LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>
-            {l.label}
-          </option>
-        ))}
-      </select>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <label htmlFor={languageId} className={showLabels ? "text-xs text-foreground/70" : "sr-only"}>
+          {languageLabel}
+        </label>
+        <select
+          id={languageId}
+          value={localLang}
+          onChange={onChangeLanguage}
+          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+          aria-label={languageLabel}
+        >
+          {SUPPORTED_LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        id="currency-select"
-        value={localCurrency}
-        onChange={onChangeCurrency}
-        className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-        aria-label="Currency"
-      >
-        {SUPPORTED_CURRENCIES.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <label htmlFor={currencyId} className={showLabels ? "text-xs text-foreground/70" : "sr-only"}>
+          {currencyLabel}
+        </label>
+        <select
+          id={currencyId}
+          value={localCurrency}
+          onChange={onChangeCurrency}
+          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+          aria-label={currencyLabel}
+        >
+          {SUPPORTED_CURRENCIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
