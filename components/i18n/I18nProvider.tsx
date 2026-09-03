@@ -43,13 +43,6 @@ type I18nContextType = {
 const I18nContext = createContext<I18nContextType | null>(null);
 const ENGLISH_DICTIONARY = getEnglishDictionary();
 
-function getCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : undefined;
-}
-
 function getStoredValue(primary: string, legacy: readonly string[]) {
   if (typeof window === 'undefined') return undefined;
   try {
@@ -94,11 +87,10 @@ export default function I18nProvider({
 }) {
   const [locale, setLocaleState] = useState<SupportedLocale>(() => toLocale(initialLocale));
   const [currency, setCurrencyState] = useState<CurrencyCode>(() => toCurrencyCode(initialCurrency));
-  const [dict, setDict] = useState<Dictionary>(() => getDictionary(initialLocale));
+  const dict = useMemo<Dictionary>(() => getDictionary(locale), [locale]);
   const [fx, setFx] = useState<FxRates>(() => coerceFxRates(initialFx) || FALLBACK_RATES);
 
   useEffect(() => {
-    setDict(getDictionary(locale));
     const root = document.documentElement;
     root.lang = locale;
     root.dir = getLocaleDirection(locale);
@@ -148,19 +140,27 @@ export default function I18nProvider({
     };
   }, []);
 
-  // Migrate localStorage-only legacy preferences after hydration without changing
-  // the server-rendered first frame. Canonical localStorage always wins.
+  // Migrate localStorage-only legacy preferences after hydration. Scheduling the
+  // state change outside the effect body avoids an extra synchronous render and
+  // keeps the server-rendered first frame authoritative until hydration completes.
   useEffect(() => {
-    try {
-      if (!localStorage.getItem(LOCALE_STORAGE_KEY)) {
-        const storedLocale = getStoredValue(LOCALE_STORAGE_KEY, LEGACY_LOCALE_KEYS);
-        if (storedLocale) setLocale(storedLocale);
-      }
-      if (!localStorage.getItem(CURRENCY_STORAGE_KEY)) {
-        const storedCurrency = getStoredValue(CURRENCY_STORAGE_KEY, LEGACY_CURRENCY_KEYS);
-        if (storedCurrency) setCurrency(storedCurrency);
-      }
-    } catch {}
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        if (!localStorage.getItem(LOCALE_STORAGE_KEY)) {
+          const storedLocale = getStoredValue(LOCALE_STORAGE_KEY, LEGACY_LOCALE_KEYS);
+          if (storedLocale) setLocale(storedLocale);
+        }
+        if (!localStorage.getItem(CURRENCY_STORAGE_KEY)) {
+          const storedCurrency = getStoredValue(CURRENCY_STORAGE_KEY, LEGACY_CURRENCY_KEYS);
+          if (storedCurrency) setCurrency(storedCurrency);
+        }
+      } catch {}
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [setCurrency, setLocale]);
 
   const refreshFx = useCallback(async () => {
