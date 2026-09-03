@@ -17,15 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-  if v_public_tables <> 50 then
-    raise exception 'Expected 50 public tables, found %', v_public_tables;
+  if v_public_tables <> 51 then
+    raise exception 'Expected 51 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-  if v_rls_tables <> 50 then
-    raise exception 'Expected RLS on all 50 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 51 then
+    raise exception 'Expected RLS on all 51 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -34,10 +34,10 @@ begin
     and c.relkind = 'r'
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-  -- Reviews, content pages and notifications have scoped policies while
-  -- prohibited-product rules, upload scans and encrypted translation cache
-  -- remain trusted-worker-only. Eleven operational tables intentionally remain
-  -- deny-by-default.
+  -- Reviews, content pages, notifications and fulfillment evidence have scoped
+  -- policies while prohibited-product rules, upload scans and encrypted
+  -- translation cache remain trusted-worker-only. Eleven operational tables
+  -- intentionally remain deny-by-default.
   if v_no_policy_tables <> 11 then
     raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
@@ -59,11 +59,12 @@ with expected(name) as (
     ('marketplace_capability_state_events'), ('marketplace_capability_states'),
     ('marketplace_reports'), ('message_attachments'), ('message_translations'),
     ('messages'), ('notifications'), ('order_dispute_events'), ('order_disputes'),
-    ('order_items'), ('orders'), ('payment_sessions'), ('payment_webhook_events'),
-    ('payout_items'), ('payout_provider_events'), ('payout_requests'),
-    ('product_categories'), ('product_media'), ('product_moderation_events'),
-    ('product_variants'), ('products'), ('profiles_business'), ('profiles_buyer'),
-    ('profiles_seller'), ('profiles_seller_private'), ('prohibited_product_rules'),
+    ('order_fulfillment_events'), ('order_items'), ('orders'), ('payment_sessions'),
+    ('payment_webhook_events'), ('payout_items'), ('payout_provider_events'),
+    ('payout_requests'), ('product_categories'), ('product_media'),
+    ('product_moderation_events'), ('product_variants'), ('products'),
+    ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
+    ('profiles_seller_private'), ('prohibited_product_rules'),
     ('refund_provider_events'), ('refund_requests'), ('reviews'), ('upload_scan_jobs'),
     ('wholesale_offer_tiers'), ('wholesale_offers')
 ), actual(name) as (
@@ -83,7 +84,7 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical 50-table M5 dark-translation marketplace baseline';
+    raise exception 'Public table set differs from canonical 51-table fulfillment marketplace baseline';
   end if;
 
   if not exists (
@@ -208,7 +209,7 @@ begin
     'product_moderation_events','addresses','carts','cart_items','cart_quotes',
     'marketplace_capability_states','entiznet_identity_links','marketplace_reports',
     'content_pages','notifications','business_trading_roles','wholesale_offers',
-    'wholesale_offer_tiers'
+    'wholesale_offer_tiers','order_fulfillment_events'
   ] loop
     if not has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
       raise exception 'authenticated missing scoped SELECT on %', v_table;
@@ -253,6 +254,14 @@ begin
       raise exception 'service_role missing operational table access: %', v_table;
     end if;
   end loop;
+
+  if not has_table_privilege('service_role','public.order_fulfillment_events','SELECT')
+     or has_table_privilege('service_role','public.order_fulfillment_events','INSERT')
+     or has_table_privilege('service_role','public.order_fulfillment_events','UPDATE')
+     or has_table_privilege('service_role','public.order_fulfillment_events','DELETE')
+     or has_table_privilege('service_role','public.order_fulfillment_events','TRUNCATE') then
+    raise exception 'service_role fulfillment ledger must remain read-only';
+  end if;
 
   if not has_table_privilege('service_role','public.upload_scan_jobs','INSERT')
      or not has_table_privilege('service_role','public.upload_scan_jobs','UPDATE')
@@ -325,7 +334,7 @@ begin
     'business_trading_roles_one_primary','idx_wholesale_offers_active_variant',
     'idx_wholesale_offers_seller_status','idx_wholesale_offer_tiers_lookup',
     'idx_cart_items_wholesale_offer','idx_payment_sessions_initialization_attempt',
-    'idx_payment_sessions_provider_reference_unique'
+    'idx_payment_sessions_provider_reference_unique','idx_order_fulfillment_events_order_time'
   ] loop
     if to_regclass('public.' || v_idx) is null then
       raise exception 'Required supporting index missing: %', v_idx;
@@ -497,6 +506,7 @@ begin
   select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
+    and p.prosecdef
     and p.proname in (
       'create_checkout_session','create_checkout_session_v2',
       'attach_checkout_payment_intent','attach_checkout_payment_reference',
@@ -542,6 +552,10 @@ begin
     and p.proname in ('admin_review_kyc_document','admin_complete_seller_kyc')
     and not ('search_path=public, pg_temp' = any(coalesce(p.proconfig, array[]::text[])));
   if v_bad <> 0 then raise exception '% privileged KYC functions lack hardened search_path', v_bad; end if;
+
+  select count(*) into v_bad
+  from pg_proc p join pg_namespace n on n.oid = p.relnamespace
+  where false;
 
   select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
