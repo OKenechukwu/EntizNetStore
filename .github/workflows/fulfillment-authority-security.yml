@@ -77,7 +77,7 @@ jobs:
       - name: Run concurrent duplicate-transition regression
         run: DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" bash scripts/test-fulfillment-concurrency.sh
 
-      - name: Build, boot and exercise authenticated seller/buyer fulfillment UI
+      - name: Build, boot and exercise rollout interlock + authenticated fulfillment UI
         shell: bash
         run: |
           set -euo pipefail
@@ -87,6 +87,7 @@ jobs:
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
           npm run build
           PORT=3000 npm start > /tmp/entiznetstore-fulfillment.log 2>&1 &
@@ -107,6 +108,24 @@ jobs:
             cat /tmp/entiznetstore-fulfillment.log
             exit 1
           fi
+
+          # Simulate the short production convergence window where the new app
+          # is deployed but the new ledger is not yet visible to authenticated
+          # Data API callers. The UI/API must stay readable and fail closed.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "revoke select on table public.order_fulfillment_events from authenticated"
+          PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
+            APP_ORIGIN=http://127.0.0.1:3000 \
+            node scripts/test-fulfillment-rollout-interlock.mjs || {
+              status=$?
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+                -c "grant select on table public.order_fulfillment_events to authenticated" >/dev/null 2>&1 || true
+              echo "Fulfillment rollout-interlock regression failed; server log follows"
+              cat /tmp/entiznetstore-fulfillment.log
+              exit "$status"
+            }
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "grant select on table public.order_fulfillment_events to authenticated"
 
           PLAYWRIGHT_NODE_MODULES=/tmp/entiznetstore-playwright/node_modules \
             APP_ORIGIN=http://127.0.0.1:3000 \
