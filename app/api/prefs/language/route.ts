@@ -1,24 +1,24 @@
-// app/api/prefs/language/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/languages";
+import {
+  LEGACY_LOCALE_KEYS,
+  LOCALE_COOKIE,
+  toLocale,
+} from "@/lib/preferences";
 
 export async function POST(request: Request) {
-  const { language } = (await request.json().catch(() => ({}))) as {
-    language?: string;
-  };
-
-  const next = (language ?? "").toLowerCase().trim();
-  const chosen = SUPPORTED_LANGUAGES.find(l => l.code === next)?.code || DEFAULT_LANGUAGE;
-
-  // 1 year, readable by client (not httpOnly) so your forms can read it
-  const cookieStore = await cookies();
-  cookieStore.set("language", chosen, {
+  const body = (await request.json().catch(() => ({}))) as { language?: string; locale?: string };
+  const chosen = toLocale(body.locale || body.language);
+  const store = await cookies();
+  store.set(LOCALE_COOKIE, chosen, {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
-
-  return new NextResponse(null, { status: 204 });
+  for (const legacy of LEGACY_LOCALE_KEYS) store.delete(legacy);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }

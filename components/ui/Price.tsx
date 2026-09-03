@@ -1,124 +1,65 @@
-// components/ui/Price.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { useCurrency } from "@/components/currency/CurrencyProvider";
-
-type FxRates = Record<string, number> | null | undefined;
+import {
+  convertFromBase,
+  formatPrice,
+  toCurrencyCode,
+  type CurrencyCode,
+} from "@/lib/currency";
 
 type Props = {
-  amountUSD?: number | string | null | undefined; // main prop
-  amount?: number | string | null | undefined; // backward compat
-  rates?: FxRates; // optional; auto-fetch if missing
+  amountUSD?: number | string | null;
+  amount?: number | string | null;
+  rates?: Partial<Record<CurrencyCode, number>>;
   className?: string;
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
 };
 
-/** Normalize things like "£ GBP" → "GBP" */
-function normalizeCode(input?: string | null): string {
-  if (!input) return "USD";
-  const match = String(input)
-    .toUpperCase()
-    .match(/[A-Z]{3}/);
-  return match ? match[0] : "USD";
-}
-
-/** Safe numeric parse: handles undefined/null, "$39.17", "39,17", etc. */
-function toNumberUSD(v: unknown): number {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  const s = String(v)
-    .trim()
-    .replace(/[^0-9.,-]/g, "")
-    .replace(/,/g, ".");
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-const ZERO_DECIMAL = new Set(["JPY", "KRW"]);
-
-// Shared cache across all <Price/> renders in this session
-let cachedRates: Record<string, number> | null = null;
-let inflight: Promise<Record<string, number> | null> | null = null;
-
-/** Fetch live FX rates once (cached in-memory for all <Price/> components) */
-async function loadRatesOnce(): Promise<Record<string, number> | null> {
-  if (cachedRates) return cachedRates;
-  if (inflight) return inflight;
-
-  inflight = fetch("/api/fx", { cache: "no-store" })
-    .then((res) => res.json())
-    .then((j) =>
-      j?.rates && typeof j.rates === "object" ? (cachedRates = j.rates) : null,
-    )
-    .catch(() => null)
-    .finally(() => {
-      inflight = null;
-    });
-
-  return inflight;
+function toNumberUSD(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = String(value).trim().replace(/[^0-9.,-]/g, "").replace(/,/g, ".");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export default function Price({
   amountUSD,
-  amount, // alias
+  amount,
   rates,
   className,
   minimumFractionDigits,
   maximumFractionDigits,
 }: Props) {
   const { locale } = useI18n();
-  const { currency: currencyFromProvider, rates: currencyRates } = useCurrency();
-  
-  const code = normalizeCode(currencyFromProvider);
+  const { currency, rates: canonicalRates } = useCurrency();
+  const code = toCurrencyCode(currency);
   const base = toNumberUSD(amountUSD ?? amount);
-
-  const [autoRates, setAutoRates] = useState<Record<string, number> | null>(
-    cachedRates,
+  const effectiveRates = rates || canonicalRates;
+  const converted = useMemo(
+    () => convertFromBase(base, code, effectiveRates),
+    [base, code, effectiveRates],
   );
 
-  // Auto-fetch only once per session if no rates provided from CurrencyProvider
-  useEffect(() => {
-    if (!rates && !currencyRates && !autoRates) {
-      loadRatesOnce().then((r) => {
-        if (r) setAutoRates(r);
-      });
-    }
-  }, [rates, currencyRates, autoRates]);
-
-  // Use passed rates → CurrencyProvider rates → cached auto → fallback
-  const effectiveRates = rates ?? currencyRates ?? autoRates ?? { USD: 1 };
-
-  const rawRate = code === "USD" ? 1 : effectiveRates?.[code];
-  const rate =
-    typeof rawRate === "number" && isFinite(rawRate) && rawRate > 0
-      ? rawRate
-      : 1;
-
-  const { value, fracMin, fracMax } = useMemo(() => {
-    const converted = base * rate;
-    const zeroDec = ZERO_DECIMAL.has(code);
-    return {
-      value: Number.isFinite(converted) ? converted : 0,
-      fracMin: minimumFractionDigits ?? (zeroDec ? 0 : 2),
-      fracMax: maximumFractionDigits ?? (zeroDec ? 0 : 2),
-    };
-  }, [base, rate, code, minimumFractionDigits, maximumFractionDigits]);
-
   const formatted = useMemo(() => {
+    if (minimumFractionDigits === undefined && maximumFractionDigits === undefined) {
+      return formatPrice(converted, code, locale);
+    }
     try {
-      return new Intl.NumberFormat(locale || "en-US", {
+      return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: code,
-        minimumFractionDigits: fracMin,
-        maximumFractionDigits: fracMax,
-      }).format(value);
+        minimumFractionDigits,
+        maximumFractionDigits,
+      }).format(converted);
     } catch {
-      return `${code} ${value.toFixed(fracMax)}`;
+      return formatPrice(converted, code, locale);
     }
-  }, [value, code, locale, fracMin, fracMax]);
+  }, [converted, code, locale, minimumFractionDigits, maximumFractionDigits]);
 
   return <span className={className}>{formatted}</span>;
 }
