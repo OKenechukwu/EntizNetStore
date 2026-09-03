@@ -22,17 +22,27 @@ const publicValidationMessages: Record<string, string> = {
 };
 const conflictErrors = new Set(["invalid_fulfillment_transition", "conflicting_tracking_retry"]);
 
+function noStoreJson(body: Record<string, unknown>, status: number, extraHeaders?: HeadersInit) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+      ...extraHeaders,
+    },
+  });
+}
+
 function fulfillmentError(error: { code?: string; message?: string }) {
   if (error.code === "28000") {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Authentication required", code: "authentication_required" },
-      { status: 401 },
+      401,
     );
   }
   if (error.code === "42501") {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Order not found", code: "order_not_found" },
-      { status: 404 },
+      404,
     );
   }
   if (error.code === "22023") {
@@ -41,17 +51,17 @@ function fulfillmentError(error: { code?: string; message?: string }) {
       ? candidate
       : "invalid_fulfillment_update";
     const status = conflictErrors.has(code) ? 409 : 400;
-    return NextResponse.json(
+    return noStoreJson(
       {
         error: publicValidationMessages[code] ?? "Invalid fulfillment update",
         code,
       },
-      { status },
+      status,
     );
   }
-  return NextResponse.json(
+  return noStoreJson(
     { error: "Unable to update order fulfillment", code: "fulfillment_update_failed" },
-    { status: 500 },
+    500,
   );
 }
 
@@ -63,9 +73,9 @@ export async function POST(
   const orderId = z.string().uuid().safeParse(id);
   const input = inputSchema.safeParse(await request.json().catch(() => null));
   if (!orderId.success || !input.success) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Invalid fulfillment update", code: "invalid_request" },
-      { status: 400 },
+      400,
     );
   }
 
@@ -74,9 +84,29 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Authentication required", code: "authentication_required" },
-      { status: 401 },
+      401,
+    );
+  }
+
+  // Deployment interlock: the previous production schema contains a legacy RPC
+  // with this same name. Never call it from the new application unless the new
+  // append-only ledger is positively visible through the authenticated Data API.
+  // A missing migration, stale PostgREST schema cache, or database fault therefore
+  // fails closed instead of falling through to the legacy fulfillment behavior.
+  const { error: authorityProbeError } = await supabase
+    .from("order_fulfillment_events")
+    .select("id")
+    .limit(1);
+  if (authorityProbeError) {
+    return noStoreJson(
+      {
+        error: "Fulfillment updates are temporarily unavailable. Please refresh shortly.",
+        code: "fulfillment_authority_unavailable",
+      },
+      503,
+      { "Retry-After": "5" },
     );
   }
 
@@ -91,13 +121,13 @@ export async function POST(
 
   const result = Array.isArray(data) ? data[0] : data;
   if (!result) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Unable to confirm fulfillment update", code: "missing_authoritative_result" },
-      { status: 500 },
+      500,
     );
   }
 
-  return NextResponse.json(
+  return noStoreJson(
     {
       ok: true,
       order: {
@@ -111,6 +141,6 @@ export async function POST(
         idempotent: Boolean(result.idempotent),
       },
     },
-    { headers: { "Cache-Control": "no-store, max-age=0" } },
+    200,
   );
 }
