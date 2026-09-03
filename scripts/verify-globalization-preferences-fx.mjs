@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const read = (path) => fs.readFileSync(path, "utf8");
+const preferences = read("lib/preferences.ts");
+const dictionaries = read("lib/i18n/dictionaries.ts");
+const i18n = read("components/i18n/I18nProvider.tsx");
+const brand = read("components/providers/BrandProvider.tsx");
+const settings = read("providers/SettingsProvider.tsx");
+const switcher = read("components/i18n/LanguageCurrencySwitcher.tsx");
+const layout = read("app/layout.tsx");
+const proxy = read("proxy.ts");
+const languageRoute = read("app/api/prefs/language/route.ts");
+const currencyRoute = read("app/api/prefs/currency/route.ts");
+const currency = read("lib/currency.ts");
+const fxRoute = read("app/api/fx/route.ts");
+
+assert.match(preferences, /LOCALE_COOKIE = "entiz_locale"/);
+assert.match(preferences, /CURRENCY_COOKIE = "entiz_currency"/);
+assert.match(preferences, /code: "ar"[\s\S]*direction: "rtl"/);
+assert.match(dictionaries, /Record<SupportedLocale, Dictionary>/);
+assert.match(switcher, /SUPPORTED_LOCALES\.map/);
+assert.doesNotMatch(switcher, /const SUPPORTED_LANGUAGES =/);
+assert.doesNotMatch(i18n, /NEXT_PUBLIC_SUPPORTED_LOCALES/);
+assert.match(i18n, /getDictionary\(locale\)/);
+assert.match(i18n, /getFxRates\(\)/);
+assert.match(brand, /useI18n\(\)/);
+assert.doesNotMatch(brand, /useState/);
+assert.match(settings, /useI18n\(\)/);
+assert.doesNotMatch(settings, /localStorage\.getItem\(["']currency["']\)/);
+assert.match(layout, /dir=\{getLocaleDirection\(initialLocale\)\}/);
+assert.match(proxy, /response\.cookies\.set\(LOCALE_COOKIE/);
+assert.match(proxy, /response\.cookies\.set\(CURRENCY_COOKIE/);
+assert.doesNotMatch(proxy, /response\.cookies\.set\(["'](?:locale|currency)["'],\s*["']/);
+assert.match(languageRoute, /cookieStore\.set\(LOCALE_COOKIE/);
+assert.match(currencyRoute, /cookieStore\.set\(CURRENCY_COOKIE/);
+assert.match(currency, /function requireRate/);
+assert.doesNotMatch(currency, /if \(!r \|\| r <= 0\) return roundMoney\(amount\)/);
+assert.match(fxRoute, /https:\/\/api\.frankfurter\.dev/);
+assert.match(fxRoute, /redirect: "error"/);
+assert.match(fxRoute, /AbortController/);
+assert.match(fxRoute, /FX_MAX_RESPONSE_BYTES/);
+assert.doesNotMatch(fxRoute, /\(err as Error\).*message/);
+assert.match(fxRoute, /isValidFxRates\(candidate\)/);
+
+process.stdout.write("Globalization preference and FX foundation verification passed\n");
