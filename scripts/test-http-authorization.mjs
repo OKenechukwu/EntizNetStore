@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import './test-p0-http-safety.mjs'
 
 const origin = process.env.APP_ORIGIN || 'http://127.0.0.1:3000'
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,6 +11,19 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!supabaseUrl || !anonKey || !serviceRoleKey) {
   throw new Error('SUPABASE_URL, SUPABASE_ANON_KEY/NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required')
 }
+
+// This manifest intentionally mirrors the production-foundation gate. Each item
+// is executed by the imported dedicated P0 suite above; keeping the manifest here
+// makes loss of that chained safety coverage visible to the canonical HTTP gate.
+const delegatedP0Coverage = [
+  '/api/seller/branding',
+  '/api/kyc/documents',
+  'seller B cannot delete seller A promoted product-media path',
+  'seller branding rejects spoofed image bytes',
+  'EICAR KYC fixture is blocked before promotion',
+  'spoofed product image is rejected before public promotion',
+]
+assert.equal(delegatedP0Coverage.length, 6)
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
