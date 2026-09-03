@@ -73,13 +73,41 @@ async function inspectPreferenceMigration(browser) {
   assert.doesNotMatch(state.cookies, /(?:^|;\s*)locale=/);
   assert.doesNotMatch(state.cookies, /(?:^|;\s*)currency=/);
 
-  await page.locator('select[id$="-language"]').first().selectOption("de");
-  await page.locator('select[id$="-currency"]').first().selectOption("EUR");
+  const visibleLanguage = page.locator('select[id$="-language"]:visible').first();
+  const visibleCurrency = page.locator('select[id$="-currency"]:visible').first();
+  assert.equal(await visibleLanguage.count(), 1, "one visible language control must be available at the migration viewport");
+  assert.equal(await visibleCurrency.count(), 1, "one visible currency control must be available at the migration viewport");
+
+  await visibleLanguage.selectOption("de");
+  await visibleCurrency.selectOption("EUR");
   await page.waitForFunction(() => document.documentElement.lang === "de" && document.documentElement.dir === "ltr" && document.documentElement.dataset.currency === "EUR");
+
+  const synchronized = await page.evaluate(() => ({
+    languages: [...document.querySelectorAll('select[id$="-language"]')].map((element) => element.value),
+    currencies: [...document.querySelectorAll('select[id$="-currency"]')].map((element) => element.value),
+  }));
+  assert.ok(synchronized.languages.length >= 2, "responsive language instances must remain rendered for synchronization proof");
+  assert.ok(synchronized.currencies.length >= 2, "responsive currency instances must remain rendered for synchronization proof");
+  assert.ok(synchronized.languages.every((value) => value === "de"), "all responsive language controls must synchronize to canonical state");
+  assert.ok(synchronized.currencies.every((value) => value === "EUR"), "all responsive currency controls must synchronize to canonical state");
+
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.documentElement.lang === "de" && document.documentElement.dataset.currency === "EUR");
-  state = await page.evaluate(() => ({ lang: document.documentElement.lang, dir: document.documentElement.dir, currency: document.documentElement.dataset.currency }));
-  assert.deepEqual(state, { lang: "de", dir: "ltr", currency: "EUR" });
+  state = await page.evaluate(() => ({
+    lang: document.documentElement.lang,
+    dir: document.documentElement.dir,
+    currency: document.documentElement.dataset.currency,
+    cookies: document.cookie,
+  }));
+  assert.deepEqual(
+    { lang: state.lang, dir: state.dir, currency: state.currency },
+    { lang: "de", dir: "ltr", currency: "EUR" },
+  );
+  assert.match(state.cookies, /(?:^|;\s*)entiz_locale=de(?:;|$)/);
+  assert.match(state.cookies, /(?:^|;\s*)entiz_currency=EUR(?:;|$)/);
+  assert.doesNotMatch(state.cookies, /(?:^|;\s*)locale=/);
+  assert.doesNotMatch(state.cookies, /(?:^|;\s*)currency=/);
+
   await context.close();
   process.stdout.write("ok - legacy preference cookies migrate to canonical RTL state and persist\n");
 }
