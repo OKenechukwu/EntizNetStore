@@ -48,6 +48,7 @@ for (const key of ["buyerOrders", "sellerOrders"]) {
   mustContain(key, /order_fulfillment_events\(/i, `${key} must read authoritative fulfillment events`);
   mustContain(key, /<OrderFulfillmentTimeline/i, `${key} must render the shared timeline`);
   mustContain(key, /<Price\s+amount=/i, `${key} must use canonical display currency formatting`);
+  mustNotContain(key, /<main\b/i, `${key} must rely on the root layout's single global main landmark`);
 }
 mustNotContain("timeline", /href=|https?:\/\//i, "tracking timeline must not turn seller-provided data into arbitrary links");
 

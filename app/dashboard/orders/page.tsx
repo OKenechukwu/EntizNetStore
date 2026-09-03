@@ -30,7 +30,7 @@ export default async function SellerOrdersPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Seller Orders</h1>
@@ -109,6 +109,6 @@ export default async function SellerOrdersPage() {
           })}
         </div>
       )}
-    </main>
+    </div>
   );
 }
