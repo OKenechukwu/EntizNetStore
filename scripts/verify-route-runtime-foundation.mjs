@@ -48,12 +48,26 @@ if (!exists("proxy.ts")) {
   }
   for (const requiredFragment of [
     'updateSupabaseSession',
-    'request.cookies.get("locale")',
-    'request.cookies.get("currency")',
+    'LOCALE_COOKIE',
+    'CURRENCY_COOKIE',
+    'LEGACY_LOCALE_KEYS',
+    'LEGACY_CURRENCY_KEYS',
+    'request.cookies.get(LOCALE_COOKIE)',
+    'request.cookies.get(CURRENCY_COOKIE)',
+    'expireLegacyCookie(response, key)',
     'matcher: ["/((?!_next|.*\\\\..*).*)"]',
   ]) {
     if (!proxy.includes(requiredFragment)) {
       fail(`Proxy lost required request/cookie control: ${requiredFragment}`);
+    }
+  }
+  for (const forbiddenWrite of [
+    'response.cookies.set("locale"',
+    'response.cookies.set("language"',
+    'response.cookies.set("currency"',
+  ]) {
+    if (proxy.includes(forbiddenWrite)) {
+      fail(`Proxy must not reintroduce legacy preference writes: ${forbiddenWrite}`);
     }
   }
 }
