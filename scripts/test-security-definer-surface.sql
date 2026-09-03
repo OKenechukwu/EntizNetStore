@@ -91,6 +91,106 @@ begin
 end;
 $$;
 
+-- M5 Store Chat exposes only SECURITY INVOKER wrappers in public. Privileged
+-- implementations live in the non-exposed app_private schema. Audit both sides:
+-- exact signatures, explicit grants, pinned search paths, auth.uid binding, and
+-- the absence of any caller-supplied recipient parameter.
+do $$
+declare
+  public_fns regprocedure[] := array[
+    'public.open_store_conversation(text,uuid)'::regprocedure,
+    'public.send_store_message(uuid,text,text,text,text)'::regprocedure,
+    'public.mark_store_conversation_read(uuid)'::regprocedure
+  ];
+  private_fns regprocedure[] := array[
+    'app_private.open_store_conversation_authority(text,uuid)'::regprocedure,
+    'app_private.send_store_message_authority(uuid,text,text,text,text)'::regprocedure,
+    'app_private.mark_store_conversation_read_authority(uuid)'::regprocedure
+  ];
+  fn regprocedure;
+  definition text;
+  arguments text;
+  is_definer boolean;
+begin
+  foreach fn in array public_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'Store Chat public wrapper privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if is_definer then
+      raise exception 'Store Chat public wrapper % must remain SECURITY INVOKER', fn;
+    end if;
+    if not (
+      definition ilike '%set search_path to ''pg_catalog''%'
+      or definition ilike '%set search_path = pg_catalog%'
+    ) then
+      raise exception 'Store Chat public wrapper % lost pinned search_path', fn;
+    end if;
+    if arguments ilike '%recipient%' then
+      raise exception 'Store Chat public wrapper % accepts caller-supplied recipient authority', fn;
+    end if;
+  end loop;
+
+  foreach fn in array private_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'Store Chat private authority privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if not is_definer
+       or definition not ilike '%auth.uid()%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog''%'
+         or definition ilike '%set search_path = pg_catalog%'
+       ) then
+      raise exception 'Store Chat private authority % lost definer/auth.uid/search_path hardening', fn;
+    end if;
+    if arguments ilike '%recipient%' then
+      raise exception 'Store Chat private authority % accepts caller-supplied recipient authority', fn;
+    end if;
+  end loop;
+
+  select pg_get_functiondef('app_private.open_store_conversation_authority(text,uuid)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%p_context_type%'
+     or definition not ilike '%p_context_id%'
+     or definition not ilike '%store_chat_role_is_active%'
+     or definition not ilike '%participant1_id%'
+     or definition not ilike '%participant2_id%' then
+    raise exception 'private open_store_conversation authority lost context/capability-derived participants';
+  end if;
+
+  select pg_get_functiondef('app_private.send_store_message_authority(uuid,text,text,text,text)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%v_recipient := v_conversation.participant2_id%'
+     or definition not ilike '%v_recipient := v_conversation.participant1_id%'
+     or definition not ilike '%store_chat_role_is_active%'
+     or definition not ilike '%message_key_envelopes%'
+     or definition not ilike '%is_encrypted%'
+     or definition not ilike '%encryption_version%' then
+    raise exception 'private send_store_message authority lost recipient/capability/encryption controls';
+  end if;
+
+  select pg_get_functiondef('app_private.mark_store_conversation_read_authority(uuid)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%recipient_id = v_actor%'
+     or definition not ilike '%conversation_id = p_conversation_id%' then
+    raise exception 'private mark_store_conversation_read authority lost recipient/conversation scoping';
+  end if;
+end;
+$$;
+
 -- Anonymous callers must never receive direct EXECUTE on public SECURITY
 -- DEFINER functions. Public catalogue RLS uses a deliberately non-exposed
 -- app_private helper instead of a public RPC.

@@ -1,102 +1,76 @@
-// app/api/chat/start/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { createServerSupabase } from "@/lib/supabase/server";
 import { logOperationalError } from "@/lib/observability/operationalEvent";
 
-/**
- * POST /api/chat/start
- * Creates or opens a chat thread with a seller
- * Body: { sellerId, productId }
- */
+const contextSchema = z.object({
+  contextType: z.enum(["product", "storefront", "order", "wholesale_offer"]),
+  contextId: z.string().uuid(),
+});
+
+const legacyProductSchema = z.object({
+  productId: z.string().uuid(),
+  // sellerId is intentionally not part of the authority decision. Older
+  // clients may still send it, but the database derives the counterparty from
+  // the product itself.
+  sellerId: z.string().uuid().optional(),
+});
+
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { sellerId, productId } = body;
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    if (!sellerId) {
-      return NextResponse.json({ error: "Seller ID required" }, { status: 400 });
-    }
-
-    const supabase = await createClient();
-
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    if (sellerId === user.id) {
-      return NextResponse.json(
-        { error: "You cannot start a conversation with yourself" },
-        { status: 400 },
-      );
-    }
-
-    const { data: seller } = await supabase
-      .from("profiles_seller")
-      .select("id")
-      .eq("id", sellerId)
-      .eq("verification_status", "verified")
-      .maybeSingle();
-    if (!seller) {
-      return NextResponse.json(
-        { error: "Verified seller not found" },
-        { status: 404 },
-      );
-    }
-
-    // Reuse an existing two-party conversation when possible.
-    const { data: existingThread } = await supabase
-      .from("conversations")
-      .select("id")
-      .contains("participants", [user.id, sellerId])
-      .eq("type", "product_inquiry")
-      .limit(1)
-      .maybeSingle();
-
-    if (existingThread) {
-      return NextResponse.json({ threadId: existingThread.id });
-    }
-
-    // Create new thread
-    const { data: newThread, error } = await supabase
-      .from("conversations")
-      .insert({
-        type: "product_inquiry",
-        participants: [user.id, sellerId],
-        subject: "Product inquiry",
-        metadata: productId ? { product_id: productId } : {},
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      logOperationalError("chat_thread_create_failed", error, {
-        component: "messaging",
-        operation: "chat-start-create",
-        route: "/api/chat/start",
-        actorId: user.id,
-        recordId: sellerId,
-      });
-      return NextResponse.json(
-        { error: "Failed to create chat thread" },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({ threadId: newThread.id });
-  } catch (error) {
-    logOperationalError("chat_start_failed", error, {
-      component: "messaging",
-      operation: "chat-start",
-      route: "/api/chat/start",
-    });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const body = await request.json().catch(() => null);
+  const canonical = contextSchema.safeParse(body);
+  const legacyProduct = canonical.success ? null : legacyProductSchema.safeParse(body);
+
+  const context = canonical.success
+    ? canonical.data
+    : legacyProduct?.success
+      ? { contextType: "product" as const, contextId: legacyProduct.data.productId }
+      : null;
+
+  if (!context) {
+    return NextResponse.json({ error: "A valid marketplace conversation context is required" }, { status: 400 });
+  }
+
+  const { data, error } = await supabase.rpc("open_store_conversation", {
+    p_context_type: context.contextType,
+    p_context_id: context.contextId,
+  });
+
+  if (error || !data) {
+    const message = error?.message || "Unable to open conversation";
+    if (error?.code === "42501") {
+      return NextResponse.json({ error: "Conversation unavailable for this account" }, { status: 403 });
+    }
+    if (error?.code === "28000") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error?.code === "22023") {
+      return NextResponse.json({ error: "Conversation context is not available" }, { status: 404 });
+    }
+
+    logOperationalError("store_chat_open_failed", error || new Error(message), {
+      component: "messaging",
+      operation: `open-store-conversation:${context.contextType}`,
+      route: "/api/chat/start",
+      actorId: user.id,
+      recordId: context.contextId,
+    });
+    return NextResponse.json({ error: "Unable to open conversation" }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    conversationId: data,
+    // Transitional alias for any old product surface still reading threadId.
+    threadId: data,
+  });
 }
