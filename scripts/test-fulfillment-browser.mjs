@@ -160,23 +160,36 @@ try {
     await buyerPage.getByText(label, { exact: true }).last().waitFor();
   }
   await buyerPage.getByText("TRACK-BROWSER-001", { exact: false }).waitFor();
-  await assertAxe(buyerPage, "buyer fulfillment timeline");
+  await buyerPage.getByRole("button", { name: "Confirm receipt" }).waitFor();
+  await assertAxe(buyerPage, "buyer fulfillment timeline before receipt confirmation");
+
+  await buyerPage.getByRole("button", { name: "Confirm receipt" }).click();
+  await buyerPage.getByText(/Receipt confirmed/i).first().waitFor({ timeout: 15_000 });
+  assert.equal(await buyerPage.getByRole("button", { name: "Confirm receipt" }).count(), 0, "confirmed order must not keep a live receipt-confirmation control");
+  await assertAxe(buyerPage, "buyer trusted receipt confirmation");
   await buyerContext.close();
 
-  const [{ data: events, error: eventsError }, { data: notifications, error: notificationError }, { data: escrow, error: escrowReadError }] = await Promise.all([
+  const [
+    { data: events, error: eventsError },
+    { data: notifications, error: notificationError },
+    { data: escrow, error: escrowReadError },
+  ] = await Promise.all([
     admin.from("order_fulfillment_events").select("to_status").eq("order_id", order.id),
-    admin.from("notifications").select("id").eq("metadata->>order_id", order.id),
+    admin.from("notifications").select("id,user_id,metadata").eq("metadata->>order_id", order.id),
     admin.from("escrow_transactions").select("status,released_at").eq("order_id", order.id).single(),
   ]);
   if (eventsError) throw eventsError;
   if (notificationError) throw notificationError;
   if (escrowReadError) throw escrowReadError;
   assert.deepEqual((events || []).map((event) => event.to_status).sort(), ["delivered", "processing", "shipped"]);
-  assert.equal((notifications || []).length, 3, "buyer should receive one notification per transition");
-  assert.equal(escrow.status, "held", "seller delivery must not release escrow");
-  assert.equal(escrow.released_at, null, "seller delivery must not set escrow released_at");
+  assert.equal((notifications || []).length, 4, "fulfillment plus receipt confirmation must emit exactly four order notifications");
+  const settlementNotice = (notifications || []).filter((notification) => notification.metadata?.event === "buyer_receipt_confirmed");
+  assert.equal(settlementNotice.length, 1, "buyer receipt confirmation must notify seller exactly once");
+  assert.equal(settlementNotice[0]?.user_id, seller.id, "receipt confirmation notification must target seller");
+  assert.equal(escrow.status, "held", "seller delivery and buyer receipt confirmation must not release escrow");
+  assert.equal(escrow.released_at, null, "trusted receipt confirmation must still respect payout hold authority");
   assert.deepEqual(browserErrors, [], `fulfillment browser errors\n${browserErrors.join("\n")}`);
-  process.stdout.write("Atomic fulfillment seller/buyer browser + WCAG regression passed\n");
+  process.stdout.write("Atomic fulfillment + buyer settlement browser/WCAG regression passed\n");
 } finally {
   await browser.close();
 }
