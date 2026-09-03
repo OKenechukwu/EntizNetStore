@@ -24,7 +24,7 @@ export default async function SellerOrdersPage() {
   const { data: orders, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents), order_fulfillment_events(id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at)",
+      "id, order_number, status, payment_status, fulfillment_status, total_cents, shipping_carrier, tracking_number, shipped_at, delivered_at, created_at, order_items(id, product_title, variant_title, quantity, total_cents, requires_shipping), order_fulfillment_events(id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at)",
     )
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
@@ -55,6 +55,9 @@ export default async function SellerOrdersPage() {
         <div className="space-y-4">
           {orders.map((order) => {
             const events = (order.order_fulfillment_events ?? []) as OrderFulfillmentEvent[];
+            const requiresShipping = (order.order_items ?? []).some(
+              (item) => item.requires_shipping !== false,
+            );
             return (
               <article key={order.id} className="rounded-xl border border-border bg-background p-5 text-foreground">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
@@ -103,6 +106,7 @@ export default async function SellerOrdersPage() {
                   orderId={order.id}
                   status={order.status || "pending"}
                   paymentStatus={order.payment_status || "pending"}
+                  requiresShipping={requiresShipping}
                 />
               </article>
             );
