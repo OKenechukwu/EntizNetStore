@@ -1,6 +1,4 @@
-// lib/currency.ts
-// Phase 1: solid, app-wide currency utils with safe fallbacks + cookies.
-// No external calls; you can later plug an /api/fx endpoint if you want live rates.
+import { CURRENCY_COOKIE, LEGACY_CURRENCY_KEYS } from "@/lib/preferences";
 
 export type CurrencyCode =
   | "USD"
@@ -17,57 +15,23 @@ export type CurrencyCode =
   | "INR"
   | "BRL";
 
-// For compatibility with callers that import SupportedCurrency
 export type SupportedCurrency = CurrencyCode;
+export const SUPPORTED_CURRENCIES: readonly CurrencyCode[] = [
+  "USD", "EUR", "GBP", "JPY", "CNY", "PHP", "AUD", "CAD", "NGN", "GHS", "ZAR", "INR", "BRL",
+] as const;
 
-export const SUPPORTED_CURRENCIES: CurrencyCode[] = [
-  "USD",
-  "EUR",
-  "GBP",
-  "JPY",
-  "CNY",
-  "PHP",
-  "AUD",
-  "CAD",
-  "NGN",
-  "GHS",
-  "ZAR",
-  "INR",
-  "BRL",
-];
-
-/**
- * Normalize an arbitrary string (cookie, query, request body) to a supported
- * CurrencyCode, falling back to DEFAULT_CURRENCY.
- */
-export function toCurrencyCode(value?: string | null): CurrencyCode {
-  const v = (value ?? "").toUpperCase().trim();
-  return SUPPORTED_CURRENCIES.includes(v as CurrencyCode)
-    ? (v as CurrencyCode)
-    : DEFAULT_CURRENCY;
-}
-
-// Base is what your DB prices are stored in.
-// Keep this consistent across the whole store.
 export const BASE_CURRENCY: CurrencyCode = "USD";
-
-// What users see if nothing is chosen yet.
 export const DEFAULT_CURRENCY: CurrencyCode = "USD";
-
-// --- Local storage + cookie keys
-const FX_STORAGE_KEY = "entiz_fx_rates_v1";
-const FX_STORAGE_TS_KEY = "entiz_fx_rates_ts_v1";
-const CURRENCY_COOKIE = "currency";
-const FX_MAX_AGE_MS = 1000 * 60 * 60 * 24; // 24h
+const FX_STORAGE_KEY = "entiz_fx_rates_v2";
+const FX_STORAGE_TS_KEY = "entiz_fx_rates_ts_v2";
+const FX_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 
 export type FxRates = Record<CurrencyCode, number> & {
-  // Optional metadata (not required for conversion)
   __base?: CurrencyCode;
   __asOf?: string;
+  __source?: "live" | "cache" | "static-fallback";
 };
 
-// Safe fallback table (1 BASE -> target).
-// Keep these reasonable; they’re only used if nothing else is available.
 export const FALLBACK_RATES: FxRates = {
   USD: 1,
   EUR: 0.92,
@@ -84,143 +48,150 @@ export const FALLBACK_RATES: FxRates = {
   BRL: 5.6,
   __base: BASE_CURRENCY,
   __asOf: "static-fallback",
+  __source: "static-fallback",
 };
 
-// ---------- Small helpers
+export function toCurrencyCode(value?: string | null): CurrencyCode {
+  const normalized = (value ?? "").toUpperCase().trim();
+  return SUPPORTED_CURRENCIES.includes(normalized as CurrencyCode)
+    ? (normalized as CurrencyCode)
+    : DEFAULT_CURRENCY;
+}
+
+export function isValidFxRates(value: unknown): value is FxRates {
+  if (!value || typeof value !== "object") return false;
+  const table = value as Record<string, unknown>;
+  if (table.__base != null && table.__base !== BASE_CURRENCY) return false;
+  return SUPPORTED_CURRENCIES.every((currency) => {
+    const rate = table[currency];
+    return typeof rate === "number" && Number.isFinite(rate) && rate > 0;
+  }) && table.USD === 1;
+}
+
 function isBrowser() {
   return typeof window !== "undefined";
 }
 
 function readCookie(name: string): string | null {
   if (!isBrowser()) return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-function writeCookie(name: string, value: string, days = 365) {
-  if (!isBrowser()) return;
-  const d = new Date();
-  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-  document.cookie = `${name}=${encodeURIComponent(
-    value
-  )}; expires=${d.toUTCString()}; path=/; SameSite=Lax`;
-}
-
-// ---------- Active currency (user-chosen)
 export function getActiveCurrency(): CurrencyCode {
-  const c = readCookie(CURRENCY_COOKIE);
-  if (c && SUPPORTED_CURRENCIES.includes(c as CurrencyCode)) {
-    return c as CurrencyCode;
+  const canonical = readCookie(CURRENCY_COOKIE);
+  if (canonical) return toCurrencyCode(canonical);
+  for (const legacy of LEGACY_CURRENCY_KEYS) {
+    const value = readCookie(legacy);
+    if (value) return toCurrencyCode(value);
   }
   return DEFAULT_CURRENCY;
 }
 
-export function setActiveCurrency(c: CurrencyCode) {
-  writeCookie(CURRENCY_COOKIE, c);
+export function setActiveCurrency(currency: CurrencyCode) {
+  if (!isBrowser()) return;
+  document.cookie = `${CURRENCY_COOKIE}=${encodeURIComponent(currency)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  for (const legacy of LEGACY_CURRENCY_KEYS) {
+    document.cookie = `${legacy}=; path=/; max-age=0; SameSite=Lax`;
+  }
 }
 
-// ---------- Rates storage
 export function getStoredFxRates(): FxRates | null {
   if (!isBrowser()) return null;
   try {
-    const raw = localStorage.getItem(FX_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as FxRates;
+    const parsed = JSON.parse(localStorage.getItem(FX_STORAGE_KEY) || "null") as unknown;
+    return isValidFxRates(parsed) ? { ...parsed, __source: "cache" } : null;
   } catch {
     return null;
   }
 }
 
 export function saveFxRates(rates: FxRates) {
-  if (!isBrowser()) return;
+  if (!isBrowser() || !isValidFxRates(rates)) return;
   try {
     localStorage.setItem(FX_STORAGE_KEY, JSON.stringify(rates));
     localStorage.setItem(FX_STORAGE_TS_KEY, String(Date.now()));
-  } catch {
-    /* ignore */
-  }
+  } catch {}
 }
 
 function isRatesFresh(): boolean {
   if (!isBrowser()) return false;
-  const ts = localStorage.getItem(FX_STORAGE_TS_KEY);
-  if (!ts) return false;
-  const age = Date.now() - Number(ts);
+  const timestamp = Number(localStorage.getItem(FX_STORAGE_TS_KEY));
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return false;
+  const age = Date.now() - timestamp;
   return age >= 0 && age <= FX_MAX_AGE_MS;
 }
 
-// ---------- Public API
+async function fetchLiveFxRates(): Promise<FxRates | null> {
+  if (!isBrowser()) return null;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch("/api/fx", {
+      method: "GET",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as {
+      base?: string;
+      date?: string;
+      rates?: unknown;
+      source?: string;
+    };
+    const candidate = {
+      ...(payload.rates as object),
+      __base: payload.base,
+      __asOf: payload.date,
+      __source: "live",
+    } as FxRates;
+    if (!isValidFxRates(candidate)) return null;
+    saveFxRates(candidate);
+    return candidate;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
-/**
- * Returns FX rates with this contract: 1 BASE -> target.
- * For now, we use stored (or fallback) rates. In Phase 1B, you can
- * wire an /api/fx endpoint and then call it here to refresh live rates.
- */
-export async function getFxRates(): Promise<FxRates> {
-  // Prefer fresh stored rates
+export async function getFxRates(options: { refresh?: boolean } = {}): Promise<FxRates> {
   const stored = getStoredFxRates();
-  if (stored && isRatesFresh()) return stored;
-
-  // If stored but stale, we still return it (better than nothing),
-  // but we do not block on network here.
+  if (!options.refresh && stored && isRatesFresh()) return stored;
+  const live = await fetchLiveFxRates();
+  if (live) return live;
   if (stored) return stored;
-
-  // Otherwise, fallback
   return FALLBACK_RATES;
 }
 
-/**
- * Convert an amount that is stored in BASE_CURRENCY to target currency.
- * If target equals base, returns the original amount.
- */
-export function convertFromBase(
-  amount: number,
-  target: CurrencyCode,
-  rates?: FxRates
-): number {
-  const table = rates ?? FALLBACK_RATES;
-  if (target === BASE_CURRENCY) return roundMoney(amount);
-  const r = table[target];
-  if (!r || r <= 0) return roundMoney(amount);
-  return roundMoney(amount * r);
-}
-
-/**
- * Convert from any currency to any other using the base as a bridge.
- */
-export function convert(
-  amount: number,
-  from: CurrencyCode,
-  to: CurrencyCode,
-  rates?: FxRates
-): number {
-  const table = rates ?? FALLBACK_RATES;
-  if (from === to) return roundMoney(amount);
-  if (from === BASE_CURRENCY) return convertFromBase(amount, to, table);
-  if (to === BASE_CURRENCY) {
-    // from -> base
-    const r = table[from];
-    if (!r || r <= 0) return roundMoney(amount);
-    return roundMoney(amount / r);
+function requireRate(table: FxRates, currency: CurrencyCode): number {
+  const rate = table[currency];
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error(`Missing FX rate for ${currency}`);
   }
-  // from -> base -> to
-  const toBase = convert(amount, from, BASE_CURRENCY, table);
-  return convertFromBase(toBase, to, table);
+  return rate;
 }
 
-function roundMoney(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+export function convertFromBase(amount: number, target: CurrencyCode, rates: FxRates = FALLBACK_RATES): number {
+  if (!Number.isFinite(amount)) throw new Error("Invalid money amount");
+  if (target === BASE_CURRENCY) return roundMoney(amount);
+  return roundMoney(amount * requireRate(rates, target));
 }
 
-/**
- * Format a price using Intl.NumberFormat.
- * Locale is optional: if not provided, it will use the browser default.
- */
-export function formatPrice(
-  amount: number,
-  currency: CurrencyCode,
-  locale?: string
-): string {
+export function convert(amount: number, from: CurrencyCode, to: CurrencyCode, rates: FxRates = FALLBACK_RATES): number {
+  if (!Number.isFinite(amount)) throw new Error("Invalid money amount");
+  if (from === to) return roundMoney(amount);
+  const baseAmount = from === BASE_CURRENCY ? amount : amount / requireRate(rates, from);
+  return to === BASE_CURRENCY ? roundMoney(baseAmount) : roundMoney(baseAmount * requireRate(rates, to));
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function formatPrice(amount: number, currency: CurrencyCode, locale?: string): string {
   try {
     return new Intl.NumberFormat(locale || undefined, {
       style: "currency",
@@ -230,62 +201,19 @@ export function formatPrice(
       minimumFractionDigits: 2,
     }).format(amount);
   } catch {
-    // Extremely rare fallback
-    const sym = currencySymbol(currency);
-    return `${sym}${amount.toFixed(2)}`;
+    return `${currency} ${amount.toFixed(2)}`;
   }
 }
 
-/**
- * Convenience: convert from BASE to target and format in one call.
- * Useful for components that have prices stored in BASE (USD).
- */
 export function convertAndFormatFromBase(
   amountInBase: number,
-  opts: {
-    currency: CurrencyCode;
-    rates?: FxRates;
-    locale?: string;
-  }
+  options: { currency: CurrencyCode; rates?: FxRates; locale?: string },
 ): string {
-  const converted = convertFromBase(amountInBase, opts.currency, opts.rates);
-  return formatPrice(converted, opts.currency, opts.locale);
+  return formatPrice(
+    convertFromBase(amountInBase, options.currency, options.rates || FALLBACK_RATES),
+    options.currency,
+    options.locale,
+  );
 }
 
-function currencySymbol(c: CurrencyCode): string {
-  switch (c) {
-    case "USD":
-      return "$";
-    case "EUR":
-      return "€";
-    case "GBP":
-      return "£";
-    case "JPY":
-      return "¥";
-    case "CNY":
-      return "¥";
-    case "PHP":
-      return "₱";
-    case "AUD":
-      return "A$";
-    case "CAD":
-      return "C$";
-    case "NGN":
-      return "₦";
-    case "GHS":
-      return "₵";
-    case "ZAR":
-      return "R";
-    case "INR":
-      return "₹";
-    case "BRL":
-      return "R$";
-    default:
-      return "";
-  }
-}
-
-/**
- * Alias for formatPrice - used by SettingsProvider
- */
 export const formatMoney = formatPrice;
