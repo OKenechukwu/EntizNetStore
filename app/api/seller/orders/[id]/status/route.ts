@@ -22,7 +22,11 @@ const publicValidationMessages: Record<string, string> = {
 };
 const conflictErrors = new Set(["invalid_fulfillment_transition", "conflicting_tracking_retry"]);
 
-function noStoreJson(body: Record<string, unknown>, status: number, extraHeaders?: HeadersInit) {
+function noStoreJson(
+  body: Record<string, unknown>,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+) {
   return NextResponse.json(body, {
     status,
     headers: {
