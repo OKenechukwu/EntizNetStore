@@ -2,9 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import Price from "@/components/common/Price";
+import BuyerReceiptConfirmation from "@/components/orders/BuyerReceiptConfirmation";
 import OrderFulfillmentTimeline, {
   type OrderFulfillmentEvent,
 } from "@/components/orders/OrderFulfillmentTimeline";
+
+type SettlementConfirmation = {
+  confirmed_at: string;
+  authority_type: string;
+};
 
 export default async function BuyerOrdersPage() {
   const supabase = await createServerSupabase();
@@ -23,8 +29,8 @@ export default async function BuyerOrdersPage() {
   if (!buyer) redirect("/dashboard");
 
   // Keep the base order read compatible with the pre-ledger production schema.
-  // Fulfillment events are loaded separately and degrade to the legacy order
-  // status fields during a controlled migration/deployment convergence window.
+  // Fulfillment events and trusted settlement evidence are loaded separately so
+  // an app-before-database deployment remains readable while new actions fail closed.
   const { data: orders, error } = await supabase
     .from("orders")
     .select(
@@ -67,6 +73,41 @@ export default async function BuyerOrdersPage() {
     }
   }
 
+  const settlementsByOrder = new Map<string, SettlementConfirmation>();
+  let settlementAuthorityReady = true;
+  if (!error && orders?.length) {
+    const deliveredOrders = orders.filter(
+      (order) =>
+        order.payment_status === "paid" &&
+        order.status === "delivered" &&
+        order.fulfillment_status === "fulfilled" &&
+        Boolean(order.delivered_at),
+    );
+
+    const settlementReads = await Promise.all(
+      deliveredOrders.map(async (order) => {
+        const result = await supabase.rpc("get_order_settlement_confirmation", {
+          p_order_id: order.id,
+        });
+        return { orderId: order.id, ...result };
+      }),
+    );
+
+    for (const result of settlementReads) {
+      if (result.error) {
+        settlementAuthorityReady = false;
+        continue;
+      }
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (row?.confirmed_at) {
+        settlementsByOrder.set(result.orderId, {
+          confirmed_at: row.confirmed_at,
+          authority_type: row.authority_type,
+        });
+      }
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -90,6 +131,15 @@ export default async function BuyerOrdersPage() {
         </p>
       )}
 
+      {!error && !settlementAuthorityReady && (
+        <p
+          className="mb-4 rounded-lg border border-border bg-white/5 p-3 text-sm text-foreground/80"
+          role="status"
+        >
+          Receipt confirmation is temporarily unavailable. Your order and delivery status remain unchanged.
+        </p>
+      )}
+
       {error ? (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-red-200" role="alert">
           Unable to load your orders right now. Please refresh and try again.
@@ -107,6 +157,15 @@ export default async function BuyerOrdersPage() {
         <div className="space-y-4">
           {orders.map((order) => {
             const events = eventsByOrder.get(order.id) ?? [];
+            const settlement = settlementsByOrder.get(order.id);
+            const canConfirmReceipt =
+              settlementAuthorityReady &&
+              !settlement &&
+              order.payment_status === "paid" &&
+              order.status === "delivered" &&
+              order.fulfillment_status === "fulfilled" &&
+              Boolean(order.delivered_at);
+
             return (
               <article key={order.id} className="rounded-xl border border-border bg-background p-5 text-foreground">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
@@ -151,6 +210,14 @@ export default async function BuyerOrdersPage() {
                     trackingNumber: order.tracking_number,
                   }}
                 />
+
+                {settlement && (
+                  <p className="mt-4 border-t border-border pt-4 text-sm text-foreground/75" role="status">
+                    Receipt confirmed {new Date(settlement.confirmed_at).toLocaleString()} via {settlement.authority_type === "admin" ? "verified support review" : "buyer confirmation"}. Seller payout remains subject to the platform hold, refund and dispute policy.
+                  </p>
+                )}
+
+                {canConfirmReceipt && <BuyerReceiptConfirmation orderId={order.id} />}
               </article>
             );
           })}
