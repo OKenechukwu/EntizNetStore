@@ -1,118 +1,45 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { cookiesGet } from "@/utils/cookies";
-import {
-  formatMoney,
-  DEFAULT_CURRENCY,
-  SupportedCurrency,
-} from "@/lib/currency";
-
-// Dictionaries
-import { dict as en } from "@/i18n/dictionaries/en";
-import { dict as zh } from "@/i18n/dictionaries/zh";
-import { dict as ja } from "@/i18n/dictionaries/ja";
-import { dict as vi } from "@/i18n/dictionaries/vi";
-import { dict as th } from "@/i18n/dictionaries/th";
-
-// Dictionaries may contain nested sections; t() only resolves string values.
-type Dict = Record<string, unknown>;
-const DICTS: Record<string, Dict> = { en, zh, ja, vi, th };
+import React, { createContext, useContext, useMemo } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { formatMoney, type SupportedCurrency } from "@/lib/currency";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { SupportedLocale } from "@/lib/preferences";
 
 export type SettingsState = {
-  locale: string;
+  locale: SupportedLocale;
   currency: SupportedCurrency;
-  dict: Dict;
+  dict: Dictionary;
 };
-
-const DEFAULT_LOCALE = "en";
 
 const SettingsCtx = createContext<{
   state: SettingsState;
-  setLocale: (l: string) => void;
-  setCurrency: (c: SupportedCurrency) => void;
+  setLocale: (locale: string) => void;
+  setCurrency: (currency: SupportedCurrency) => void;
   t: (key: string) => string;
-  money: (n: number | string) => string;
+  money: (value: number | string) => string;
 } | null>(null);
 
-export function SettingsProvider({
-  children,
-  initialLocale,
-  initialCurrency,
-}: {
-  children: React.ReactNode;
-  initialLocale?: string;
-  initialCurrency?: SupportedCurrency;
-}) {
-  const [state, setState] = useState<SettingsState>(() => {
-    const cookieLocale =
-      initialLocale || cookiesGet("locale") || DEFAULT_LOCALE;
-    const cookieCurrency =
-      initialCurrency ||
-      (cookiesGet("currency") as SupportedCurrency) ||
-      DEFAULT_CURRENCY;
-    const dict = DICTS[cookieLocale] || en;
-    return { locale: cookieLocale, currency: cookieCurrency, dict };
-  });
-
-  // Client re-hydration from localStorage
-  useEffect(() => {
-    const lsLocale = localStorage.getItem("locale") || state.locale;
-    const lsCurrency =
-      (localStorage.getItem("currency") as SupportedCurrency) || state.currency;
-    setState((s) => ({
-      locale: lsLocale,
-      currency: lsCurrency,
-      dict: DICTS[lsLocale] || en,
-    }));
-
-    const onCurrency = () => {
-      const c =
-        (localStorage.getItem("currency") as SupportedCurrency) ||
-        DEFAULT_CURRENCY;
-      setState((s) => ({ ...s, currency: c }));
-    };
-    window.addEventListener("currencyChange", onCurrency);
-    return () => window.removeEventListener("currencyChange", onCurrency);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const setLocale = (l: string) => {
-    document.cookie = `locale=${l}; path=/; max-age=31536000`;
-    localStorage.setItem("locale", l);
-    setState((s) => ({ ...s, locale: l, dict: DICTS[l] || en }));
-  };
-
-  const setCurrency = (c: SupportedCurrency) => {
-    document.cookie = `currency=${c}; path=/; max-age=31536000`;
-    localStorage.setItem("currency", c);
-    setState((s) => ({ ...s, currency: c }));
-    window.dispatchEvent(new Event("currencyChange"));
-  };
-
-  const t = (key: string) => {
-    const v = state.dict[key];
-    return typeof v === "string" ? v : key;
-  };
-  const money = (n: number | string) =>
-    formatMoney(typeof n === "string" ? parseFloat(n) || 0 : n, state.currency, state.locale);
-
+/** Legacy compatibility adapter over I18nProvider's single authoritative state. */
+export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const { locale, currency, setLocale, setCurrency, t, dict } = useI18n();
+  const state = useMemo<SettingsState>(() => ({ locale, currency, dict }), [locale, currency, dict]);
   const value = useMemo(
-    () => ({ state, setLocale, setCurrency, t, money }),
-    [state],
+    () => ({
+      state,
+      setLocale,
+      setCurrency: (next: SupportedCurrency) => setCurrency(next),
+      t: (key: string) => t(key),
+      money: (amount: number | string) =>
+        formatMoney(typeof amount === "string" ? Number.parseFloat(amount) || 0 : amount, currency, locale),
+    }),
+    [state, setLocale, setCurrency, t, currency, locale],
   );
-
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 }
 
 export function useSettings() {
-  const ctx = useContext(SettingsCtx);
-  if (!ctx) throw new Error("useSettings must be used within SettingsProvider");
-  return ctx;
+  const context = useContext(SettingsCtx);
+  if (!context) throw new Error("useSettings must be used within SettingsProvider");
+  return context;
 }
