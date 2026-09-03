@@ -1,88 +1,75 @@
-// components/i18n/I18nProvider.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import englishDictionary from '@/locales/en.json';
-
-type Dict = Record<string, any>;
+import {
+  getDictionary,
+  getEnglishDictionary,
+  resolveDictionaryValue,
+  type Dictionary,
+} from '@/lib/i18n/dictionaries';
+import {
+  CURRENCY_CHANGE_EVENT,
+  CURRENCY_COOKIE,
+  CURRENCY_STORAGE_KEY,
+  LEGACY_CURRENCY_KEYS,
+  LEGACY_LOCALE_KEYS,
+  LOCALE_CHANGE_EVENT,
+  LOCALE_COOKIE,
+  LOCALE_STORAGE_KEY,
+  getLocaleDirection,
+  toLocale,
+  type SupportedLocale,
+} from '@/lib/preferences';
+import {
+  FALLBACK_RATES,
+  getFxRates,
+  toCurrencyCode,
+  type CurrencyCode,
+  type FxRates,
+} from '@/lib/currency';
 
 type I18nContextType = {
-  locale: string;
-  currency: string;
-  setLocale: (l: string) => void;
-  setCurrency: (c: string) => void;
-  t: (k: string, fallback?: string) => string;
-  dict: Dict;
-  fx?: Record<string, number>;
+  locale: SupportedLocale;
+  currency: CurrencyCode;
+  setLocale: (value: string) => void;
+  setCurrency: (value: string) => void;
+  t: (key: string, fallback?: string) => string;
+  dict: Dictionary;
+  fx: FxRates;
+  refreshFx: () => Promise<void>;
 };
 
 const I18nContext = createContext<I18nContextType | null>(null);
-const ENGLISH_DICTIONARY = englishDictionary as Dict;
+const ENGLISH_DICTIONARY = getEnglishDictionary();
 
-/* -------------------- helpers -------------------- */
 function getCookie(name: string): string | undefined {
   if (typeof document === 'undefined') return;
-  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[2]) : undefined;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : undefined;
 }
 
-function getSupportedLocales(): string[] {
-  const raw =
-    (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPPORTED_LOCALES) ||
-    'en';
-  return raw
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-/** Optional default FX table (can be overridden if you fetch live rates) */
-const DEFAULT_FX: Record<string, number> = {
-  USD: 1,
-  EUR: 0.93,
-  GBP: 0.8,
-  JPY: 156,
-  CNY: 7.1,
-  PHP: 58,
-};
-
-function mergeDictionary(base: Dict, override: Dict): Dict {
-  const merged: Dict = { ...base };
-  for (const [key, value] of Object.entries(override || {})) {
-    const current = merged[key];
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      current &&
-      typeof current === 'object' &&
-      !Array.isArray(current)
-    ) {
-      merged[key] = mergeDictionary(current as Dict, value as Dict);
-    } else {
-      merged[key] = value;
-    }
-  }
-  return merged;
-}
-
-/** SSR-safe locale loader. Every locale inherits the canonical English baseline. */
-async function loadLocaleDict(locale: string): Promise<Dict> {
-  if (locale === 'en') return ENGLISH_DICTIONARY;
+function getStoredValue(primary: string, legacy: readonly string[]) {
+  if (typeof window === 'undefined') return undefined;
   try {
-    const mod = await import(`@/locales/${locale}.json`);
-    const localized = ((mod as any).default ?? mod ?? {}) as Dict;
-    return mergeDictionary(ENGLISH_DICTIONARY, localized);
-  } catch {
-    return ENGLISH_DICTIONARY;
-  }
+    const primaryValue = localStorage.getItem(primary);
+    if (primaryValue) return primaryValue;
+    for (const key of legacy) {
+      const value = localStorage.getItem(key);
+      if (value) return value;
+    }
+  } catch {}
+  return undefined;
 }
 
-function resolveDictValue(dict: Dict, key: string): unknown {
-  return key.split('.').reduce<unknown>((value, segment) => {
-    if (!value || typeof value !== 'object') return undefined;
-    return (value as Dict)[segment];
-  }, dict);
+function clearLegacyPreference(keys: readonly string[]) {
+  if (typeof document === 'undefined') return;
+  for (const key of keys) {
+    try {
+      document.cookie = `${key}=; path=/; max-age=0; samesite=lax`;
+      localStorage.removeItem(key);
+    } catch {}
+  }
 }
 
 function humanizeKey(key: string) {
@@ -90,10 +77,9 @@ function humanizeKey(key: string) {
   return last
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[_\.]/g, ' ')
-    .replace(/\b\w/g, (m) => m.toUpperCase());
+    .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
-/* -------------------- Provider -------------------- */
 export default function I18nProvider({
   children,
   initialLocale,
@@ -103,104 +89,120 @@ export default function I18nProvider({
   children: React.ReactNode;
   initialLocale?: string;
   initialCurrency?: string;
-  initialFx?: Record<string, number>;
+  initialFx?: FxRates;
 }) {
-  const supported = useMemo(() => new Set(getSupportedLocales()), []);
-  const [mounted, setMounted] = useState(false);
-
-  const [locale, setLocaleState] = useState<string>(() => {
-    const fromProp = (initialLocale || '').toLowerCase();
-    const fromCookie = (getCookie('entiz_locale') || '').toLowerCase();
-    const fromLS =
-      (typeof window !== 'undefined' ? localStorage.getItem('entiz_locale') : '') || '';
-    const picked =
-      (fromProp && supported.has(fromProp) && fromProp) ||
-      (fromCookie && supported.has(fromCookie) && fromCookie) ||
-      (fromLS && supported.has(fromLS.toLowerCase()) && fromLS.toLowerCase()) ||
-      'en';
-    return picked;
+  const [locale, setLocaleState] = useState<SupportedLocale>(() => {
+    const candidate =
+      initialLocale ||
+      getCookie(LOCALE_COOKIE) ||
+      LEGACY_LOCALE_KEYS.map((key) => getCookie(key)).find(Boolean) ||
+      getStoredValue(LOCALE_STORAGE_KEY, LEGACY_LOCALE_KEYS);
+    return toLocale(candidate);
   });
 
-  const [currency, setCurrencyState] = useState<string>(() => {
-    const fromProp = (initialCurrency || '').toUpperCase();
-    const fromCookie = (getCookie('entiz_currency') || '').toUpperCase();
-    const fromLS =
-      (typeof window !== 'undefined' ? localStorage.getItem('entiz_currency') : '') || '';
-    return (fromProp || fromCookie || fromLS || 'USD').toUpperCase();
+  const [currency, setCurrencyState] = useState<CurrencyCode>(() => {
+    const candidate =
+      initialCurrency ||
+      getCookie(CURRENCY_COOKIE) ||
+      LEGACY_CURRENCY_KEYS.map((key) => getCookie(key)).find(Boolean) ||
+      getStoredValue(CURRENCY_STORAGE_KEY, LEGACY_CURRENCY_KEYS);
+    return toCurrencyCode(candidate);
   });
 
-  // Never begin with an empty dictionary. The server/client first render gets
-  // meaningful English copy until a requested locale has loaded.
-  const [dict, setDict] = useState<Dict>(ENGLISH_DICTIONARY);
-  const [fx, setFx] = useState<Record<string, number>>(initialFx || DEFAULT_FX);
-
-  useEffect(() => setMounted(true), []);
+  const [dict, setDict] = useState<Dictionary>(() => getDictionary(locale));
+  const [fx, setFx] = useState<FxRates>(() => initialFx || FALLBACK_RATES);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const d = await loadLocaleDict(locale);
-      if (!alive) return;
-      setDict(d);
-    })();
-    return () => {
-      alive = false;
-    };
+    setDict(getDictionary(locale));
+    const root = document.documentElement;
+    root.lang = locale;
+    root.dir = getLocaleDirection(locale);
+    root.dataset.locale = locale;
   }, [locale]);
 
-  const setLocale = (l: string) => {
-    const requested = l.trim().toLowerCase();
-    const next = supported.has(requested) ? requested : 'en';
+  useEffect(() => {
+    document.documentElement.dataset.currency = currency;
+  }, [currency]);
+
+  useEffect(() => {
+    const onLocale = (event: Event) => {
+      const detail = (event as CustomEvent<{ locale?: string }>).detail;
+      if (detail?.locale) setLocaleState(toLocale(detail.locale));
+    };
+    const onCurrency = (event: Event) => {
+      const detail = (event as CustomEvent<{ currency?: string }>).detail;
+      if (detail?.currency) setCurrencyState(toCurrencyCode(detail.currency));
+    };
+    window.addEventListener(LOCALE_CHANGE_EVENT, onLocale);
+    window.addEventListener(CURRENCY_CHANGE_EVENT, onCurrency);
+    return () => {
+      window.removeEventListener(LOCALE_CHANGE_EVENT, onLocale);
+      window.removeEventListener(CURRENCY_CHANGE_EVENT, onCurrency);
+    };
+  }, []);
+
+  const refreshFx = async () => {
+    const next = await getFxRates({ refresh: true });
+    setFx(next);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void getFxRates().then((rates) => {
+      if (active) setFx(rates);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const setLocale = (value: string) => {
+    const next = toLocale(value);
     setLocaleState(next);
     try {
-      if (mounted) localStorage.setItem('entiz_locale', next);
-      document.cookie = `entiz_locale=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      localStorage.setItem(LOCALE_STORAGE_KEY, next);
+      document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      clearLegacyPreference(LEGACY_LOCALE_KEYS);
+      window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale: next } }));
     } catch {}
   };
 
-  const setCurrency = (c: string) => {
-    const next = c.toUpperCase();
+  const setCurrency = (value: string) => {
+    const next = toCurrencyCode(value);
     setCurrencyState(next);
     try {
-      if (mounted) localStorage.setItem('entiz_currency', next);
-      document.cookie = `entiz_currency=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      localStorage.setItem(CURRENCY_STORAGE_KEY, next);
+      document.cookie = `${CURRENCY_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      clearLegacyPreference(LEGACY_CURRENCY_KEYS);
+      window.dispatchEvent(new CustomEvent(CURRENCY_CHANGE_EVENT, { detail: { currency: next } }));
     } catch {}
   };
 
-  /**
-   * Critical controls can provide a semantic fallback. This prevents loading or
-   * missing-dictionary states from exposing humanized implementation keys such
-   * as "Aria" or "Placeholder" to users and assistive technology.
-   */
   const t = useMemo(() => {
-    return (k: string, fallback?: string) => {
-      const translated = resolveDictValue(dict, k);
+    return (key: string, fallback?: string) => {
+      const translated = resolveDictionaryValue(dict, key);
       if (typeof translated === 'string' && translated.trim()) return translated;
-
-      const english = resolveDictValue(ENGLISH_DICTIONARY, k);
+      const english = resolveDictionaryValue(ENGLISH_DICTIONARY, key);
       if (typeof english === 'string' && english.trim()) return english;
-
       if (fallback?.trim()) return fallback;
-      return humanizeKey(k);
+      return humanizeKey(key);
     };
   }, [dict]);
 
   const value = useMemo<I18nContextType>(
-    () => ({ locale, currency, setLocale, setCurrency, t, dict, fx }),
-    [locale, currency, t, dict, fx]
+    () => ({ locale, currency, setLocale, setCurrency, t, dict, fx, refreshFx }),
+    [locale, currency, t, dict, fx],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
-/* -------------------- Hooks & helpers -------------------- */
 export function useI18n() {
   const ctx = useContext(I18nContext);
   if (!ctx) throw new Error('useI18n must be used within <I18nProvider>');
   return ctx;
 }
 
-/** Tiny text component: <T k="nav.signIn" fallback="Sign in" vars={{ count: 3 }} /> */
 export function T({
   k,
   fallback,
@@ -211,11 +213,11 @@ export function T({
   vars?: Record<string, string | number>;
 }) {
   const { t } = useI18n();
-  let txt = t(k, fallback);
+  let text = t(k, fallback);
   if (vars) {
-    for (const [key, val] of Object.entries(vars)) {
-      txt = txt.split(`{${key}}`).join(String(val));
+    for (const [key, value] of Object.entries(vars)) {
+      text = text.split(`{${key}}`).join(String(value));
     }
   }
-  return <>{txt}</>;
+  return <>{text}</>;
 }
