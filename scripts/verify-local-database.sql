@@ -554,10 +554,6 @@ begin
   if v_bad <> 0 then raise exception '% privileged KYC functions lack hardened search_path', v_bad; end if;
 
   select count(*) into v_bad
-  from pg_proc p join pg_namespace n on n.oid = p.relnamespace
-  where false;
-
-  select count(*) into v_bad
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname in (
