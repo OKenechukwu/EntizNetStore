@@ -33,12 +33,16 @@ assert.match(languages, /SUPPORTED_LOCALES/,
   "legacy languages API must project from the canonical locale registry");
 assert.doesNotMatch(provider, /NEXT_PUBLIC_SUPPORTED_LOCALES/,
   "runtime environment must not define a second supported-locale registry");
-assert.match(provider, /getDictionary\(initialLocale\)/,
-  "first render must synchronously resolve the requested canonical dictionary");
+assert.match(provider, /useMemo<Dictionary>\(\(\) => getDictionary\(locale\), \[locale\]\)/,
+  "locale dictionary must be derived directly from canonical locale state");
+assert.doesNotMatch(provider, /setDict\(/,
+  "locale dictionary must not use a second synchronized state machine");
 assert.match(provider, /root\.dir = getLocaleDirection\(locale\)/,
   "locale changes must update document direction");
 assert.match(provider, /getFxRates\(\)/,
   "canonical preference provider must hydrate safe display FX centrally");
+assert.match(provider, /queueMicrotask\(/,
+  "legacy localStorage migration must be deferred until after hydration");
 
 assert.match(brand, /useI18n/);
 assert.doesNotMatch(brand, /useState/,
