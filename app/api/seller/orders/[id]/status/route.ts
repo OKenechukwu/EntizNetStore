@@ -12,7 +12,9 @@ const inputSchema = z
 
 const publicValidationMessages: Record<string, string> = {
   only_paid_orders_can_be_fulfilled: "Only paid orders can be fulfilled.",
+  order_has_no_items: "This order has no fulfillable items. Refresh and contact support if the problem continues.",
   invalid_fulfillment_transition: "The order changed state. Refresh and try again.",
+  shipping_not_required_for_order: "This order does not require shipping or tracking.",
   carrier_and_tracking_required: "Carrier and tracking number are required before shipping.",
   invalid_tracking_number: "Enter a valid single-line tracking number.",
   invalid_shipping_carrier: "Enter a valid single-line shipping carrier.",
