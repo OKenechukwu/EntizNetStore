@@ -1,7 +1,7 @@
 // components/layout/SearchSuggestions.tsx
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Search } from "lucide-react";
@@ -20,7 +20,8 @@ type Props = {
 };
 
 const DEBOUNCE_MS = 250;
-const LISTBOX_ID = "search-suggestions";
+const SEARCH_PLACEHOLDER_FALLBACK = "Search products, brands, and stores";
+const SEARCH_ARIA_FALLBACK = "Search EntizNetStore";
 
 export default function SearchSuggestions({ className }: Props) {
   const { t } = useI18n();
@@ -29,6 +30,10 @@ export default function SearchSuggestions({ className }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
+  const instanceId = useId();
+  const listboxId = `${instanceId}-search-suggestions`;
+  const searchPlaceholder = t("search.placeholder", SEARCH_PLACEHOLDER_FALLBACK);
+  const searchAria = t("search.aria", SEARCH_ARIA_FALLBACK);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -44,14 +49,16 @@ export default function SearchSuggestions({ className }: Props) {
 
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/search/suggest?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`/api/search/suggest?q=${encodeURIComponent(searchQuery)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`Search suggestions failed with HTTP ${res.status}`);
       const data = await res.json();
-      const nextSuggestions = data.suggestions || [];
+      const nextSuggestions = Array.isArray(data?.suggestions) ? data.suggestions : [];
       setSuggestions(nextSuggestions);
       setSelectedIndex(-1);
       setIsOpen(nextSuggestions.length > 0);
-    } catch (error) {
-      console.error("Search suggestions error:", error);
+    } catch {
       setSuggestions([]);
       setSelectedIndex(-1);
       setIsOpen(false);
@@ -131,7 +138,9 @@ export default function SearchSuggestions({ className }: Props) {
   };
 
   const activeOptionId =
-    isOpen && selectedIndex >= 0 ? `${LISTBOX_ID}-option-${suggestions[selectedIndex]?.id}` : undefined;
+    isOpen && selectedIndex >= 0
+      ? `${listboxId}-option-${suggestions[selectedIndex]?.id}`
+      : undefined;
 
   return (
     <div className={`relative w-full ${className || ""}`}>
@@ -141,7 +150,7 @@ export default function SearchSuggestions({ className }: Props) {
           ref={inputRef}
           type="search"
           role="combobox"
-          placeholder={t("search.placeholder")}
+          placeholder={searchPlaceholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -149,10 +158,10 @@ export default function SearchSuggestions({ className }: Props) {
             if (suggestions.length > 0) setIsOpen(true);
           }}
           className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-foreground/50 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/20"
-          aria-label={t("search.aria")}
+          aria-label={searchAria}
           aria-autocomplete="list"
           aria-haspopup="listbox"
-          aria-controls={LISTBOX_ID}
+          aria-controls={listboxId}
           aria-expanded={isOpen}
           aria-activedescendant={activeOptionId}
         />
@@ -161,14 +170,14 @@ export default function SearchSuggestions({ className }: Props) {
       {isOpen && suggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          id={LISTBOX_ID}
+          id={listboxId}
           role="listbox"
-          aria-label={t("search.aria")}
+          aria-label={searchAria}
           className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[400px] overflow-y-auto rounded-lg border border-white/10 bg-black/95 backdrop-blur-md shadow-xl"
         >
           {suggestions.map((item, index) => (
             <Link
-              id={`${LISTBOX_ID}-option-${item.id}`}
+              id={`${listboxId}-option-${item.id}`}
               key={item.id}
               href={`/products/${item.slug}`}
               role="option"
