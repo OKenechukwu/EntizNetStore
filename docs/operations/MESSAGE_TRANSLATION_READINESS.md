@@ -1,0 +1,117 @@
+# Message Translation Readiness and Dark Launch
+
+## Purpose
+
+Message translation is a derived presentation feature. The encrypted original in
+`public.messages` remains the canonical record for users, moderation, disputes,
+refunds, safety review and legal/audit workflows. Translation must never overwrite
+or become the authoritative copy of a message.
+
+This capability is deliberately shipped in two stages:
+
+1. **Dark foundation** — schema, authorization, encryption, provider boundary,
+   concurrency control, health/readiness signals and regressions are deployed
+   while the launch interlock remains off.
+2. **User exposure** — Translate / Show original controls are enabled only after a
+   production provider probe and exact-deployment verification prove the dark
+   foundation and its dependencies are healthy.
+
+`MESSAGE_TRANSLATION_LAUNCH_ENABLED=false` is therefore the safe default.
+
+## Authorization contract
+
+`POST /api/messages/translate` accepts only a message UUID and target language.
+It does not accept a recipient, seller, order or conversation authority supplied
+by the caller.
+
+The route authenticates the caller and reads the canonical message through the
+normal user-scoped Supabase client first. Existing message RLS must prove that the
+caller is a conversation participant before any server-only key or translation
+cache is touched. Missing and inaccessible messages both remain non-actionable to
+the translation provider.
+
+The cache table `public.message_translations` is intentionally in the API schema
+only because the trusted server Supabase client needs direct access. It has RLS
+enabled, no browser policies, explicit privilege revocation from `public`, `anon`
+and `authenticated`, and explicit service-role access. Browser code never reads
+the table directly.
+
+## Canonical-original integrity
+
+No `original_text`, `translated_text` or equivalent plaintext column is stored.
+
+For each translation request the server:
+
+1. decrypts the canonical original using the existing per-conversation DEK;
+2. derives a purpose-separated integrity key with HKDF-SHA256;
+3. computes an HMAC-SHA256 digest over message identity, canonical encryption
+   version and original plaintext;
+4. uses that keyed digest as part of the cache identity and translation AAD.
+
+A raw SHA-256 plaintext hash is intentionally not used because short messages can
+be susceptible to offline dictionary guessing if a database snapshot is exposed.
+
+Translation ciphertext uses a separate HKDF-derived AES-256-GCM key and AAD bound
+to conversation ID, message ID, target language, provider identity, provider
+version and the keyed original-integrity digest. A cached translation cannot be
+moved to another message, target language or provider/version without
+authentication failure.
+
+## Provider egress contract
+
+Production remote translation is fail-closed:
+
+- exact HTTPS origin allowlist;
+- endpoint credentials/query/fragment rejected;
+- localhost, literal IP addresses and private-style host suffixes rejected;
+- server-only bearer token;
+- redirects rejected;
+- `no-store` requests;
+- bounded 1–20 second timeout;
+- bounded 32 KiB response;
+- JSON content type and shape required;
+- provider identifiers/version bounded and configured server-side;
+- deterministic provider allowed only for local/CI regression.
+
+Provider errors are converted to bounded internal codes. Original message
+read/send behavior does not depend on provider availability.
+
+## Cost and concurrency control
+
+The cache has a unique identity over message, target language, provider,
+provider-version and keyed original digest. Provider work is protected by a
+database-backed claim token and lease.
+
+The first request creates the pending claim. Concurrent requests encounter the
+unique row and return pending rather than calling the provider again. A crashed
+worker can be recovered only after the lease expires. Conditional update semantics
+prevent a second worker from stealing an active lease. Provider failures enter a
+short retry cooldown rather than permanently poisoning the cache.
+
+## Health and launch readiness
+
+Core `/api/health` status remains based on database, storage, operational-event and
+payment health. Optional features are reported independently under `launchGates`:
+
+- `storeChat`: configured only when a dedicated message KEK is present and valid;
+- `messageTranslation`: configured only when the provider configuration validates
+  and the explicit translation launch interlock is enabled.
+
+A blocked optional feature must not make browsing or checkout globally unhealthy.
+
+## Promotion gate
+
+Do not expose Translate / Show original until all of the following are true:
+
+- exact-head CI and Message Translation Security workflows are green;
+- fresh migration replay and translation structural/adversarial SQL pass;
+- Vercel Preview is READY at the exact head;
+- production migration is applied and hosted advisors show no new unsafe surface;
+- dedicated Store Chat KEK readiness is configured;
+- remote translation provider configuration is installed;
+- a synthetic production translation probe succeeds without logging plaintext;
+- the exact production deployment is healthy with no warning/error/fatal logs;
+- browser/WCAG tests for Translate / Show original pass.
+
+If any dependency regresses after launch, translation must fail independently and
+leave the canonical original available.
