@@ -1,20 +1,27 @@
-# EntizNetStore Fulfillment & Tracking Authority
+# EntizNetStore Fulfillment, Settlement & Tracking Authority
 
-Last reviewed: **2026-09-03**
+Last reviewed: **2026-09-04**
 
-This document defines the V1 authority boundary for Seller fulfillment, shipment tracking, Buyer delivery history and the relationship between delivery and Seller payout eligibility.
+This document defines the V1 authority boundary for Seller fulfillment, shipment tracking, Buyer delivery history, trusted receipt confirmation and Seller payout eligibility.
 
 ## Core invariant
 
-**Fulfillment records delivery facts. It does not release money.**
+**Fulfillment records delivery facts. It does not create financial settlement authority and it does not release money.**
 
-Seller delivery may make an otherwise eligible held escrow row available to the separate payout ledger, but only provider-confirmed payout settlement may change escrow from `held` to `released`. Seller fulfillment code, routes and RPCs must never update or delete `escrow_transactions`.
+A Seller can move a paid order through the legal fulfillment state machine, but Seller-controlled `delivered`, `fulfilled` and `delivered_at` facts cannot by themselves start the payout hold clock or make escrow payout-eligible.
 
-The payout ledger remains authoritative for money release and requires, among other controls, a paid order that is `delivered`, `fulfilled`, has a delivery timestamp and is not under dispute.
+Independent trusted settlement confirmation is required:
 
-## Authoritative state machine
+- the canonical Buyer may confirm receipt after a paid order is delivered and fulfilled; or
+- a verified Admin may create an exceptional confirmation after independent review, with a mandatory reason and immutable Admin audit evidence.
 
-The marketplace derives whether shipping is required from the immutable order-item purchase facts rather than from client input.
+Only after trusted confirmation has aged past the configured payout hold, while the order remains paid/delivered/fulfilled, escrow remains held, and no active dispute or refund exists, may the trusted payout worker reserve that escrow. Provider-confirmed payout success is the only normal authority that changes escrow from `held` to `released`.
+
+Seller fulfillment code, routes and RPCs must never update or delete `escrow_transactions`.
+
+## Authoritative fulfillment state machine
+
+The marketplace derives whether shipping is required from immutable order-item purchase facts rather than client input.
 
 Physical or mixed orders:
 
@@ -31,11 +38,11 @@ Digital-only orders:
 
 - no carrier, tracking number or synthetic `shipped` state is required or permitted.
 - a stale or malicious request attempting to mark a digital-only order shipped fails closed.
-- delivery/fulfillment can make the order payout-eligible, but escrow remains held until the payout authority settles it.
+- digital fulfillment remains logistics evidence only; it does not bypass trusted settlement confirmation.
 
 Illegal jumps, unpaid fulfillment, cross-Seller ownership attempts, malformed tracking details and conflicting retries are rejected in the database authority.
 
-## Transaction authority
+## Fulfillment transaction authority
 
 The exposed API calls:
 
@@ -54,9 +61,9 @@ A successful transition atomically changes:
 3. one immutable fulfillment-event record;
 4. one Buyer notification.
 
-If any of those writes fails, PostgreSQL rolls the complete transition back.
+If any write fails, PostgreSQL rolls the complete transition back.
 
-Exact retries after a lost HTTP response are idempotent. The row lock serializes concurrent duplicate requests so only one event and one notification can be created. A shipped retry carrying different carrier/tracking details is a conflict rather than an overwrite.
+Exact retries after a lost HTTP response are idempotent. The order row lock serializes concurrent duplicate requests so only one event and one notification can be created. A shipped retry carrying different carrier/tracking details is a conflict rather than an overwrite.
 
 ## Immutable fulfillment evidence
 
@@ -69,7 +76,62 @@ Exact retries after a lost HTTP response are idempotent. The row lock serializes
 - an immutability trigger rejects row updates and deletes;
 - one `(order_id, to_status)` record prevents duplicate transition evidence.
 
-Do not add a general Admin or service-role mutation path to this ledger. Any future correction model must be additive and auditable rather than rewriting historical fulfillment evidence.
+Do not add a general Admin or service-role mutation path to this ledger. Future corrections must be additive and auditable rather than rewriting historical evidence.
+
+## Trusted settlement evidence
+
+`private.order_settlement_confirmations` is the financial handoff between logistics and payout eligibility. It is outside the exposed Data API schema.
+
+The table records:
+
+- canonical order, Buyer and Seller identity;
+- authority type (`buyer` or `admin`);
+- exact confirming actor;
+- idempotency key;
+- server-controlled confirmation timestamp;
+- bounded reason/metadata.
+
+Direct table access is revoked from `anon`, `authenticated` and `service_role`. Even trusted service code cannot manufacture a confirmation by inserting a row. Runtime authority flows through constrained functions.
+
+Buyer confirmation:
+
+`public.confirm_buyer_order_receipt(uuid,uuid)`
+
+The implementation derives the actor from `auth.uid()`, locks the canonical order and requires that actor to equal the order's `buyer_id`. The browser cannot supply a Buyer ID, Seller ID, payout cutoff or escrow instruction. Paid + delivered + fulfilled state is required, and an active dispute or active refund blocks confirmation.
+
+The Buyer confirmation is idempotent and creates exactly one Seller notification. Confirmation does **not** release escrow.
+
+Admin fallback:
+
+`public.admin_confirm_order_settlement(uuid,uuid,text,uuid)`
+
+This is service-role-only. It verifies the supplied Admin identity against Auth Admin metadata, requires a meaningful reason and appends an immutable `order_settlement_confirmed` Admin audit record when a new confirmation is created.
+
+Confirmation timestamps are server-controlled using PostgreSQL transaction time. Callers cannot backdate the payout hold clock.
+
+Settlement evidence is immutable: update/delete attempts are rejected by trigger.
+
+## Payout reservation and finalization
+
+`public.request_seller_payout(...)` is trusted-server-only and requires all of the following for each claimed escrow row:
+
+- verified Seller;
+- escrow `held`, positive and not directly marked disputed;
+- canonical order Seller matches payout Seller;
+- canonical order remains `paid`, `delivered` and `fulfilled` with delivery timestamp;
+- trusted settlement confirmation exists and its Buyer/Seller identity matches the canonical order;
+- `confirmation.confirmed_at <= eligibility cutoff`;
+- no `open`/`under_review` order dispute;
+- no `requested`/`approved`/`processing` refund;
+- escrow has no other reserved/settled payout claim.
+
+The hold clock therefore starts from independent settlement confirmation, **never** Seller `delivered_at`.
+
+`public.finalize_seller_payout_v1(...)` does not trust the earlier reservation blindly. When a provider reports success it re-locks the payout request, reserved payout items, escrow rows and canonical orders, then re-validates settlement evidence, order state, dispute state and refund state immediately before money changes state.
+
+Refund/dispute writers serialize on the same canonical order row. A refund or dispute opened after payout reservation therefore blocks finalization instead of racing escrow release.
+
+If any authority changed, payout success fails closed for manual reconciliation and escrow remains held.
 
 ## Buyer and Seller read model
 
@@ -79,64 +141,64 @@ The shared `OrderFulfillmentTimeline` renders the same event evidence to both pa
 
 Legacy orders created before the event ledger use canonical order-level status, carrier, tracking and timestamps as a read-only fallback.
 
+For paid/delivered/fulfilled Buyer orders, the Buyer page separately reads participant-scoped settlement status through `get_order_settlement_confirmation`. When no confirmation exists and authority is ready, an accessible **Confirm receipt** control is shown. The control explains that confirmation starts the Seller payout hold period and that refunds/disputes still block payout.
+
+A browser retry reuses the same idempotency key until success. After confirmation, the server-rendered order state shows confirmation provenance/time and suppresses the mutation control.
+
 ## Migration-safe deployment interlock
 
-The historical production schema already contains an older RPC named `transition_seller_order`. Therefore new application code must never infer that the correct authority exists merely because that function name resolves.
+The historical production schema contains an older RPC named `transition_seller_order`. New application code must never infer that the correct authority exists merely because that name resolves.
 
-Before invoking the RPC, the Seller status route positively probes authenticated visibility of `order_fulfillment_events`. If the ledger is missing, unavailable, hidden by a stale PostgREST schema cache or otherwise cannot be read, the route returns:
+Before invoking Seller fulfillment, the Seller status route positively probes authenticated visibility of `order_fulfillment_events`. If the ledger is missing, unavailable, hidden by stale PostgREST schema cache or otherwise cannot be read, the route returns HTTP `503`, fixed code `fulfillment_authority_unavailable`, `Cache-Control: no-store`, and bounded `Retry-After` guidance. It does **not** call the legacy behavior.
 
-- HTTP `503`;
-- fixed code `fulfillment_authority_unavailable`;
-- `Cache-Control: no-store`;
-- bounded `Retry-After` guidance.
+Seller order pages use the event read as their UI readiness probe. If it fails, existing order state remains readable, mutation controls disappear and no state changes.
 
-It does **not** call the same-named legacy RPC.
-
-Seller order pages use the separate event read as their UI readiness probe. If it fails:
-
-- existing order state remains readable;
-- mutation controls are suppressed;
-- a temporary availability message is rendered;
-- no state is changed.
-
-Buyer order pages similarly continue to render existing order state and legacy tracking facts if detailed timeline evidence is temporarily unavailable.
+Buyer settlement state is also loaded separately. If the settlement RPC is not ready, Buyer order state remains readable and receipt-confirmation controls are suppressed. The receipt API converts missing settlement authority into a non-cacheable temporary failure rather than recreating financial authority in application code.
 
 This makes both production ordering scenarios safe:
 
-1. **Application deploy becomes active before migration:** reads remain available; Seller mutations fail closed until the ledger is visible.
-2. **Migration is applied before the new application finishes deploying:** the previous application remains compatible with the replacement RPC signature; digital-only stale shipping attempts may fail closed until the new UI arrives, but money/order safety is preserved.
+1. **Application deploy becomes active before migration:** reads remain available; new fulfillment/settlement mutations fail closed until authority is visible.
+2. **Migration is applied before the new application finishes deploying:** previous reads remain compatible while the database already enforces the stronger money invariant.
 
 ## Release sequence
 
-For a release containing this migration:
+For a release containing these migrations:
 
-1. Require all exact-head PR gates green, including the dedicated Fulfillment Authority Security workflow and exact-head Vercel Preview READY.
+1. Require all exact-head PR gates green, including dedicated Fulfillment Authority Security and exact-head Vercel Preview READY.
 2. Reconcile live Supabase migration history and capture the normal recovery checkpoint required by `PRODUCTION_RELEASE.md`.
-3. Merge only the pinned exact head into `main`.
-4. As the Vercel production deployment builds, apply the new forward migration to the verified EntizNetStore Supabase project.
-5. Run live structural/privilege verification and Supabase security/performance advisors.
-6. Require the exact merge-SHA Vercel deployment to become READY.
-7. Verify the canonical production endpoint, `/api/health.version`, runtime logs and fail-closed route behavior.
-8. Never exercise a real customer order merely to prove production deployment. Use non-mutating authorization/readiness evidence unless dedicated isolated production verification identities are explicitly available.
+3. Apply/rehearse forward migrations first in the EntizNetStore development environment and run structural, adversarial and advisor verification.
+4. Merge only the pinned, fully verified exact head into `main`.
+5. Coordinate production migration and exact merge-SHA Vercel deployment according to the production release runbook; never rewrite an applied migration.
+6. Run live structural/privilege verification and Supabase security/performance advisors after migration.
+7. Require the exact merge-SHA Vercel deployment to become READY.
+8. Verify the canonical production endpoint, `/api/health`, runtime logs and non-mutating authorization/readiness evidence.
+9. Never exercise a real customer order merely to prove production deployment. Use isolated verification identities only when explicitly available.
 
-If migration verification fails, stop application promotion/traffic expansion. Do not rewrite or reverse the applied migration; correct defects with a new forward migration.
+If migration verification fails, stop application promotion/traffic expansion. Correct defects with a new forward migration.
 
 ## Failure-before-user release gate
 
-`.github/workflows/fulfillment-authority-security.yml` must remain a required exact-head gate for this authority. It proves:
+`.github/workflows/fulfillment-authority-security.yml` must remain a required exact-head gate. It proves:
 
-- static architecture boundaries and no escrow mutation;
+- static architecture boundaries and zero fulfillment-driven escrow mutation;
 - fresh zero-to-latest Supabase migration replay;
-- public/private function privilege and search-path invariants;
-- authenticated/service-role read-only event ledger permissions;
+- fulfillment and settlement function privilege/search-path invariants;
+- hidden settlement table direct-access denial;
+- authenticated/service-role read-only fulfillment ledger permissions;
 - cross-account and unpaid-order rejection;
 - illegal transitions and malformed tracking rejection;
-- deliberately injected mid-transaction event failure rolls earlier writes back;
+- deliberately injected mid-transaction evidence failure rolls earlier writes back;
 - digital-only orders skip shipping and reject fabricated tracking;
-- service_role cannot forge fulfillment evidence;
-- duplicate concurrent requests create exactly one transition event/notification;
-- real authenticated Seller -> Buyer physical fulfillment flow;
-- migration-convergence simulation where authenticated ledger SELECT is temporarily revoked: Seller reads continue, controls disappear, mutation returns 503, and order/events/notifications/escrow remain unchanged;
-- WCAG A/AA on the critical authenticated Seller/Buyer states.
+- service role cannot forge fulfillment or settlement evidence;
+- Seller/self/unrelated-Buyer settlement confirmation is denied;
+- trusted Buyer/Admin confirmation is idempotent and auditable;
+- Seller-delivered timestamps cannot bypass the settlement hold;
+- active refund/dispute blocks payout selection/finalization;
+- blocked payout finalization leaves escrow and reservations unchanged;
+- concurrent payout and fulfillment claims remain single-writer;
+- real authenticated Seller -> Buyer fulfillment -> Buyer receipt-confirmation browser flow;
+- migration-convergence simulation keeps existing reads available while mutations fail closed;
+- WCAG A/AA on critical authenticated Seller/Buyer states;
+- Buyer confirmation still leaves escrow held pending payout authority.
 
-A failure in any of these gates disqualifies that commit from merge. Fix the root cause on a new SHA and rerun all exact-head evidence.
+A failure in any gate disqualifies that commit from merge. Fix the root cause on a new SHA and rerun all exact-head evidence.
