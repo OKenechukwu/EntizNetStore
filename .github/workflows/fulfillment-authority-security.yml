@@ -68,6 +68,9 @@ jobs:
       - name: Verify fulfillment structural invariants
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-fulfillment-structural-invariants.sql
 
+      - name: Verify trusted settlement structural invariants
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-settlement-structural-invariants.sql
+
       - name: Run adversarial atomic physical fulfillment regression
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-fulfillment-authority.sql
 
