@@ -36,6 +36,9 @@ mustNotContain("migration", /delete\s+from\s+public\.escrow_transactions/i, "sel
 mustContain("canonicalRoute", /\.rpc\("transition_seller_order"/i, "canonical seller route must use DB authority");
 mustNotContain("canonicalRoute", /\.from\(["'](?:orders|order_items|escrow_transactions|notifications)["']\)/i, "canonical route must not recreate multi-write fulfillment");
 mustNotContain("canonicalRoute", /error\.message\s*\|\|/i, "canonical route must not blindly expose raw DB error text");
+mustNotContain("canonicalRoute", /code\s*:\s*error\.message/i, "canonical route must never return raw DB error text as a public code");
+mustContain("canonicalRoute", /Object\.hasOwn\(publicValidationMessages, candidate\)/i, "canonical route must allowlist database validation messages before exposing a code");
+mustContain("canonicalRoute", /invalid_fulfillment_update/i, "canonical route must collapse unknown validation failures to a fixed public code");
 
 mustContain("legacyRoute", /status:\s*410/i, "legacy fulfillment route must be retired with 410");
 mustContain("legacyRoute", /legacy_fulfillment_retired/i, "legacy retirement code missing");

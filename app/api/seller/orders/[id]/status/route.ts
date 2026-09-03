@@ -10,28 +10,40 @@ const inputSchema = z
   })
   .strict();
 
+const publicValidationMessages: Record<string, string> = {
+  only_paid_orders_can_be_fulfilled: "Only paid orders can be fulfilled.",
+  invalid_fulfillment_transition: "The order changed state. Refresh and try again.",
+  carrier_and_tracking_required: "Carrier and tracking number are required before shipping.",
+  invalid_tracking_number: "Enter a valid single-line tracking number.",
+  invalid_shipping_carrier: "Enter a valid single-line shipping carrier.",
+  conflicting_tracking_retry: "This order already has different tracking details. Refresh before continuing.",
+};
 const conflictErrors = new Set(["invalid_fulfillment_transition", "conflicting_tracking_retry"]);
 
 function fulfillmentError(error: { code?: string; message?: string }) {
-  const code = error.message || "fulfillment_update_failed";
   if (error.code === "28000") {
-    return NextResponse.json({ error: "Authentication required", code: "authentication_required" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Authentication required", code: "authentication_required" },
+      { status: 401 },
+    );
   }
   if (error.code === "42501") {
-    return NextResponse.json({ error: "Order not found", code: "order_not_found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Order not found", code: "order_not_found" },
+      { status: 404 },
+    );
   }
   if (error.code === "22023") {
+    const candidate = typeof error.message === "string" ? error.message : "";
+    const code = Object.hasOwn(publicValidationMessages, candidate)
+      ? candidate
+      : "invalid_fulfillment_update";
     const status = conflictErrors.has(code) ? 409 : 400;
-    const messages: Record<string, string> = {
-      only_paid_orders_can_be_fulfilled: "Only paid orders can be fulfilled.",
-      invalid_fulfillment_transition: "The order changed state. Refresh and try again.",
-      carrier_and_tracking_required: "Carrier and tracking number are required before shipping.",
-      invalid_tracking_number: "Enter a valid single-line tracking number.",
-      invalid_shipping_carrier: "Enter a valid single-line shipping carrier.",
-      conflicting_tracking_retry: "This order already has different tracking details. Refresh before continuing.",
-    };
     return NextResponse.json(
-      { error: messages[code] || "Invalid fulfillment update", code },
+      {
+        error: publicValidationMessages[code] ?? "Invalid fulfillment update",
+        code,
+      },
       { status },
     );
   }
