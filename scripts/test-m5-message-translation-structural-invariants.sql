@@ -2,19 +2,13 @@
 
 -- Translation cache catalog contract. The cache is a derived, encrypted,
 -- server-only surface; browser roles must not gain any table access.
+--
+-- Deliberately do not assert the total number of public tables here. Whole-schema
+-- topology belongs to verify-database-reproduction; this module owns only the
+-- translation surfaces below, so unrelated marketplace tables cannot create a
+-- false message-translation regression.
 do $$
-declare
-  public_table_count integer;
 begin
-  select count(*) into public_table_count
-  from information_schema.tables
-  where table_schema = 'public'
-    and table_type = 'BASE TABLE';
-
-  if public_table_count <> 50 then
-    raise exception 'canonical public physical table count changed after translation cache: %', public_table_count;
-  end if;
-
   if not exists (
     select 1
     from pg_class c
