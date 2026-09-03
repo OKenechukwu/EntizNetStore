@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@10.9.4",
-  "engines": {
-    "node": ">=22 <23"
-  },
+  "engines": { "node": ">=22 <23" },
   "scripts": {
     "dev": "PORT=${PORT:-3000} next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-upload-safety-foundation.mjs && node scripts/verify-public-launch-foundation.mjs && node scripts/verify-request-integrity-foundation.mjs && npm run test:request-integrity && node scripts/verify-image-egress-foundation.mjs && node scripts/verify-browser-egress-service-boundary.mjs && node scripts/verify-address-suggestion-boundary.mjs && npm run test:address-suggestions && node scripts/verify-store-chat-security.mjs && npm run test:message-crypto && node scripts/verify-message-translation-security.mjs && npm run test:message-translation && node scripts/verify-globalization-accessibility-foundation.mjs && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs && node scripts/verify-actions-foundation.mjs && node scripts/verify-repository-governance.mjs && node scripts/verify-backup-recovery-foundation.mjs && node scripts/test-m4a-hosted-guard-contract.mjs",
+    "verify:foundation": "node scripts/verify-production-foundation.mjs && node scripts/verify-upload-safety-foundation.mjs && node scripts/verify-public-launch-foundation.mjs && node scripts/verify-request-integrity-foundation.mjs && npm run test:request-integrity && node scripts/verify-image-egress-foundation.mjs && node scripts/verify-browser-egress-service-boundary.mjs && node scripts/verify-address-suggestion-boundary.mjs && npm run test:address-suggestions && node scripts/verify-store-chat-security.mjs && npm run test:message-crypto && node scripts/verify-message-translation-security.mjs && npm run test:message-translation && node scripts/verify-globalization-accessibility-foundation.mjs && npm run test:globalization-core && node scripts/verify-lint-foundation.mjs && node scripts/verify-route-runtime-foundation.mjs && node scripts/verify-actions-foundation.mjs && node scripts/verify-repository-governance.mjs && node scripts/verify-backup-recovery-foundation.mjs && node scripts/test-m4a-hosted-guard-contract.mjs",
     "test:storage-recovery": "node --experimental-strip-types --test tests/storage-compensation.test.mts",
     "test:upload-scanner": "node --experimental-strip-types --test tests/upload-scanner.test.mts tests/upload-scanner-network-policy.test.mts",
     "test:launch-indexing": "node --experimental-strip-types --test tests/public-launch-indexing.test.mts",
@@ -18,6 +16,7 @@
     "test:address-suggestions": "node --experimental-strip-types --test tests/address-suggestions.test.mts",
     "test:message-crypto": "node --experimental-strip-types --test tests/message-crypto.test.mts",
     "test:message-translation": "node --experimental-strip-types --test tests/message-translation-crypto.test.mts tests/message-translation-provider.test.mts",
+    "test:globalization-core": "node --experimental-strip-types --test tests/globalization-preferences-currency.test.mts tests/fx-policy.test.mts",
     "test:public-media-source": "node --experimental-strip-types --test tests/public-media-source.test.mts",
     "test:image-egress-config": "node --test tests/image-egress-config.test.mjs",
     "test:image-optimizer-egress": "node scripts/test-image-optimizer-egress.mjs",

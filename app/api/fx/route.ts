@@ -1,72 +1,57 @@
-// app/api/fx/route.ts
 import { NextResponse } from "next/server";
+import { BASE_CURRENCY, FALLBACK_RATES } from "@/lib/currency";
+import { fetchFrankfurterRates, FxProviderError } from "@/lib/fx";
 
-// Optional (safe): ensure this route is treated as dynamic and can revalidate
 export const dynamic = "force-dynamic";
 
-/**
- * Proxy for live FX rates (base = USD).
- * Uses Frankfurter (free) and returns a trimmed set of currencies.
- * Adds caching headers for CDN/browser and server revalidation.
- */
+const LIVE_CACHE_CONTROL = "public, s-maxage=10800, stale-while-revalidate=3600, max-age=1800";
+const FALLBACK_CACHE_CONTROL = "no-store, max-age=0";
+
+function fallbackResponse(source = "fallback") {
+  return NextResponse.json(
+    {
+      base: BASE_CURRENCY,
+      rates: FALLBACK_RATES,
+      asOf: "static-fallback",
+      source,
+      stale: true,
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control": FALLBACK_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
+  );
+}
+
 export async function GET() {
+  // Browser/security CI must not depend on a public third-party service. The
+  // remote boundary is covered by deterministic provider tests instead.
+  if (process.env.CI === "true") return fallbackResponse("ci-fallback");
+
   try {
-    const res = await fetch("https://api.frankfurter.app/latest?from=USD", {
-      // Server-side revalidation window (3 hours)
-      next: { revalidate: 60 * 60 * 3 },
-    });
-
-    if (!res.ok) {
-      throw new Error(`FX upstream error: ${res.status}`);
-    }
-
-    // Example response: { amount, base, date, rates: { EUR: 0.93, ... } }
-    const data = (await res.json()) as {
-      base?: string;
-      date?: string;
-      rates?: Record<string, number>;
-    };
-
-    // Keep only currencies we actually use (plus USD=1)
-    const wanted = [
-      "USD",
-      "EUR",
-      "GBP",
-      "PHP",
-      "JPY",
-      "KRW",
-      "AUD",
-      "CAD",
-      "NGN",
-    ];
-    const pick = (obj: Record<string, number> = {}, keys: string[]) =>
-      keys.reduce(
-        (acc, k) => {
-          if (k === "USD") acc[k] = 1;
-          else if (obj[k] != null) acc[k] = obj[k];
-          return acc;
+    const snapshot = await fetchFrankfurterRates();
+    return NextResponse.json(
+      {
+        base: BASE_CURRENCY,
+        rates: snapshot.rates,
+        asOf: snapshot.asOf,
+        source: "frankfurter-v2",
+        stale: false,
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": LIVE_CACHE_CONTROL,
+          "X-Content-Type-Options": "nosniff",
         },
-        {} as Record<string, number>,
-      );
-
-    const rates = pick(data.rates, wanted);
-
-    return NextResponse.json(
-      { base: "USD", rates, date: data.date },
-      {
-        // CDN 3h, browser 30m (server revalidates every 3h via `next.revalidate`)
-        headers: { "Cache-Control": "public, s-maxage=10800, max-age=1800" },
       },
     );
-  } catch (err) {
-    // Graceful fallback — client can decide to use static rates
-    return NextResponse.json(
-      {
-        base: "USD",
-        rates: null,
-        error: (err as Error)?.message ?? "FX fetch failed",
-      },
-      { status: 200 },
-    );
+  } catch (error) {
+    const code = error instanceof FxProviderError ? error.code : "unexpected";
+    console.warn("[fx] live display rates unavailable", { code });
+    return fallbackResponse();
   }
 }
