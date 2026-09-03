@@ -18,6 +18,13 @@ This capability is deliberately shipped in two stages:
 
 `MESSAGE_TRANSLATION_LAUNCH_ENABLED=false` is therefore the safe default.
 
+The release philosophy is explicit: defects discovered by static verification,
+unit tests, clean-database replay, hosted builds, authorization tests, browser
+checks, advisor scans or dark production probes are treated as successful
+pre-user discovery. The candidate SHA that exposed a defect is retired; fixes
+must earn a complete new exact-head evidence set rather than inheriting stale
+green results.
+
 ## Authorization contract
 
 `POST /api/messages/translate` accepts only a message UUID and target language.
@@ -139,6 +146,12 @@ public tables and no `public.message_translations`. After application, prove 50,
 50 and 11 respectively, plus the exact browser/service-role privilege and
 constraint/index contracts. Any partial or unexpected shape blocks application
 promotion.
+
+Capture the pre-migration compatible application SHA and live migration list as a
+recovery checkpoint. Because this migration is additive and remains dark, the
+previous application release must continue to operate against the expanded
+schema. Never reverse an applied migration by rewriting history; any correction
+is a new forward migration.
 
 ## Promotion gate
 
