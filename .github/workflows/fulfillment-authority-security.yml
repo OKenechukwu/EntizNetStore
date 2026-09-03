@@ -74,6 +74,9 @@ jobs:
       - name: Run digital-only and immutable-ledger regression
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-fulfillment-digital-authority.sql
 
+      - name: Run trusted settlement and payout authority regression
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f scripts/test-settlement-payout-authority.sql
+
       - name: Run concurrent duplicate-transition regression
         run: DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" bash scripts/test-fulfillment-concurrency.sh
 
