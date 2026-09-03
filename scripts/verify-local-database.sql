@@ -17,15 +17,15 @@ begin
   select count(*) into v_public_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r';
-  if v_public_tables <> 49 then
-    raise exception 'Expected 49 public tables, found %', v_public_tables;
+  if v_public_tables <> 50 then
+    raise exception 'Expected 50 public tables, found %', v_public_tables;
   end if;
 
   select count(*) into v_rls_tables
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity;
-  if v_rls_tables <> 49 then
-    raise exception 'Expected RLS on all 49 public tables, found %', v_rls_tables;
+  if v_rls_tables <> 50 then
+    raise exception 'Expected RLS on all 50 public tables, found %', v_rls_tables;
   end if;
 
   select count(*) into v_no_policy_tables
@@ -35,10 +35,11 @@ begin
     and c.relrowsecurity
     and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
   -- Reviews, content pages and notifications have scoped policies while
-  -- prohibited-product rules and the upload scan ledger remain trusted-worker-only.
-  -- Ten operational tables intentionally remain deny-by-default.
-  if v_no_policy_tables <> 10 then
-    raise exception 'Expected 10 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
+  -- prohibited-product rules, upload scans and encrypted translation cache
+  -- remain trusted-worker-only. Eleven operational tables intentionally remain
+  -- deny-by-default.
+  if v_no_policy_tables <> 11 then
+    raise exception 'Expected 11 intentional deny-by-default RLS tables, found %', v_no_policy_tables;
   end if;
 
   select count(*) into v_categories from public.categories;
@@ -56,13 +57,13 @@ with expected(name) as (
     ('entiznet_identity_links'), ('escrow_transactions'), ('featured_products'),
     ('inventory_reservations'), ('kyc_documents'), ('kyc_verification_requests'),
     ('marketplace_capability_state_events'), ('marketplace_capability_states'),
-    ('marketplace_reports'), ('message_attachments'), ('messages'), ('notifications'),
-    ('order_dispute_events'), ('order_disputes'), ('order_items'), ('orders'),
-    ('payment_sessions'), ('payment_webhook_events'), ('payout_items'),
-    ('payout_provider_events'), ('payout_requests'), ('product_categories'),
-    ('product_media'), ('product_moderation_events'), ('product_variants'),
-    ('products'), ('profiles_business'), ('profiles_buyer'), ('profiles_seller'),
-    ('profiles_seller_private'), ('prohibited_product_rules'),
+    ('marketplace_reports'), ('message_attachments'), ('message_translations'),
+    ('messages'), ('notifications'), ('order_dispute_events'), ('order_disputes'),
+    ('order_items'), ('orders'), ('payment_sessions'), ('payment_webhook_events'),
+    ('payout_items'), ('payout_provider_events'), ('payout_requests'),
+    ('product_categories'), ('product_media'), ('product_moderation_events'),
+    ('product_variants'), ('products'), ('profiles_business'), ('profiles_buyer'),
+    ('profiles_seller'), ('profiles_seller_private'), ('prohibited_product_rules'),
     ('refund_provider_events'), ('refund_requests'), ('reviews'), ('upload_scan_jobs'),
     ('wholesale_offer_tiers'), ('wholesale_offers')
 ), actual(name) as (
@@ -82,7 +83,7 @@ end;
 do $$
 begin
   if current_setting('entiznetstore.invalid_table_delta', true) = 'true' then
-    raise exception 'Public table set differs from canonical 49-table M4A marketplace baseline';
+    raise exception 'Public table set differs from canonical 50-table M5 dark-translation marketplace baseline';
   end if;
 
   if not exists (
@@ -242,7 +243,7 @@ begin
   foreach v_table in array array[
     'admin_audit_logs','payment_webhook_events','payout_provider_events',
     'marketplace_capability_state_events','entiznet_handoff_events','refund_provider_events',
-    'prohibited_product_rules','upload_scan_jobs'
+    'prohibited_product_rules','upload_scan_jobs','message_translations'
   ] loop
     if has_table_privilege('anon', format('public.%I', v_table), 'SELECT')
        or has_table_privilege('authenticated', format('public.%I', v_table), 'SELECT') then
@@ -257,6 +258,21 @@ begin
      or not has_table_privilege('service_role','public.upload_scan_jobs','UPDATE')
      or not has_table_privilege('service_role','public.upload_scan_jobs','DELETE') then
     raise exception 'service_role upload scan ledger mutation privileges are incomplete';
+  end if;
+
+  if has_table_privilege('anon','public.message_translations','INSERT')
+     or has_table_privilege('anon','public.message_translations','UPDATE')
+     or has_table_privilege('anon','public.message_translations','DELETE')
+     or has_table_privilege('authenticated','public.message_translations','INSERT')
+     or has_table_privilege('authenticated','public.message_translations','UPDATE')
+     or has_table_privilege('authenticated','public.message_translations','DELETE') then
+    raise exception 'Encrypted translation cache mutation privilege leaked to browser roles';
+  end if;
+
+  if not has_table_privilege('service_role','public.message_translations','INSERT')
+     or not has_table_privilege('service_role','public.message_translations','UPDATE')
+     or not has_table_privilege('service_role','public.message_translations','DELETE') then
+    raise exception 'service_role encrypted translation cache mutation privileges are incomplete';
   end if;
 end
 $$;
@@ -277,12 +293,13 @@ begin
     'idx_content_pages_brand_active_key','idx_notifications_user_unread_created',
     'idx_featured_products_product_id',
     'idx_inventory_reservations_payment_session_id','idx_inventory_reservations_product_id',
-    'idx_messages_order_id','idx_order_items_variant_id',
-    'idx_payment_webhook_events_payment_session_id','idx_product_categories_category_id',
-    'idx_product_media_product_id','idx_product_media_variant_id','idx_product_variants_product_id',
-    'idx_products_brand_id','idx_products_moderation_status','idx_product_moderation_events_product_created',
-    'profiles_seller_store_slug_key','idx_reviews_buyer_id','reviews_one_per_order_product_buyer',
-    'idx_reviews_status_created','idx_reviews_product_status_created','idx_reviews_order_id','idx_reviews_moderated_by',
+    'idx_messages_order_id','idx_message_translations_message','idx_message_translations_recoverable_claim',
+    'idx_order_items_variant_id','idx_payment_webhook_events_payment_session_id',
+    'idx_product_categories_category_id','idx_product_media_product_id','idx_product_media_variant_id',
+    'idx_product_variants_product_id','idx_products_brand_id','idx_products_moderation_status',
+    'idx_product_moderation_events_product_created','profiles_seller_store_slug_key',
+    'idx_reviews_buyer_id','reviews_one_per_order_product_buyer','idx_reviews_status_created',
+    'idx_reviews_product_status_created','idx_reviews_order_id','idx_reviews_moderated_by',
     'idx_payout_requests_seller_created','idx_payout_requests_status','idx_payout_requests_provider_reference',
     'idx_payout_items_request','idx_payout_items_escrow','idx_payout_items_active_escrow',
     'idx_payout_provider_events_request','idx_profiles_business_verification_status',
