@@ -45,19 +45,34 @@ mustNotContain("canonicalRoute", /error\.message\s*\|\|/i, "canonical route must
 mustNotContain("canonicalRoute", /code\s*:\s*error\.message/i, "canonical route must never return raw DB error text as a public code");
 mustContain("canonicalRoute", /Object\.hasOwn\(publicValidationMessages, candidate\)/i, "canonical route must allowlist database validation messages before exposing a code");
 mustContain("canonicalRoute", /shipping_not_required_for_order/i, "canonical route must normalize digital shipping rejection");
+mustContain("canonicalRoute", /fulfillment_authority_unavailable/i, "canonical route must fail closed while the migration is unavailable");
+mustContain("canonicalRoute", /Retry-After/i, "temporary fulfillment-authority outage should expose bounded retry guidance");
 mustContain("canonicalRoute", /invalid_fulfillment_update/i, "canonical route must collapse unknown validation failures to a fixed public code");
+const authorityProbeIndex = source.canonicalRoute.indexOf('.from("order_fulfillment_events")');
+const authorityRpcIndex = source.canonicalRoute.indexOf('.rpc("transition_seller_order"');
+assert.ok(authorityProbeIndex >= 0, "canonical route must positively probe the new fulfillment ledger");
+assert.ok(authorityRpcIndex > authorityProbeIndex, "canonical route must probe authority readiness before invoking the same-named RPC");
 
 mustContain("legacyRoute", /status:\s*410/i, "legacy fulfillment route must be retired with 410");
 mustContain("legacyRoute", /legacy_fulfillment_retired/i, "legacy retirement code missing");
 mustNotContain("legacyRoute", /@\/lib\/supabase|\.from\(|escrow_transactions|\.update\(/i, "legacy route contains a live database mutation path");
 
 for (const key of ["buyerOrders", "sellerOrders"]) {
-  mustContain(key, /order_fulfillment_events\(/i, `${key} must read authoritative fulfillment events`);
+  mustContain(key, /\.from\("order_fulfillment_events"\)/i, `${key} must load authoritative fulfillment events separately`);
+  mustContain(key, /eventsByOrder/i, `${key} must merge separately loaded timeline evidence by order id`);
   mustContain(key, /<OrderFulfillmentTimeline/i, `${key} must render the shared timeline`);
   mustContain(key, /<Price\s+amount=/i, `${key} must use canonical display currency formatting`);
   mustNotContain(key, /<main\b/i, `${key} must rely on the root layout's single global main landmark`);
+  mustNotContain(
+    key,
+    /order_items\([^"\n]*\),\s*order_fulfillment_events\(/i,
+    `${key} must not make base order rendering depend on the new ledger relation`,
+  );
 }
+mustContain("buyerOrders", /detailedTimelineAvailable\s*=\s*false/i, "buyer orders must degrade to legacy status if detailed timeline is not yet available");
 mustContain("sellerOrders", /requires_shipping/i, "seller order query must load authoritative item shipping facts");
+mustContain("sellerOrders", /fulfillmentAuthorityReady\s*=\s*false/i, "seller orders must detect unavailable fulfillment authority");
+mustContain("sellerOrders", /fulfillmentAuthorityReady\s*&&\s*\(/i, "seller mutation controls must be suppressed until authority readiness is proven");
 mustContain("sellerOrders", /requiresShipping=\{requiresShipping\}/i, "seller UI must pass item-derived shipping requirements to actions");
 mustContain("sellerActions", /requiresShipping\s*\?/i, "seller actions must branch physical versus digital fulfillment");
 mustContain("sellerActions", /\?\s*"shipped"\s*:\s*"delivered"/i, "digital-only orders must skip shipping in seller UI");
