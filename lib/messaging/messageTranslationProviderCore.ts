@@ -48,6 +48,7 @@ const MAX_RESPONSE_BYTES = 32 * 1024;
 const MAX_TOKEN_BYTES = 4096;
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_TRANSLATED_CHARS = 8000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BLOCKED_PRODUCTION_HOST_SUFFIXES = [
   ".localhost",
   ".local",
@@ -68,6 +69,11 @@ function boundedIdentifier(value: string | undefined, max = 80) {
     return null;
   }
   return candidate;
+}
+
+function normalizeIdempotencyKey(value: string) {
+  const candidate = value.trim();
+  return UUID_PATTERN.test(candidate) ? candidate.toLowerCase() : null;
 }
 
 /**
@@ -253,7 +259,7 @@ async function readBoundedResponseText(response: Response) {
 }
 
 export async function executeMessageTranslation(
-  input: { text: string; targetLanguage: string },
+  input: { text: string; targetLanguage: string; idempotencyKey: string },
   configuration: MessageTranslationConfiguration = validateMessageTranslationConfiguration(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<MessageTranslationResult> {
@@ -262,6 +268,8 @@ export async function executeMessageTranslation(
   if (!input.text || input.text.length > MAX_MESSAGE_CHARS) {
     return { ok: false, code: "translation_payload_size_invalid" };
   }
+  const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
+  if (!idempotencyKey) return { ok: false, code: "translation_idempotency_key_invalid" };
   if (!configuration.ok) return { ok: false, code: configuration.code };
 
   if (configuration.mode === "deterministic") {
@@ -282,9 +290,16 @@ export async function executeMessageTranslation(
         Authorization: `Bearer ${configuration.token}`,
         "Content-Type": "application/json",
         Accept: "application/json",
-        "X-EntizNetStore-Translation-Protocol": "1",
+        "Idempotency-Key": idempotencyKey,
+        "X-EntizNetStore-Translation-Idempotency-Key": idempotencyKey,
+        "X-EntizNetStore-Translation-Protocol": "2",
       },
-      body: JSON.stringify({ text: input.text, targetLanguage, sourceLanguage: "auto" }),
+      body: JSON.stringify({
+        requestId: idempotencyKey,
+        text: input.text,
+        targetLanguage,
+        sourceLanguage: "auto",
+      }),
       signal: AbortSignal.timeout(configuration.timeoutMs),
       cache: "no-store",
       redirect: "error",
@@ -309,11 +324,19 @@ export async function executeMessageTranslation(
   const responseText = await readBoundedResponseText(response);
   if (responseText === null) return { ok: false, code: "translation_provider_response_too_large" };
 
-  let payload: { translatedText?: unknown; sourceLanguage?: unknown } | null = null;
+  let payload: { requestId?: unknown; translatedText?: unknown; sourceLanguage?: unknown } | null = null;
   try {
-    payload = JSON.parse(responseText) as { translatedText?: unknown; sourceLanguage?: unknown };
+    payload = JSON.parse(responseText) as {
+      requestId?: unknown;
+      translatedText?: unknown;
+      sourceLanguage?: unknown;
+    };
   } catch {
     return { ok: false, code: "translation_provider_response_invalid" };
+  }
+
+  if (payload.requestId !== idempotencyKey) {
+    return { ok: false, code: "translation_provider_idempotency_ack_invalid" };
   }
 
   const translatedText = typeof payload.translatedText === "string" ? payload.translatedText.trim() : "";

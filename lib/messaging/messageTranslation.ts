@@ -56,6 +56,7 @@ export type AuthorizedTranslationResult =
         | "message_translation_pending"
         | "message_translation_cache_integrity_failed"
         | "message_translation_persistence_failed";
+      diagnosticCode?: string;
     };
 
 const CLAIM_LEASE_MS = 30_000;
@@ -155,6 +156,28 @@ async function readCache(
 
   if (error) throw new Error("Unable to read message translation cache");
   return (data as TranslationCacheRow | null) ?? null;
+}
+
+async function markTranslationCacheIntegrityFailure(row: TranslationCacheRow) {
+  const admin = getSupabaseAdmin();
+  const failedAt = new Date();
+  const retryAt = new Date(failedAt.getTime() + FAILURE_RETRY_MS);
+  const result = await admin
+    .from("message_translations")
+    .update({
+      status: "failed",
+      claim_token: null,
+      last_error_code: "translation_cache_integrity_failed",
+      lease_expires_at: retryAt.toISOString(),
+      updated_at: failedAt.toISOString(),
+    })
+    .eq("id", row.id)
+    .eq("status", "ready")
+    .eq("original_integrity_digest", row.original_integrity_digest)
+    .select("id")
+    .maybeSingle();
+
+  return !result.error && Boolean(result.data);
 }
 
 async function claimTranslation(
@@ -278,44 +301,79 @@ export async function translateAuthorizedMessage(
       originalIntegrityDigest,
     );
   } catch {
-    return { ok: false, code: "message_translation_persistence_failed" };
+    return {
+      ok: false,
+      code: "message_translation_persistence_failed",
+      diagnosticCode: "translation_claim_persistence_failed",
+    };
   }
 
   if (!claim.owned) {
     if (claim.row.status === "ready") {
       try {
-        return decryptReadyRow(claim.row, message, dataKey) ?? {
-          ok: false,
-          code: "message_translation_cache_integrity_failed",
-        };
+        const cached = decryptReadyRow(claim.row, message, dataKey);
+        if (cached) return cached;
       } catch {
-        return { ok: false, code: "message_translation_cache_integrity_failed" };
+        // The persisted ciphertext is retained as evidence on the failed row.
       }
+
+      const marked = await markTranslationCacheIntegrityFailure(claim.row);
+      return marked
+        ? {
+            ok: false,
+            code: "message_translation_cache_integrity_failed",
+            diagnosticCode: "translation_cache_integrity_failed",
+          }
+        : {
+            ok: false,
+            code: "message_translation_persistence_failed",
+            diagnosticCode: "translation_cache_integrity_state_persist_failed",
+          };
     }
     return { ok: false, code: "message_translation_pending" };
   }
 
   const translated = await executeMessageTranslation(
-    { text: message.plaintext, targetLanguage },
+    {
+      text: message.plaintext,
+      targetLanguage,
+      idempotencyKey: claim.row.id,
+    },
     configuration,
   );
   const admin = getSupabaseAdmin();
 
   if (!translated.ok) {
-    const retryAt = new Date(Date.now() + FAILURE_RETRY_MS).toISOString();
-    await admin
+    const failedAt = new Date();
+    const retryAt = new Date(failedAt.getTime() + FAILURE_RETRY_MS).toISOString();
+    const failurePersisted = await admin
       .from("message_translations")
       .update({
         status: "failed",
         claim_token: null,
         last_error_code: translated.code.slice(0, 120),
         lease_expires_at: retryAt,
-        updated_at: new Date().toISOString(),
+        updated_at: failedAt.toISOString(),
       })
       .eq("id", claim.row.id)
       .eq("status", "pending")
-      .eq("claim_token", claim.claimToken);
-    return { ok: false, code: "message_translation_unavailable" };
+      .eq("claim_token", claim.claimToken)
+      .select("id")
+      .maybeSingle();
+
+    if (failurePersisted.error || !failurePersisted.data) {
+      return {
+        ok: false,
+        code: "message_translation_persistence_failed",
+        diagnosticCode: "translation_failure_state_persist_failed",
+      };
+    }
+
+    return {
+      ok: false,
+      code: "message_translation_unavailable",
+      diagnosticCode: translated.code,
+    };
   }
 
   const encrypted = encryptMessageTranslation(
@@ -350,7 +408,11 @@ export async function translateAuthorizedMessage(
     .maybeSingle();
 
   if (completed.error || !completed.data) {
-    return { ok: false, code: "message_translation_persistence_failed" };
+    return {
+      ok: false,
+      code: "message_translation_persistence_failed",
+      diagnosticCode: "translation_provider_result_persist_failed",
+    };
   }
 
   return {

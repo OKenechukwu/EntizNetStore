@@ -121,6 +121,16 @@ begin
     raise exception 'stale translation claim was not recoverable exactly once';
   end if;
 
+  if not exists (
+    select 1
+    from public.message_translations
+    where id = current_setting('translation.translation_id')::uuid
+      and attempt_count = 2
+      and claim_token = 'd4000000-0000-4000-8000-000000000004'::uuid
+  ) then
+    raise exception 'translation provider idempotency row identity changed across takeover';
+  end if;
+
   update public.message_translations
   set claim_token = gen_random_uuid(),
       lease_expires_at = now() + interval '30 seconds'

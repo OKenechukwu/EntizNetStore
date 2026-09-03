@@ -62,6 +62,11 @@ for (const required of [
   "AbortSignal.timeout",
   "MAX_RESPONSE_BYTES",
   "translation_deterministic_forbidden_in_production",
+  '"Idempotency-Key": idempotencyKey',
+  '"X-EntizNetStore-Translation-Idempotency-Key": idempotencyKey',
+  '"X-EntizNetStore-Translation-Protocol": "2"',
+  "requestId: idempotencyKey",
+  "translation_provider_idempotency_ack_invalid",
 ]) {
   if (!providerCore.includes(required)) fail(`provider boundary is missing: ${required}`);
 }
@@ -76,6 +81,9 @@ for (const required of [
   '.eq("claim_token", claim.claimToken)',
   "computeOriginalIntegrityDigest",
   "encryptMessageTranslation",
+  "idempotencyKey: claim.row.id",
+  "markTranslationCacheIntegrityFailure",
+  "translation_provider_result_persist_failed",
 ]) {
   if (!adapter.includes(required)) fail(`translation idempotency/integrity adapter is missing: ${required}`);
 }
@@ -92,6 +100,9 @@ if (!route.includes('messageTranslationLaunchStatus() !== "configured"')) {
 if (!route.includes("decryptConversationMessage") || !route.includes("translateAuthorizedMessage")) {
   fail("translation route must derive from the canonical encrypted original");
 }
+if (!route.includes("result.diagnosticCode ?? result.code")) {
+  fail("translation route must preserve sanitized provider/persistence diagnostic codes");
+}
 if (/recipientId|orderId/.test(route)) {
   fail("translation route must not accept recipient/order authority from clients");
 }
@@ -99,8 +110,11 @@ if (/recipientId|orderId/.test(route)) {
 if (!readiness.includes("MESSAGE_KEY_ENCRYPTION_KEY") || !readiness.includes("messageTranslationLaunchStatus")) {
   fail("messaging readiness must distinguish dedicated Store Chat key and translation readiness");
 }
-if (!health.includes("storeChat: storeChatLaunchStatus()") || !health.includes("messageTranslation: messageTranslationLaunchStatus()")) {
+if (!health.includes("storeChat: storeChatLaunchStatus()") || !health.includes("messageTranslation: messageTranslationGate")) {
   fail("health endpoint must expose machine-readable Store Chat and translation launch gates");
+}
+if (!health.includes(".from('message_translations')") || !health.includes("messageTranslationGate = 'blocked'")) {
+  fail("translation health gate must prove live cache availability before reporting configured");
 }
 
 for (const required of [
@@ -114,6 +128,7 @@ for (const required of [
   "authenticated browser read translation cache",
   "duplicate translation claim bypassed unique cache constraint",
   "active translation claim could be stolen before lease expiry",
+  "translation provider idempotency row identity changed across takeover",
 ]) {
   if (!authority.includes(required)) fail(`translation adversarial DB gate missing: ${required}`);
 }

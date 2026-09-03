@@ -83,7 +83,9 @@ grant select, insert, update, delete on table public.message_translations to ser
 
 comment on table public.message_translations is
   'Server-only encrypted cache of derived message translations. Canonical originals remain public.messages ciphertext.';
+comment on column public.message_translations.id is
+  'Stable provider idempotency identity reused across retries and stale-lease takeover for this cache entry.';
 comment on column public.message_translations.original_integrity_digest is
   'Keyed HMAC digest bound to the canonical original message; not a raw plaintext hash.';
 comment on column public.message_translations.lease_expires_at is
-  'Fail-recoverable provider-call claim lease used to prevent duplicate translation billing.';
+  'Fail-recoverable provider-call claim lease used with the stable row id to prevent duplicate translation billing.';

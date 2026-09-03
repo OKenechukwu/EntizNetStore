@@ -10,8 +10,8 @@ or become the authoritative copy of a message.
 This capability is deliberately shipped in two stages:
 
 1. **Dark foundation** — schema, authorization, encryption, provider boundary,
-   concurrency control, health/readiness signals and regressions are deployed
-   while the launch interlock remains off.
+   concurrency/crash recovery, health/readiness signals and regressions are
+   deployed while the launch interlock remains off.
 2. **User exposure** — Translate / Show original controls are enabled only after a
    production provider probe and exact-deployment verification prove the dark
    foundation and its dependencies are healthy.
@@ -57,7 +57,12 @@ version and the keyed original-integrity digest. A cached translation cannot be
 moved to another message, target language or provider/version without
 authentication failure.
 
-## Provider egress contract
+If cached ciphertext fails authenticated decryption, the row is not silently
+deleted. It is moved to a failed/cooldown state while its persisted evidence is
+retained, then becomes eligible for a controlled retry using the same stable
+provider idempotency identity.
+
+## Provider egress and idempotency contract
 
 Production remote translation is fail-closed:
 
@@ -73,10 +78,24 @@ Production remote translation is fail-closed:
 - provider identifiers/version bounded and configured server-side;
 - deterministic provider allowed only for local/CI regression.
 
-Provider errors are converted to bounded internal codes. Original message
-read/send behavior does not depend on provider availability.
+The remote gateway contract is protocol **v2** and idempotency is mandatory. The
+stable `message_translations.id` UUID is sent as both `Idempotency-Key` and
+`X-EntizNetStore-Translation-Idempotency-Key`, and as the JSON `requestId`. The
+gateway must deduplicate retries for that identity and echo the exact `requestId`
+in a successful response. A response that does not acknowledge the exact identity
+is rejected.
 
-## Cost and concurrency control
+This closes the normal lease-only crash window: if a provider completes but the
+application crashes, times out while the provider continues, or fails to persist
+the encrypted result, stale-lease recovery reuses the same cache row UUID instead
+of creating a new external request identity. Provider adapters that cannot prove
+idempotent retry semantics must not be approved for production launch.
+
+Provider errors are converted to bounded internal diagnostic codes. Original
+message read/send behavior does not depend on provider availability and plaintext
+is never included in operational diagnostics.
+
+## Cost, concurrency and crash recovery
 
 The cache has a unique identity over message, target language, provider,
 provider-version and keyed original digest. Provider work is protected by a
@@ -85,8 +104,10 @@ database-backed claim token and lease.
 The first request creates the pending claim. Concurrent requests encounter the
 unique row and return pending rather than calling the provider again. A crashed
 worker can be recovered only after the lease expires. Conditional update semantics
-prevent a second worker from stealing an active lease. Provider failures enter a
-short retry cooldown rather than permanently poisoning the cache.
+prevent a second worker from stealing an active lease. Crucially, takeover updates
+the existing row rather than replacing it, preserving the provider idempotency UUID
+across every retry. Provider failures enter a short retry cooldown rather than
+permanently poisoning the cache.
 
 ## Health and launch readiness
 
@@ -94,10 +115,13 @@ Core `/api/health` status remains based on database, storage, operational-event 
 payment health. Optional features are reported independently under `launchGates`:
 
 - `storeChat`: configured only when a dedicated message KEK is present and valid;
-- `messageTranslation`: configured only when the provider configuration validates
-  and the explicit translation launch interlock is enabled.
+- `messageTranslation`: configured only when the provider configuration validates,
+  the explicit translation launch interlock is enabled, **and the live encrypted
+  translation cache is readable from the trusted server boundary**.
 
-A blocked optional feature must not make browsing or checkout globally unhealthy.
+An environment flag by itself therefore cannot make health report translation as
+ready before its database dependency exists. A blocked optional feature must not
+make browsing or checkout globally unhealthy.
 
 ## Promotion gate
 
@@ -105,10 +129,13 @@ Do not expose Translate / Show original until all of the following are true:
 
 - exact-head CI and Message Translation Security workflows are green;
 - fresh migration replay and translation structural/adversarial SQL pass;
+- crash-safe provider idempotency protocol tests pass;
 - Vercel Preview is READY at the exact head;
 - production migration is applied and hosted advisors show no new unsafe surface;
 - dedicated Store Chat KEK readiness is configured;
 - remote translation provider configuration is installed;
+- the provider gateway proves stable-idempotency replay behavior, including a
+  simulated lost-response/retry case;
 - a synthetic production translation probe succeeds without logging plaintext;
 - the exact production deployment is healthy with no warning/error/fatal logs;
 - browser/WCAG tests for Translate / Show original pass.

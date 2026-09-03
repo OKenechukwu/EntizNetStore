@@ -125,7 +125,8 @@ export async function POST(request: Request) {
       return json({ status: "pending" }, 202);
     }
 
-    await reportOperationalError(`message_translation.${result.code}`, result.code, {
+    const diagnosticCode = result.diagnosticCode ?? result.code;
+    await reportOperationalError(`message_translation.${diagnosticCode}`, diagnosticCode, {
       component: "messaging",
       operation: "translate-message",
       route: "/api/messages/translate",
