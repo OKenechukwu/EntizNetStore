@@ -41,6 +41,18 @@ if (rawExpectedSha && !/^[0-9a-f]{12,40}$/.test(rawExpectedSha)) {
 }
 const expectedVersion = rawExpectedSha ? rawExpectedSha.slice(0, 12) : null
 
+const expectedBackendBinding = (process.env.CAPACITY_EXPECTED_BACKEND_BINDING || '')
+  .trim()
+  .toLowerCase()
+if (!allowLocal && !/^[0-9a-f]{24}$/.test(expectedBackendBinding)) {
+  console.error('CAPACITY_EXPECTED_BACKEND_BINDING must bind production probes to a 24 character backend fingerprint')
+  process.exit(2)
+}
+if (expectedBackendBinding && !/^[0-9a-f]{24}$/.test(expectedBackendBinding)) {
+  console.error('CAPACITY_EXPECTED_BACKEND_BINDING must be a 24 character hexadecimal backend fingerprint')
+  process.exit(2)
+}
+
 function boundedInteger(name, fallback, min, max) {
   const value = Number.parseInt(process.env[name] || String(fallback), 10)
   if (!Number.isInteger(value) || value < min || value > max) {
@@ -76,12 +88,30 @@ async function runOne(path) {
       const body = await response.json().catch(() => null)
       const elapsedMs = performance.now() - started
       const versionMatches = !expectedVersion || body?.version === expectedVersion
+      const backendMatches =
+        !expectedBackendBinding || body?.backendBinding === expectedBackendBinding
+      const launchGateContractValid =
+        ['configured', 'blocked'].includes(body?.launchGates?.uploadSafety) &&
+        ['enabled', 'blocked'].includes(body?.launchGates?.indexing) &&
+        ['configured', 'blocked'].includes(body?.launchGates?.storeChat) &&
+        ['configured', 'blocked'].includes(body?.launchGates?.messageTranslation)
+
+      let reason
+      if (!versionMatches) reason = 'deployment_version_mismatch'
+      else if (!backendMatches) reason = 'backend_binding_mismatch'
+      else if (!launchGateContractValid) reason = 'launch_gate_contract_invalid'
+
       results.push({
         path,
         elapsedMs,
-        ok: healthy && body?.status === 'ok' && versionMatches,
+        ok:
+          healthy &&
+          body?.status === 'ok' &&
+          versionMatches &&
+          backendMatches &&
+          launchGateContractValid,
         status: response.status,
-        reason: versionMatches ? undefined : 'deployment_version_mismatch',
+        reason,
       })
       return
     }
@@ -127,6 +157,7 @@ const throughputRps = results.length / Math.max(durationMs / 1000, 0.001)
 const summary = {
   origin: baseUrl.origin,
   expectedVersion,
+  expectedBackendBinding: expectedBackendBinding || null,
   paths,
   concurrency,
   requests: results.length,

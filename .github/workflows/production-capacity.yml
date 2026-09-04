@@ -64,6 +64,7 @@ jobs:
           ENTIZNETSTORE_BASE_URL: https://entiznetstore.vercel.app
           CAPACITY_EXPECTED_ORIGIN: https://entiznetstore.vercel.app
           CAPACITY_EXPECTED_SHA: ${{ github.sha }}
+          CAPACITY_EXPECTED_BACKEND_BINDING: 26f7fc5faab297eb924e4a0f
           CAPACITY_CONCURRENCY: ${{ inputs.concurrency }}
           CAPACITY_REQUESTS_PER_PATH: ${{ inputs.requests_per_path }}
           CAPACITY_MAX_P95_MS: ${{ inputs.max_p95_ms }}

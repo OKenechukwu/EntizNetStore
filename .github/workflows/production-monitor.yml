@@ -35,6 +35,10 @@ jobs:
         env:
           ENTIZNETSTORE_BASE_URL: https://entiznetstore.vercel.app
           ENTIZNETSTORE_EXPECTED_SHA: ${{ github.sha }}
+          # Public fingerprint of the canonical Supabase origin. This is not a
+          # credential; it prevents a healthy deployment bound to the wrong Store
+          # backend from passing release monitoring.
+          ENTIZNETSTORE_EXPECTED_BACKEND_BINDING: 26f7fc5faab297eb924e4a0f
         shell: bash
         run: |
           set -euo pipefail
@@ -71,7 +75,7 @@ jobs:
               `Workflow run: ${runUrl}`,
               `Detected at: ${new Date().toISOString()}`,
               '',
-              'Treat deployment-version drift, readiness failure, security-header regression, or authorization exposure as release incidents until disproven.',
+              'Treat deployment-version drift, backend-binding drift, launch-gate contract loss, readiness failure, security-header regression, or authorization exposure as release incidents until disproven.',
               'Follow `docs/operations/INCIDENT_RESPONSE.md` before changing production state.',
               'Do not paste credentials, assertions, signed URLs, KYC data, payment payloads, or other secrets into this issue.',
             ].join('\n');
@@ -106,7 +110,7 @@ jobs:
               state: 'open',
               per_page: 100,
             });
-            for (const issue of issues.filter((item) => issue.title === title && !item.pull_request)) {
+            for (const issue of issues.filter((item) => item.title === title && !item.pull_request)) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
