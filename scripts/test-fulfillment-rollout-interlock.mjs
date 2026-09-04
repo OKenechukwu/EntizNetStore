@@ -177,6 +177,11 @@ try {
     assert.equal(await page.locator("main#main").count(), 1, "fallback seller view must keep one main landmark");
     assert.equal(await page.locator("main main").count(), 0, "fallback seller view rendered nested main landmarks");
     await assertAxe(page, "fulfillment rollout interlock seller view");
+    assert.equal(
+      browserErrors.length,
+      0,
+      `browser errors before deliberate fail-closed mutation:\n${browserErrors.join("\n")}`,
+    );
 
     const mutation = await page.evaluate(async (id) => {
       const result = await fetch(`/api/seller/orders/${id}/status`, {
@@ -188,7 +193,13 @@ try {
     }, order.id);
     assert.equal(mutation.status, 503, `authority-unavailable mutation expected 503, got ${mutation.status}`);
     assert.equal(mutation.body.code, "fulfillment_authority_unavailable");
-    assert.equal(browserErrors.length, 0, `browser errors during fail-closed rollout state:\n${browserErrors.join("\n")}`);
+
+    const expectedFailClosedConsoleError =
+      /^console: Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)$/;
+    assert.ok(
+      browserErrors.length <= 1 && browserErrors.every((error) => expectedFailClosedConsoleError.test(error)),
+      `unexpected browser errors during deliberate fail-closed mutation:\n${browserErrors.join("\n")}`,
+    );
     await context.close();
   } finally {
     await browser.close();
