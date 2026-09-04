@@ -7,14 +7,9 @@ declare
   expected_authenticated text[] := array[
     'business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)',
     'business_set_trading_roles(text[])',
-    'buyer_clear_cart()',
     'buyer_delete_address(uuid)',
-    'buyer_get_or_create_cart()',
-    'buyer_remove_cart_item(uuid)',
     'buyer_request_order_refund(uuid,bigint,text,uuid)',
     'buyer_save_address(uuid,text,boolean,text,text,text,text,text,text,text,text,text,text,text)',
-    'buyer_set_cart_item(uuid,uuid,integer)',
-    'buyer_set_wholesale_cart_item(uuid,integer)',
     'buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
     'cancel_checkout_session(uuid)',
     'create_checkout_session_v2(uuid,uuid,uuid)',
@@ -86,6 +81,109 @@ begin
 
   if cardinality(unscoped) > 0 then
     raise exception 'authenticated SECURITY DEFINER RPC(s) lost auth.uid() scoping: %', unscoped;
+  end if;
+end;
+$$;
+
+-- Retail and wholesale cart mutation now use exposed SECURITY INVOKER wrappers
+-- over non-exposed app_private SECURITY DEFINER authorities. This removes five
+-- browser-callable definers without changing API signatures or caller identity.
+do $$
+declare
+  public_fns regprocedure[] := array[
+    'public.buyer_get_or_create_cart()'::regprocedure,
+    'public.buyer_set_cart_item(uuid,uuid,integer)'::regprocedure,
+    'public.buyer_remove_cart_item(uuid)'::regprocedure,
+    'public.buyer_clear_cart()'::regprocedure,
+    'public.buyer_set_wholesale_cart_item(uuid,integer)'::regprocedure
+  ];
+  private_fns regprocedure[] := array[
+    'app_private.buyer_get_or_create_cart_authority()'::regprocedure,
+    'app_private.buyer_set_cart_item_authority(uuid,uuid,integer)'::regprocedure,
+    'app_private.buyer_remove_cart_item_authority(uuid)'::regprocedure,
+    'app_private.buyer_clear_cart_authority()'::regprocedure,
+    'app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)'::regprocedure
+  ];
+  fn regprocedure;
+  definition text;
+  arguments text;
+  is_definer boolean;
+begin
+  foreach fn in array public_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'cart public wrapper privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if is_definer then
+      raise exception 'cart public wrapper % must remain SECURITY INVOKER', fn;
+    end if;
+    if definition not ilike '%app_private.%authority%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog''%'
+         or definition ilike '%set search_path = pg_catalog%'
+       ) then
+      raise exception 'cart public wrapper % lost private delegation or pinned search_path', fn;
+    end if;
+    if arguments ilike '%buyer_id%' or arguments ilike '%user_id%' then
+      raise exception 'cart public wrapper % accepts caller-supplied Buyer identity', fn;
+    end if;
+  end loop;
+
+  foreach fn in array private_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'cart private authority privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if not is_definer
+       or definition not ilike '%auth.uid()%'
+       or definition not ilike '%set search_path to ''''%' then
+      raise exception 'cart private authority % lost definer/auth.uid/empty-search-path hardening', fn;
+    end if;
+    if arguments ilike '%buyer_id%' or arguments ilike '%user_id%' then
+      raise exception 'cart private authority % accepts caller-supplied Buyer identity', fn;
+    end if;
+  end loop;
+
+  select pg_get_functiondef('app_private.buyer_set_cart_item_authority(uuid,uuid,integer)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%marketplace_capability_is_active%'
+     or definition not ilike '%inventory_reservations%'
+     or definition not ilike '%buyer_get_or_create_cart_authority%'
+     or definition not ilike '%purchase_mode%retail%' then
+    raise exception 'retail cart private authority lost catalogue/inventory/cart controls';
+  end if;
+
+  select pg_get_functiondef('app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%profiles_business%'
+     or definition not ilike '%minimum_order_quantity%'
+     or definition not ilike '%order_multiple%'
+     or definition not ilike '%wholesale_offer_tiers%'
+     or definition not ilike '%inventory_reservations%'
+     or definition not ilike '%purchase_mode%wholesale%' then
+    raise exception 'wholesale cart private authority lost BSM/MOQ/tier/inventory controls';
+  end if;
+
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'private'
+      and tablename = 'order_settlement_confirmations'
+      and indexname = 'idx_order_settlement_confirmations_confirmed_by'
+      and indexdef ilike '%(confirmed_by)%'
+  ) then
+    raise exception 'settlement confirmation confirmed_by FK index missing';
   end if;
 end;
 $$;
