@@ -352,13 +352,22 @@ begin
 end
 $$;
 
--- Separate order: once payout ledger has reserved the Seller escrow, approving
--- a refund does not fake a clawback. Provider attachment must fail closed.
+-- Separate order: once trusted settlement has made Seller escrow payout-eligible
+-- and the payout ledger reserves it, approving a refund does not fake a clawback.
+-- Provider attachment must fail closed.
 set local role service_role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+select public.admin_confirm_order_settlement(
+  'd4000000-0000-0000-0000-000000000004',
+  'e2000000-0000-0000-0000-000000000002',
+  'Regression fixture: independent delivery evidence reviewed before payout.',
+  'ad000000-0000-0000-0000-000000000001'
+);
 select * from public.request_seller_payout(
   'd5000000-0000-0000-0000-000000000005',
   'ac000000-0000-0000-0000-000000000001',
-  now() - interval '7 days'
+  now()
 );
 
 reset role;
