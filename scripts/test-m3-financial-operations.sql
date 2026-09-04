@@ -30,8 +30,8 @@ insert into public.orders(
   now()-interval '11 days',now()
 );
 
--- Order 002 is a separate fully-paid delivered order. Its held escrow is the
--- only payout-eligible balance in this fixture.
+-- Order 002 is a separate fully-paid delivered order. Its held escrow becomes
+-- payout eligible only after independent Admin settlement confirmation below.
 insert into public.orders(
   id,order_number,buyer_id,seller_id,status,subtotal_cents,total_cents,
   payment_status,fulfillment_status,delivered_at,metadata,created_at,updated_at
@@ -72,7 +72,8 @@ begin
     'public.admin_search_escrow_transactions(uuid,text,text,integer,integer)',
     'public.admin_search_audit_logs(uuid,text,text,integer,integer)',
     'public.admin_create_seller_payout(uuid,uuid,uuid,timestamp with time zone)',
-    'public.admin_cancel_seller_payout(uuid,uuid,text)'
+    'public.admin_cancel_seller_payout(uuid,uuid,text)',
+    'public.admin_confirm_order_settlement(uuid,uuid,text,uuid)'
   ] loop
     if has_function_privilege('anon',v_fn,'EXECUTE')
        or has_function_privilege('authenticated',v_fn,'EXECUTE')
@@ -123,13 +124,23 @@ begin
 end
 $$;
 
--- Prepare payout through the Admin wrapper. It must reserve only eligible held
--- escrow and produce an immutable Admin audit event.
+-- Seller-declared delivery is not enough. The finance Admin must first create
+-- independently audited settlement evidence before payout preparation can see
+-- this Order as eligible.
+select public.admin_confirm_order_settlement(
+  'fa000000-0000-0000-0000-000000000001',
+  'fd100000-0000-0000-0000-000000000009',
+  'Finance regression independently verified delivery',
+  'ff150000-0000-0000-0000-000000000007'
+);
+
+-- Prepare payout through the Admin wrapper. It must reserve only independently
+-- confirmed held escrow and produce an immutable Admin audit event.
 select * from public.admin_create_seller_payout(
   'fa000000-0000-0000-0000-000000000001',
   'fc000000-0000-0000-0000-000000000003',
   'ff200000-0000-0000-0000-000000000008',
-  now()-interval '7 days'
+  now()
 ) \gset
 select set_config('m3finance.payout_request_id', :'payout_request_id', false);
 select set_config('m3finance.amount_cents', :'amount_cents', false);
@@ -140,6 +151,7 @@ declare
   v_payout_request_id uuid := current_setting('m3finance.payout_request_id')::uuid;
   v_items integer;
   v_audit integer;
+  v_settlement_audit integer;
 begin
   if current_setting('m3finance.amount_cents')::bigint <> 7200
      or current_setting('m3finance.payout_status') <> 'pending' then
@@ -149,7 +161,11 @@ begin
   where payout_request_id=v_payout_request_id and status='reserved';
   select count(*) into v_audit from public.admin_audit_logs
   where action='seller_payout_prepared' and target_id=v_payout_request_id::text;
-  if v_items<>1 or v_audit<>1 then raise exception 'Admin payout reservation/audit failed'; end if;
+  select count(*) into v_settlement_audit from public.admin_audit_logs
+  where action='order_settlement_confirmed' and target_id='fd100000-0000-0000-0000-000000000009';
+  if v_items<>1 or v_audit<>1 or v_settlement_audit<>1 then
+    raise exception 'Admin payout reservation/settlement audit failed';
+  end if;
 end
 $$;
 

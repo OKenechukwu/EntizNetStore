@@ -18,8 +18,16 @@ where payout_request_id in (
 );
 delete from public.payout_requests
 where seller_id = 'e3000000-0000-0000-0000-000000000003';
+delete from public.notifications
+where metadata->>'order_id' = 'f1000000-0000-0000-0000-000000000001';
 delete from public.escrow_transactions
 where id = 'f2000000-0000-0000-0000-000000000002';
+-- Settlement evidence is immutable in application operation. The disposable
+-- concurrency fixture is torn down only by the local postgres test owner.
+alter table private.order_settlement_confirmations disable trigger order_settlement_confirmation_immutable;
+delete from private.order_settlement_confirmations
+where order_id = 'f1000000-0000-0000-0000-000000000001';
+alter table private.order_settlement_confirmations enable trigger order_settlement_confirmation_immutable;
 delete from public.orders
 where id = 'f1000000-0000-0000-0000-000000000001';
 delete from public.profiles_seller
@@ -83,6 +91,15 @@ values (
   now() - interval '10 days',
   now()
 );
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','e1000000-0000-0000-0000-000000000001',false);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-0000-0000-000000000001","role":"authenticated"}',false);
+select public.confirm_buyer_order_receipt(
+  'f1000000-0000-0000-0000-000000000001',
+  'f3000000-0000-0000-0000-000000000003'
+);
+reset role;
 SQL
 
 run_request() {
@@ -95,7 +112,7 @@ select payout_request_id
 from public.request_seller_payout(
   'e3000000-0000-0000-0000-000000000003',
   '$key',
-  now() - interval '7 days'
+  now()
 );
 SQL
 }
@@ -154,5 +171,5 @@ begin
 end
 $$;
 
-select 'EntizNetStore concurrent payout claim verified' as result;
+select 'EntizNetStore concurrent trusted payout claim verified' as result;
 SQL

@@ -1,6 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
+import Price from "@/components/common/Price";
+import BuyerReceiptConfirmation from "@/components/orders/BuyerReceiptConfirmation";
+import OrderFulfillmentTimeline, {
+  type OrderFulfillmentEvent,
+} from "@/components/orders/OrderFulfillmentTimeline";
+
+type SettlementConfirmation = {
+  confirmed_at: string;
+  authority_type: string;
+};
 
 export default async function BuyerOrdersPage() {
   const supabase = await createServerSupabase();
@@ -18,6 +28,9 @@ export default async function BuyerOrdersPage() {
 
   if (!buyer) redirect("/dashboard");
 
+  // Keep the base order read compatible with the pre-ledger production schema.
+  // Fulfillment events and trusted settlement evidence are loaded separately so
+  // an app-before-database deployment remains readable while new actions fail closed.
   const { data: orders, error } = await supabase
     .from("orders")
     .select(
@@ -26,13 +39,82 @@ export default async function BuyerOrdersPage() {
     .eq("buyer_id", user.id)
     .order("created_at", { ascending: false });
 
+  const eventsByOrder = new Map<string, OrderFulfillmentEvent[]>();
+  let detailedTimelineAvailable = true;
+  if (!error && orders?.length) {
+    const { data: fulfillmentEvents, error: fulfillmentEventsError } = await supabase
+      .from("order_fulfillment_events")
+      .select(
+        "id, order_id, from_status, to_status, fulfillment_status, shipping_carrier, tracking_number, occurred_at",
+      )
+      .in(
+        "order_id",
+        orders.map((order) => order.id),
+      )
+      .order("occurred_at", { ascending: true });
+
+    if (fulfillmentEventsError) {
+      detailedTimelineAvailable = false;
+    } else {
+      for (const event of fulfillmentEvents ?? []) {
+        const timelineEvent: OrderFulfillmentEvent = {
+          id: event.id,
+          from_status: event.from_status,
+          to_status: event.to_status,
+          fulfillment_status: event.fulfillment_status,
+          shipping_carrier: event.shipping_carrier,
+          tracking_number: event.tracking_number,
+          occurred_at: event.occurred_at,
+        };
+        const list = eventsByOrder.get(event.order_id) ?? [];
+        list.push(timelineEvent);
+        eventsByOrder.set(event.order_id, list);
+      }
+    }
+  }
+
+  const settlementsByOrder = new Map<string, SettlementConfirmation>();
+  let settlementAuthorityReady = true;
+  if (!error && orders?.length) {
+    const deliveredOrders = orders.filter(
+      (order) =>
+        order.payment_status === "paid" &&
+        order.status === "delivered" &&
+        order.fulfillment_status === "fulfilled" &&
+        Boolean(order.delivered_at),
+    );
+
+    const settlementReads = await Promise.all(
+      deliveredOrders.map(async (order) => {
+        const result = await supabase.rpc("get_order_settlement_confirmation", {
+          p_order_id: order.id,
+        });
+        return { orderId: order.id, ...result };
+      }),
+    );
+
+    for (const result of settlementReads) {
+      if (result.error) {
+        settlementAuthorityReady = false;
+        continue;
+      }
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (row?.confirmed_at) {
+        settlementsByOrder.set(result.orderId, {
+          confirmed_at: row.confirmed_at,
+          authority_type: row.authority_type,
+        });
+      }
+    }
+  }
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">My Orders</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Track your purchases and payment status.
+          <p className="mt-1 text-sm text-foreground/70">
+            Track purchases, payment and delivery progress.
           </p>
         </div>
         <Link href="/dashboard/buyer" className="text-sm underline">
@@ -40,12 +122,30 @@ export default async function BuyerOrdersPage() {
         </Link>
       </div>
 
+      {!error && !detailedTimelineAvailable && (
+        <p
+          className="mb-4 rounded-lg border border-border bg-white/5 p-3 text-sm text-foreground/80"
+          role="status"
+        >
+          Detailed shipment history is temporarily unavailable. Your current order status remains visible below.
+        </p>
+      )}
+
+      {!error && !settlementAuthorityReady && (
+        <p
+          className="mb-4 rounded-lg border border-border bg-white/5 p-3 text-sm text-foreground/80"
+          role="status"
+        >
+          Receipt confirmation is temporarily unavailable. Your order and delivery status remain unchanged.
+        </p>
+      )}
+
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
-          Unable to load orders: {error.message}
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-red-200" role="alert">
+          Unable to load your orders right now. Please refresh and try again.
         </div>
       ) : !orders?.length ? (
-        <div className="rounded-xl border p-10 text-center text-gray-600">
+        <div className="rounded-xl border border-border p-10 text-center text-foreground/70">
           You have not placed any orders yet.
           <div className="mt-4">
             <Link href="/store" className="underline">
@@ -55,55 +155,74 @@ export default async function BuyerOrdersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
-            <article key={order.id} className="rounded-xl border bg-white p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
-                <div>
-                  <h2 className="font-semibold">{order.order_number}</h2>
-                  <p className="text-xs text-gray-500">
-                    {order.created_at
-                      ? new Date(order.created_at).toLocaleString()
-                      : "—"}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">
-                    ${(Number(order.total_cents) / 100).toFixed(2)} USD
-                  </p>
-                  <p className="text-xs uppercase text-gray-500">
-                    {order.payment_status} · {order.status}
-                  </p>
-                </div>
-              </div>
+          {orders.map((order) => {
+            const events = eventsByOrder.get(order.id) ?? [];
+            const settlement = settlementsByOrder.get(order.id);
+            const canConfirmReceipt =
+              settlementAuthorityReady &&
+              !settlement &&
+              order.payment_status === "paid" &&
+              order.status === "delivered" &&
+              order.fulfillment_status === "fulfilled" &&
+              Boolean(order.delivered_at);
 
-              <ul className="divide-y">
-                {(order.order_items ?? []).map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex justify-between gap-4 py-3 text-sm"
-                  >
-                    <span>
-                      {item.product_title}
-                      {item.variant_title ? ` — ${item.variant_title}` : ""} ×{" "}
-                      {item.quantity}
-                    </span>
-                    <span>${(Number(item.total_cents) / 100).toFixed(2)}</span>
-                  </li>
-                ))}
-              </ul>
+            return (
+              <article key={order.id} className="rounded-xl border border-border bg-background p-5 text-foreground">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                  <div>
+                    <h2 className="font-semibold">{order.order_number}</h2>
+                    <p className="text-xs text-foreground/60">
+                      {order.created_at ? new Date(order.created_at).toLocaleString() : "—"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">
+                      <Price amount={Number(order.total_cents)} cents />
+                    </p>
+                    <p className="text-xs uppercase text-foreground/60">
+                      {order.payment_status} · {order.status}
+                    </p>
+                  </div>
+                </div>
 
-              <p className="pt-2 text-xs text-gray-500">
-                Fulfillment: {order.fulfillment_status}
-              </p>
-              {order.tracking_number && (
-                <p className="mt-1 text-sm">
-                  {order.shipping_carrier || "Carrier"}: {order.tracking_number}
+                <ul className="divide-y divide-border">
+                  {(order.order_items ?? []).map((item) => (
+                    <li key={item.id} className="flex justify-between gap-4 py-3 text-sm">
+                      <span>
+                        {item.product_title}
+                        {item.variant_title ? ` — ${item.variant_title}` : ""} × {item.quantity}
+                      </span>
+                      <Price amount={Number(item.total_cents)} cents />
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="pt-2 text-xs text-foreground/60">
+                  Fulfillment: {order.fulfillment_status}
                 </p>
-              )}
-            </article>
-          ))}
+                <OrderFulfillmentTimeline
+                  events={events}
+                  legacy={{
+                    status: order.status || order.fulfillment_status || "pending",
+                    shippedAt: order.shipped_at,
+                    deliveredAt: order.delivered_at,
+                    shippingCarrier: order.shipping_carrier,
+                    trackingNumber: order.tracking_number,
+                  }}
+                />
+
+                {settlement && (
+                  <p className="mt-4 border-t border-border pt-4 text-sm text-foreground/75" role="status">
+                    Receipt confirmed {new Date(settlement.confirmed_at).toLocaleString()} via {settlement.authority_type === "admin" ? "verified support review" : "buyer confirmation"}. Seller payout remains subject to the platform hold, refund and dispute policy.
+                  </p>
+                )}
+
+                {canConfirmReceipt && <BuyerReceiptConfirmation orderId={order.id} />}
+              </article>
+            );
+          })}
         </div>
       )}
-    </main>
+    </div>
   );
 }

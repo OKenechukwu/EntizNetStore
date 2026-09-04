@@ -26,8 +26,7 @@ declare
     'seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])',
     'seller_set_product_publication(uuid,boolean)',
     'seller_submit_product_for_review(uuid)',
-    'submit_marketplace_report(text,uuid,text,text)',
-    'transition_seller_order(uuid,text,text,text)'
+    'submit_marketplace_report(text,uuid,text,text)'
   ];
   actual_authenticated text[];
   unexpected text[];
@@ -187,6 +186,65 @@ begin
   if definition not ilike '%recipient_id = v_actor%'
      or definition not ilike '%conversation_id = p_conversation_id%' then
     raise exception 'private mark_store_conversation_read authority lost recipient/conversation scoping';
+  end if;
+end;
+$$;
+
+-- Seller fulfillment now follows the same exposed-wrapper/private-authority
+-- pattern as Store Chat. The public function is invoker-only. The private
+-- definer derives the seller from auth.uid(), locks the order, appends immutable
+-- evidence + notification atomically, and must never release escrow.
+do $$
+declare
+  public_fn regprocedure := 'public.transition_seller_order(uuid,text,text,text)'::regprocedure;
+  private_fn regprocedure := 'app_private.transition_seller_order_authoritative(uuid,text,text,text)'::regprocedure;
+  public_definition text;
+  private_definition text;
+  public_arguments text;
+  private_arguments text;
+  public_is_definer boolean;
+  private_is_definer boolean;
+begin
+  if has_function_privilege('anon', public_fn, 'EXECUTE')
+     or not has_function_privilege('authenticated', public_fn, 'EXECUTE')
+     or not has_function_privilege('service_role', public_fn, 'EXECUTE') then
+    raise exception 'fulfillment public wrapper privilege contract changed';
+  end if;
+  if has_function_privilege('anon', private_fn, 'EXECUTE')
+     or not has_function_privilege('authenticated', private_fn, 'EXECUTE')
+     or not has_function_privilege('service_role', private_fn, 'EXECUTE') then
+    raise exception 'fulfillment private authority privilege contract changed';
+  end if;
+
+  select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+    into public_is_definer, public_definition, public_arguments
+  from pg_proc p where p.oid = public_fn::oid;
+  select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+    into private_is_definer, private_definition, private_arguments
+  from pg_proc p where p.oid = private_fn::oid;
+
+  if public_is_definer then
+    raise exception 'fulfillment public wrapper must remain SECURITY INVOKER';
+  end if;
+  if public_definition not ilike '%app_private.transition_seller_order_authoritative%'
+     or public_definition not ilike '%set search_path to ''''%' then
+    raise exception 'fulfillment public wrapper lost private delegation or empty search_path';
+  end if;
+
+  if not private_is_definer
+     or private_definition not ilike '%auth.uid()%'
+     or private_definition not ilike '%for update%'
+     or private_definition not ilike '%insert into public.order_fulfillment_events%'
+     or private_definition not ilike '%insert into public.notifications%'
+     or private_definition not ilike '%set search_path to ''''%' then
+    raise exception 'fulfillment private authority lost definer/auth/lock/evidence/search_path hardening';
+  end if;
+  if private_definition ilike '%update public.escrow_transactions%'
+     or private_definition ilike '%delete from public.escrow_transactions%' then
+    raise exception 'fulfillment private authority must never mutate escrow';
+  end if;
+  if public_arguments ilike '%seller_id%' or private_arguments ilike '%seller_id%' then
+    raise exception 'fulfillment authority must not accept caller-supplied seller identity';
   end if;
 end;
 $$;

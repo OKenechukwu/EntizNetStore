@@ -1,24 +1,36 @@
 \set ON_ERROR_STOP on
 
--- M5 hosted-shape regression. This intentionally checks catalog structure rather
--- than application fixtures so advisor-discovered schema mistakes fail CI before
--- Store Chat code can be released.
+-- M5 hosted-shape regression. This intentionally checks Store Chat catalog
+-- structure rather than the marketplace-wide physical table count, so unrelated
+-- forward migrations cannot masquerade as messaging regressions.
 do $$
 declare
-  public_table_count integer;
+  missing_physical_tables text;
   envelope_kind "char";
   envelope_options text[];
   wrapper regprocedure;
   authority regprocedure;
 begin
-  select count(*) into public_table_count
-  from information_schema.tables
-  where table_schema = 'public'
-    and table_type = 'BASE TABLE';
+  select string_agg(required.name, ', ' order by required.name)
+  into missing_physical_tables
+  from (values
+    ('conversation_keys'),
+    ('conversations'),
+    ('message_attachments'),
+    ('message_translations'),
+    ('messages')
+  ) as required(name)
+  where not exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = required.name
+      and c.relkind = 'r'
+  );
 
-  -- Message translation adds one intentionally server-only encrypted cache table.
-  if public_table_count <> 50 then
-    raise exception 'canonical public physical table count changed: %', public_table_count;
+  if missing_physical_tables is not null then
+    raise exception 'Store Chat physical tables missing or changed kind: %', missing_physical_tables;
   end if;
 
   if not exists (

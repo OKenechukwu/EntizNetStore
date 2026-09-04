@@ -43,15 +43,26 @@ values
   ('c3000000-0000-0000-0000-000000000003', 'b3000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', 500, 'held', now() - interval '1 day', now()),
   ('c4000000-0000-0000-0000-000000000004', 'b4000000-0000-0000-0000-000000000004', 'a4000000-0000-0000-0000-000000000004', 700, 'held', now() - interval '10 days', now());
 
+-- Independent Buyer authority confirms orders 1, 2 and 4. Order 3 remains
+-- deliberately unconfirmed: old Seller delivered_at age must no longer make it
+-- payout eligible by itself.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claims','{"sub":"a1000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
+select public.confirm_buyer_order_receipt('b1000000-0000-0000-0000-000000000001','aa100000-0000-0000-0000-000000000001');
+select public.confirm_buyer_order_receipt('b2000000-0000-0000-0000-000000000002','aa200000-0000-0000-0000-000000000002');
+select public.confirm_buyer_order_receipt('b4000000-0000-0000-0000-000000000004','aa400000-0000-0000-0000-000000000004');
+
+reset role;
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
--- Seller 1 claims only escrow delivered before the configured cutoff.
+-- Seller 1 claims only independently settlement-confirmed held escrow.
 select *
 from public.request_seller_payout(
   'a3000000-0000-0000-0000-000000000003',
   'd1000000-0000-0000-0000-000000000001',
-  now() - interval '7 days'
+  now()
 );
 
 do $$
@@ -59,7 +70,7 @@ declare
   v_request_id uuid;
   v_amount bigint;
   v_items integer;
-  v_recent_claims integer;
+  v_unconfirmed_claims integer;
 begin
   select id, amount_cents into v_request_id, v_amount
   from public.payout_requests
@@ -70,14 +81,14 @@ begin
   from public.payout_items
   where payout_request_id = v_request_id and status = 'reserved';
 
-  select count(*) into v_recent_claims
+  select count(*) into v_unconfirmed_claims
   from public.payout_items
   where escrow_transaction_id = 'c3000000-0000-0000-0000-000000000003'
     and status in ('reserved', 'settled');
 
-  if v_amount <> 2700 or v_items <> 2 or v_recent_claims <> 0 then
-    raise exception 'Payout eligibility/claim failed: amount %, items %, recent claims %',
-      v_amount, v_items, v_recent_claims;
+  if v_amount <> 2700 or v_items <> 2 or v_unconfirmed_claims <> 0 then
+    raise exception 'Payout eligibility/claim failed: amount %, items %, unconfirmed claims %',
+      v_amount, v_items, v_unconfirmed_claims;
   end if;
 end
 $$;
@@ -87,7 +98,7 @@ select *
 from public.request_seller_payout(
   'a3000000-0000-0000-0000-000000000003',
   'd1000000-0000-0000-0000-000000000001',
-  now()
+  now() - interval '1 day'
 );
 
 do $$
@@ -112,7 +123,8 @@ begin
 end
 $$;
 
--- A different request cannot claim the two escrow rows already reserved above.
+-- A different request cannot claim rows already reserved, and the remaining
+-- delivered Order is still ineligible because no trusted confirmation exists.
 do $$
 begin
   begin
@@ -120,9 +132,9 @@ begin
     from public.request_seller_payout(
       'a3000000-0000-0000-0000-000000000003',
       'd2000000-0000-0000-0000-000000000002',
-      now() - interval '7 days'
+      now()
     );
-    raise exception 'Second payout unexpectedly double-claimed reserved escrow';
+    raise exception 'Second payout unexpectedly claimed reserved/unconfirmed escrow';
   exception when sqlstate 'P0001' then
     null;
   end;
@@ -134,7 +146,7 @@ select *
 from public.request_seller_payout(
   'a4000000-0000-0000-0000-000000000004',
   'd1000000-0000-0000-0000-000000000001',
-  now() - interval '7 days'
+  now()
 );
 
 -- Sellers can read only their own payout ledger and can never execute mutation RPCs.
@@ -381,8 +393,19 @@ begin
 end
 $$;
 
--- The recent escrow becomes eligible under a later cutoff. Terminal provider
--- failure must release only the payout claim, never the escrow money itself.
+-- Order 3 becomes payout eligible only after the Buyer independently confirms
+-- receipt. Its old Seller-delivered timestamp alone was intentionally ignored.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claims','{"sub":"a1000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
+select public.confirm_buyer_order_receipt('b3000000-0000-0000-0000-000000000003','aa300000-0000-0000-0000-000000000003');
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.sub','',true);
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+
+-- Terminal provider failure releases only the payout claim, never escrow money.
 select *
 from public.request_seller_payout(
   'a3000000-0000-0000-0000-000000000003',
