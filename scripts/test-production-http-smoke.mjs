@@ -1,5 +1,7 @@
 const rawBaseUrl = process.env.ENTIZNETSTORE_BASE_URL || process.argv[2]
 const rawExpectedSha = process.env.ENTIZNETSTORE_EXPECTED_SHA?.trim().toLowerCase() || ''
+const rawExpectedBackendBinding =
+  process.env.ENTIZNETSTORE_EXPECTED_BACKEND_BINDING?.trim().toLowerCase() || ''
 
 if (!rawBaseUrl) {
   console.error('Usage: ENTIZNETSTORE_BASE_URL=https://entiznetstore.example npm run test:production-http-smoke')
@@ -8,6 +10,11 @@ if (!rawBaseUrl) {
 
 if (rawExpectedSha && !/^[0-9a-f]{12,40}$/.test(rawExpectedSha)) {
   console.error('ENTIZNETSTORE_EXPECTED_SHA must be a 12..40 character hexadecimal Git SHA')
+  process.exit(2)
+}
+
+if (rawExpectedBackendBinding && !/^[0-9a-f]{24}$/.test(rawExpectedBackendBinding)) {
+  console.error('ENTIZNETSTORE_EXPECTED_BACKEND_BINDING must be a 24 character hexadecimal binding fingerprint')
   process.exit(2)
 }
 
@@ -83,17 +90,35 @@ await request('/api/health', 200, (body) => {
       'readiness response did not report database=ok, storage=ok, operations=ok and payments=ok',
     )
   }
+
   if (!['configured', 'blocked'].includes(body?.launchGates?.uploadSafety)) {
     throw new Error('readiness response did not report the bounded upload-safety launch gate')
   }
   if (!['enabled', 'blocked'].includes(body?.launchGates?.indexing)) {
     throw new Error('readiness response did not report the bounded indexing launch gate')
   }
+  if (!['configured', 'blocked'].includes(body?.launchGates?.storeChat)) {
+    throw new Error('readiness response did not report the bounded Store Chat launch gate')
+  }
+  if (!['configured', 'blocked'].includes(body?.launchGates?.messageTranslation)) {
+    throw new Error('readiness response did not report the bounded message-translation launch gate')
+  }
+
   indexingLaunchGate = body.launchGates.indexing
+
+  if (!/^[0-9a-f]{24}$/.test(body?.backendBinding || '')) {
+    throw new Error('readiness response did not expose a valid backend binding fingerprint')
+  }
+  if (rawExpectedBackendBinding && body.backendBinding !== rawExpectedBackendBinding) {
+    throw new Error(
+      `production backend drift: expected binding ${rawExpectedBackendBinding}, got ${body.backendBinding || 'missing'}`,
+    )
+  }
   if (expectedVersion && body?.version !== expectedVersion) {
     throw new Error(`production deployment drift: expected version ${expectedVersion}, got ${body?.version || 'missing'}`)
   }
 })
+
 await request('/api/messages/conversations', 401, (body) => {
   if (body?.error !== 'Unauthorized') throw new Error('anonymous messaging route did not fail closed')
 })
@@ -103,9 +128,6 @@ await request('/api/kyc/status', 401, (body) => {
 await request('/api/integrations/entiznet/admin/health', 401)
 await request('/api/integrations/entiznet/admin/accounts', 401)
 
-// Prove the deployed cross-site mutation request-integrity boundary without a
-// session or any mutation-capable payload. If the proxy guard disappears this
-// route falls through to 401; the release gate requires a proxy-level 403.
 let crossSiteMutationResponse
 try {
   crossSiteMutationResponse = await fetch(new URL('/api/buyer/profile', baseUrl), {
@@ -191,5 +213,5 @@ if (failures.length) {
 }
 
 console.log(
-  `Production HTTP smoke passed for ${baseUrl.origin}${expectedVersion ? ` at ${expectedVersion}` : ''}`,
+  `Production HTTP smoke passed for ${baseUrl.origin}${expectedVersion ? ` at ${expectedVersion}` : ''}${rawExpectedBackendBinding ? ` on backend ${rawExpectedBackendBinding}` : ''}`,
 )
