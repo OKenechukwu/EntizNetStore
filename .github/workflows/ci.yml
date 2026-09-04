@@ -233,5 +233,8 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Materialize exact production dependency tree
+        run: npm ci --omit=dev --ignore-scripts
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
