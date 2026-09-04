@@ -83,7 +83,7 @@ export default async function SellerOrdersPage() {
 
       {!error && !fulfillmentAuthorityReady && (
         <p
-          className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100"
+          className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-foreground"
           role="status"
         >
           Fulfillment updates are temporarily unavailable while the tracking authority is being prepared. Existing order status remains visible and no order state has been changed.
