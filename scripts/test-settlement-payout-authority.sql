@@ -213,6 +213,9 @@ select public.admin_confirm_order_settlement(
   '98700000-0000-0000-0000-000000000008'
 );
 
+-- Direct private-ledger inspection is performed only as the database-test
+-- observer. service_role remains intentionally unable to read the table.
+reset role;
 do $$
 declare v_source text; v_audit integer;
 begin
@@ -227,6 +230,10 @@ begin
   end if;
 end
 $$;
+
+-- Return to the trusted service boundary for payout RPCs only.
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
 
 -- The payout hold clock starts at trusted confirmation, not Seller delivered_at.
 do $$
