@@ -128,6 +128,9 @@ await request('/api/kyc/status', 401, (body) => {
 await request('/api/integrations/entiznet/admin/health', 401)
 await request('/api/integrations/entiznet/admin/accounts', 401)
 
+// Prove the deployed cross-site mutation request-integrity boundary without a
+// session or any mutation-capable payload. If the proxy guard disappears this
+// route falls through to 401; the release gate requires a proxy-level 403.
 let crossSiteMutationResponse
 try {
   crossSiteMutationResponse = await fetch(new URL('/api/buyer/profile', baseUrl), {
