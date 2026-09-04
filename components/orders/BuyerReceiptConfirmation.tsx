@@ -7,11 +7,12 @@ export default function BuyerReceiptConfirmation({ orderId }: { orderId: string 
   const router = useRouter();
   const idempotencyKey = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function confirmReceipt() {
-    if (busy) return;
+    if (busy || confirmed) return;
     if (!idempotencyKey.current) idempotencyKey.current = crypto.randomUUID();
 
     setBusy(true);
@@ -28,6 +29,10 @@ export default function BuyerReceiptConfirmation({ orderId }: { orderId: string 
         throw new Error(result.error || "Unable to confirm receipt. Refresh and try again.");
       }
 
+      // The authority call has succeeded, so make this client action terminal
+      // immediately. router.refresh() reconciles the page with the durable
+      // settlement evidence, but UI correctness must not depend on refresh timing.
+      setConfirmed(true);
       setNotice("Receipt confirmed. The seller payout hold period now follows the platform settlement policy.");
       idempotencyKey.current = null;
       router.refresh();
@@ -40,9 +45,11 @@ export default function BuyerReceiptConfirmation({ orderId }: { orderId: string 
 
   return (
     <div className="mt-4 border-t border-border pt-4">
-      <p className="mb-3 text-sm text-foreground/75">
-        Confirm only after you have received and accepted this order. Confirmation starts the seller payout hold period; disputes and refunds still block payout when applicable.
-      </p>
+      {!confirmed && (
+        <p className="mb-3 text-sm text-foreground/75">
+          Confirm only after you have received and accepted this order. Confirmation starts the seller payout hold period; disputes and refunds still block payout when applicable.
+        </p>
+      )}
       {error && (
         <p className="mb-2 text-sm text-red-300" role="alert">
           {error}
@@ -53,14 +60,16 @@ export default function BuyerReceiptConfirmation({ orderId }: { orderId: string 
           {notice}
         </p>
       )}
-      <button
-        type="button"
-        onClick={confirmReceipt}
-        disabled={busy}
-        className="min-h-11 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? "Confirming…" : "Confirm receipt"}
-      </button>
+      {!confirmed && (
+        <button
+          type="button"
+          onClick={confirmReceipt}
+          disabled={busy}
+          className="min-h-11 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "Confirming…" : "Confirm receipt"}
+        </button>
+      )}
     </div>
   );
 }
