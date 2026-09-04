@@ -1,15 +1,15 @@
 # EntizNetStore Main Branch Protection Gate
 
-Last reviewed: **2026-09-01**
+Last reviewed: **2026-09-04**
 
 `main` is the production release branch. This document defines the repository-governance controls required before P0-06 can be marked verified.
 
 ## Current observed state
 
-After the PR #45 production promotion, GitHub reported:
+After the PR #66 production promotion, GitHub reported:
 
 - branch: `main`;
-- current commit: `28a8f1efd1fafd88792e0c6c345874f1d5bb8701`;
+- current commit: `db626b4c3f8504e0383fc8e589bd8632d164ab91`;
 - protection enabled: **false**;
 - required status-check enforcement: **off**;
 - required status contexts: none;
@@ -17,7 +17,7 @@ After the PR #45 production promotion, GitHub reported:
 
 The application release process already uses feature branches, PRs, exact-head CI, Vercel previews, expected-head locked merges, production-safe database sequencing and post-promotion verification, but those practices are not yet enforced by GitHub repository policy. A direct push or forceful administrative action could therefore bypass the intended release path.
 
-The connected GitHub automation in the 2026-09-01 development session exposes protection/ruleset reads but no protection/ruleset write action. Repository protection remains an external governance action; do not emulate it by force-moving refs or adding fragile workflow-only checks.
+The connected GitHub automation in the 2026-09-04 development session exposes protection/ruleset reads but no protection/ruleset write action. Repository protection remains an external governance action; do not emulate it by force-moving refs or adding fragile workflow-only checks.
 
 Repository-controlled supply-chain hardening is tracked in `REPOSITORY_SUPPLY_CHAIN.md` and includes CODEOWNERS, Dependabot surveillance and a machine-checked workflow trust boundary. Those controls complement GitHub branch protection; they do not replace it.
 
@@ -29,13 +29,16 @@ Apply a repository ruleset or equivalent classic branch protection specifically 
 2. Do not require a human approval count solely for routine engineering if the owner wants autonomous release execution; the PR itself plus mandatory automated gates is the minimum release boundary.
 3. Require conversation resolution before merge.
 4. Require the branch to be up to date with `main` before merge, or otherwise ensure the exact tested PR head is based on current `main`.
-5. Require these exact GitHub check contexts, most recently re-proven on PR #45:
+5. Require these exact GitHub check contexts, re-proven together on PR #66:
    - `verify`
    - `database-reproduction`
    - `dependency-audit`
    - `http-authorization`
    - `product-media-provenance`
    - `image-egress`
+   - `fulfillment-authority-security`
+   - `store-chat-security`
+   - `message-translation-security`
 6. Block force pushes to `main`.
 7. Block deletion of `main`.
 8. Apply enforcement to administrators/owners so the normal release path cannot be silently bypassed.
@@ -44,17 +47,23 @@ Apply a repository ruleset or equivalent classic branch protection specifically 
 
 ## Why these checks are mandatory
 
-`verify` covers the production application foundation, repository-governance guard, lint, failure-recovery regressions, TypeScript and build.
+`verify` covers the production application foundation, repository-governance guard, release-authority monitor contract, lint, failure-recovery regressions, TypeScript and build.
 
 `database-reproduction` proves a fresh Supabase database can replay the repository migration chain and pass identity, RLS, commerce, payment, reconciliation, payout, wholesale and security regressions. It includes the independent payment-initialization and payout concurrency tests.
 
-`dependency-audit` rejects high-severity production dependency vulnerabilities according to the CI policy.
+`dependency-audit` materializes the exact production dependency tree and rejects high-severity production dependency vulnerabilities according to the CI policy.
 
 `http-authorization` exercises real HTTP and Chromium authorization/browser boundaries against a fresh local Supabase stack.
 
 `product-media-provenance` protects the product-media attach/retire authority and real PostgREST boundary, including concurrency.
 
 `image-egress` protects the application image-egress/remote-image security boundary.
+
+`fulfillment-authority-security` protects atomic Seller fulfillment, immutable tracking evidence, trusted Buyer/Admin settlement confirmation, payout eligibility/finalization authority, refund/dispute serialization, concurrency, migration-rollout fail-closed behavior, browser flows and WCAG assertions.
+
+`store-chat-security` protects canonical Store Chat authority, cryptography/key rotation and hosted structural invariants.
+
+`message-translation-security` protects translation-provider policy, cryptography, immutable original-message preservation and translation-cache authority.
 
 These contexts are intentionally named by the check-run names GitHub reports, not by guessed workflow display labels.
 
@@ -68,7 +77,7 @@ Do not mark P0-06 repository protection complete until all of the following are 
 
 - `main` is protected by an active rule/ruleset;
 - PR requirement is active;
-- all six required check contexts are active;
+- all nine required check contexts are active;
 - force push is disabled;
 - branch deletion is disabled;
 - administrator/owner bypass is disabled or explicitly constrained to an audited emergency path.
