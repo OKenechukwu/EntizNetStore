@@ -5,8 +5,6 @@
 do $$
 declare
   expected_authenticated text[] := array[
-    'business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)',
-    'business_set_trading_roles(text[])',
     'buyer_delete_address(uuid)',
     'buyer_request_order_refund(uuid,bigint,text,uuid)',
     'buyer_save_address(uuid,text,boolean,text,text,text,text,text,text,text,text,text,text,text)',
@@ -290,6 +288,98 @@ begin
      or definition not ilike '%order_items%'
      or definition not ilike '%product_has_order_history%' then
     raise exception 'seller delete private authority lost ownership/order-history controls';
+  end if;
+end;
+$$;
+
+-- BSM wholesale authoring now follows the same public-invoker/private-authority
+-- pattern as Seller catalogue and cart mutation. This freezes exact signatures,
+-- grants, caller identity derivation, capability checks and wholesale invariants.
+do $$
+declare
+  public_roles regprocedure := 'public.business_set_trading_roles(text[])'::regprocedure;
+  private_roles regprocedure := 'app_private.business_set_trading_roles_authority(text[])'::regprocedure;
+  public_offer regprocedure := 'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure;
+  private_offer regprocedure := 'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure;
+  fn regprocedure;
+  definition text;
+  arguments text;
+  is_definer boolean;
+begin
+  foreach fn in array array[public_roles, public_offer] loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'BSM public wrapper privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if is_definer
+       or definition not ilike '%app_private.%authority%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog''%'
+         or definition ilike '%set search_path = pg_catalog%'
+       ) then
+      raise exception 'BSM public wrapper % lost invoker/private delegation/search_path hardening', fn;
+    end if;
+    if arguments ilike '%business_id%' or arguments ilike '%seller_id%' or arguments ilike '%user_id%' then
+      raise exception 'BSM public wrapper % accepts caller-supplied actor identity', fn;
+    end if;
+  end loop;
+
+  foreach fn in array array[private_roles, private_offer] loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'BSM private authority privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if not is_definer
+       or definition not ilike '%auth.uid()%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog'', ''public'', ''app_private''%'
+         or definition ilike '%set search_path = pg_catalog, public, app_private%'
+       ) then
+      raise exception 'BSM private authority % lost definer/auth.uid/search_path hardening', fn;
+    end if;
+    if arguments ilike '%business_id%' or arguments ilike '%seller_id%' or arguments ilike '%user_id%' then
+      raise exception 'BSM private authority % accepts caller-supplied actor identity', fn;
+    end if;
+  end loop;
+
+  select pg_get_functiondef(private_roles::oid) into definition;
+  if definition not ilike '%profiles_business%'
+     or definition not ilike '%marketplace_capability_is_active%'
+     or definition not ilike '%business_trading_roles%'
+     or definition not ilike '%business_kind%'
+     or definition not ilike '%brand%'
+     or definition not ilike '%supplier%'
+     or definition not ilike '%manufacturer%'
+     or definition not ilike '%distributor%'
+     or definition not ilike '%wholesaler%'
+     or definition not ilike '%retailer%' then
+    raise exception 'BSM trading-role private authority lost business/capability/role controls';
+  end if;
+
+  select pg_get_functiondef(private_offer::oid) into definition;
+  if definition not ilike '%profiles_business%'
+     or definition not ilike '%profiles_seller%'
+     or definition not ilike '%marketplace_capability_is_active%'
+     or definition not ilike '%wholesale_offer_catalogue_not_owned%'
+     or definition not ilike '%minimum_order_quantity%'
+     or definition not ilike '%order_multiple%'
+     or definition not ilike '%wholesale_offer_tiers%'
+     or definition not ilike '%first_wholesale_tier_must_equal_moq%'
+     or definition not ilike '%wholesale_offer_activation_requires_verified_active_catalogue%'
+     or definition not ilike '%(v_minimum - p_minimum_order_quantity) % p_order_multiple%' then
+    raise exception 'BSM wholesale-offer private authority lost ownership/MOQ/tier/activation controls';
   end if;
 end;
 $$;
