@@ -9,7 +9,6 @@ declare
     'buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
     'cancel_checkout_session(uuid)',
     'create_checkout_session_v2(uuid,uuid,uuid)',
-    'mark_conversation_read(uuid)',
     'open_order_dispute(uuid,text,text)',
     'submit_marketplace_report(text,uuid,text,text)'
   ];
@@ -475,6 +474,61 @@ begin
      or definition not ilike '%get diagnostics v_count = row_count%'
      or definition not ilike '%return v_count%' then
     raise exception 'mark-all notification authority lost ownership/read-state/row-count controls';
+  end if;
+end;
+$$;
+
+-- Legacy conversation read-state mutation: public invoker over the preserved
+-- private SECURITY DEFINER authority. Only unread messages addressed to auth.uid()
+-- in the supplied conversation may be changed; existing read_at is never replaced.
+do $$
+declare
+  public_fn regprocedure := 'public.mark_conversation_read(uuid)'::regprocedure;
+  private_fn regprocedure := 'app_private.mark_conversation_read_authority(uuid)'::regprocedure;
+  public_definition text; private_definition text; public_arguments text; private_arguments text;
+  public_is_definer boolean; private_is_definer boolean;
+begin
+  if has_function_privilege('anon',public_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',public_fn,'EXECUTE')
+     or not has_function_privilege('service_role',public_fn,'EXECUTE') then
+    raise exception 'conversation-read public wrapper privilege contract changed';
+  end if;
+  if has_function_privilege('anon',private_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',private_fn,'EXECUTE')
+     or not has_function_privilege('service_role',private_fn,'EXECUTE') then
+    raise exception 'conversation-read private authority privilege contract changed';
+  end if;
+
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into public_is_definer,public_definition,public_arguments
+    from pg_proc p where p.oid=public_fn::oid;
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into private_is_definer,private_definition,private_arguments
+    from pg_proc p where p.oid=private_fn::oid;
+
+  if public_is_definer
+     or public_definition not ilike '%app_private.mark_conversation_read_authority%'
+     or not (public_definition ilike '%set search_path to ''pg_catalog''%' or public_definition ilike '%set search_path = pg_catalog%') then
+    raise exception 'conversation-read public wrapper lost invoker/private delegation/search_path hardening';
+  end if;
+  if public_arguments ilike '%recipient_id%' or public_arguments ilike '%user_id%' then
+    raise exception 'conversation-read public wrapper accepts caller-supplied recipient identity';
+  end if;
+
+  if not private_is_definer
+     or private_definition not ilike '%auth.uid()%'
+     or private_definition not ilike '%set search_path to ''''%'
+     or private_definition not ilike '%update public.messages%'
+     or private_definition not ilike '%set is_read = true%'
+     or private_definition not ilike '%read_at = coalesce(read_at, now())%'
+     or private_definition not ilike '%updated_at = now()%'
+     or private_definition not ilike '%conversation_id = target_conversation_id%'
+     or private_definition not ilike '%recipient_id = auth.uid()%'
+     or private_definition not ilike '%and not is_read%' then
+    raise exception 'conversation-read private authority lost recipient/unread/read_at controls';
+  end if;
+  if private_arguments ilike '%recipient_id%' or private_arguments ilike '%user_id%' then
+    raise exception 'conversation-read private authority accepts caller-supplied recipient identity';
   end if;
 end;
 $$;
