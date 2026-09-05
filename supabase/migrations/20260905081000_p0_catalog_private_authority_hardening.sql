@@ -1,10 +1,10 @@
 -- EntizNetStore P0 — reduce browser-callable SECURITY DEFINER surface for
--- Seller catalogue and BSM wholesale-authoring mutations.
+-- Seller catalogue mutations.
 --
 -- Preserve the already-audited function objects and their exact business logic
 -- by moving them into non-exposed app_private, then recreate the public Data API
--- signatures as SECURITY INVOKER wrappers. No caller-supplied Seller/Business
--- identity is introduced; the authorities continue deriving actors via auth.uid().
+-- signatures as SECURITY INVOKER wrappers. No caller-supplied Seller identity is
+-- introduced; the authorities continue deriving the actor via auth.uid().
 
 begin;
 
@@ -23,14 +23,6 @@ alter function app_private.seller_set_product_publication(uuid,boolean) rename t
 
 alter function public.seller_submit_product_for_review(uuid) set schema app_private;
 alter function app_private.seller_submit_product_for_review(uuid) rename to seller_submit_product_for_review_authority;
-
-alter function public.business_set_trading_roles(text[]) set schema app_private;
-alter function app_private.business_set_trading_roles(text[]) rename to business_set_trading_roles_authority;
-
-alter function public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)
-  set schema app_private;
-alter function app_private.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)
-  rename to business_save_wholesale_offer_authority;
 
 -- Preserve the public RPC contracts as invoker-only delegates.
 create function public.seller_save_product_v3(
@@ -97,43 +89,6 @@ as $$
   select app_private.seller_submit_product_for_review_authority(p_product_id);
 $$;
 
-create function public.business_set_trading_roles(p_roles text[])
-returns text[]
-language sql
-security invoker
-set search_path = 'pg_catalog'
-as $$
-  select app_private.business_set_trading_roles_authority(p_roles);
-$$;
-
-create function public.business_save_wholesale_offer(
-  p_offer_id uuid,
-  p_product_id uuid,
-  p_variant_id uuid,
-  p_status text,
-  p_minimum_order_quantity integer,
-  p_order_multiple integer,
-  p_unit_label text,
-  p_case_pack_size integer,
-  p_lead_time_days integer,
-  p_incoterm text,
-  p_starts_at timestamp with time zone,
-  p_ends_at timestamp with time zone,
-  p_tiers jsonb
-)
-returns uuid
-language sql
-security invoker
-set search_path = 'pg_catalog'
-as $$
-  select app_private.business_save_wholesale_offer_authority(
-    p_offer_id, p_product_id, p_variant_id, p_status,
-    p_minimum_order_quantity, p_order_multiple, p_unit_label,
-    p_case_pack_size, p_lead_time_days, p_incoterm,
-    p_starts_at, p_ends_at, p_tiers
-  );
-$$;
-
 -- New functions default EXECUTE to PUBLIC in PostgreSQL. Freeze both layers to
 -- the pre-existing browser/service roles and keep anonymous execution denied.
 grant usage on schema app_private to authenticated, service_role;
@@ -142,28 +97,20 @@ revoke all on function app_private.seller_save_product_v3_authority(uuid,text,te
 revoke all on function app_private.seller_delete_product_authority(uuid) from public, anon;
 revoke all on function app_private.seller_set_product_publication_authority(uuid,boolean) from public, anon;
 revoke all on function app_private.seller_submit_product_for_review_authority(uuid) from public, anon;
-revoke all on function app_private.business_set_trading_roles_authority(text[]) from public, anon;
-revoke all on function app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb) from public, anon;
 
 grant execute on function app_private.seller_save_product_v3_authority(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[]) to authenticated, service_role;
 grant execute on function app_private.seller_delete_product_authority(uuid) to authenticated, service_role;
 grant execute on function app_private.seller_set_product_publication_authority(uuid,boolean) to authenticated, service_role;
 grant execute on function app_private.seller_submit_product_for_review_authority(uuid) to authenticated, service_role;
-grant execute on function app_private.business_set_trading_roles_authority(text[]) to authenticated, service_role;
-grant execute on function app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb) to authenticated, service_role;
 
 revoke all on function public.seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[]) from public, anon;
 revoke all on function public.seller_delete_product(uuid) from public, anon;
 revoke all on function public.seller_set_product_publication(uuid,boolean) from public, anon;
 revoke all on function public.seller_submit_product_for_review(uuid) from public, anon;
-revoke all on function public.business_set_trading_roles(text[]) from public, anon;
-revoke all on function public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb) from public, anon;
 
 grant execute on function public.seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[]) to authenticated, service_role;
 grant execute on function public.seller_delete_product(uuid) to authenticated, service_role;
 grant execute on function public.seller_set_product_publication(uuid,boolean) to authenticated, service_role;
 grant execute on function public.seller_submit_product_for_review(uuid) to authenticated, service_role;
-grant execute on function public.business_set_trading_roles(text[]) to authenticated, service_role;
-grant execute on function public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb) to authenticated, service_role;
 
 commit;
