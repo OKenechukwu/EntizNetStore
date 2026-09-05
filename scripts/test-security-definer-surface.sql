@@ -6,7 +6,6 @@ do $$
 declare
   expected_authenticated text[] := array[
     'buyer_request_order_refund(uuid,bigint,text,uuid)',
-    'buyer_submit_review(uuid,uuid,integer,text,text,boolean)',
     'cancel_checkout_session(uuid)',
     'create_checkout_session_v2(uuid,uuid,uuid)',
     'open_order_dispute(uuid,text,text)',
@@ -529,6 +528,67 @@ begin
   end if;
   if private_arguments ilike '%recipient_id%' or private_arguments ilike '%user_id%' then
     raise exception 'conversation-read private authority accepts caller-supplied recipient identity';
+  end if;
+end;
+$$;
+
+-- Buyer review submission: public invoker over a private authority while preserving
+-- Buyer identity, delivered-purchase eligibility, validation, uniqueness and pending moderation.
+do $$
+declare
+  public_fn regprocedure := 'public.buyer_submit_review(uuid,uuid,integer,text,text,boolean)'::regprocedure;
+  private_fn regprocedure := 'app_private.buyer_submit_review_authority(uuid,uuid,integer,text,text,boolean)'::regprocedure;
+  public_definition text; private_definition text; public_arguments text; private_arguments text;
+  public_is_definer boolean; private_is_definer boolean;
+begin
+  if has_function_privilege('anon',public_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',public_fn,'EXECUTE')
+     or not has_function_privilege('service_role',public_fn,'EXECUTE') then
+    raise exception 'Buyer review public wrapper privilege contract changed';
+  end if;
+  if has_function_privilege('anon',private_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',private_fn,'EXECUTE')
+     or not has_function_privilege('service_role',private_fn,'EXECUTE') then
+    raise exception 'Buyer review private authority privilege contract changed';
+  end if;
+
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into public_is_definer,public_definition,public_arguments
+    from pg_proc p where p.oid=public_fn::oid;
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into private_is_definer,private_definition,private_arguments
+    from pg_proc p where p.oid=private_fn::oid;
+
+  if public_is_definer
+     or public_definition not ilike '%app_private.buyer_submit_review_authority%'
+     or not (public_definition ilike '%set search_path to ''pg_catalog''%' or public_definition ilike '%set search_path = pg_catalog%') then
+    raise exception 'Buyer review public wrapper lost invoker/private delegation/search_path hardening';
+  end if;
+  if public_arguments ilike '%buyer_id%' or public_arguments ilike '%user_id%' then
+    raise exception 'Buyer review public wrapper accepts caller-supplied Buyer identity';
+  end if;
+
+  if not private_is_definer
+     or private_definition not ilike '%auth.uid()%'
+     or not (private_definition ilike '%set search_path to ''pg_catalog'', ''public''%' or private_definition ilike '%set search_path = pg_catalog, public%')
+     or private_definition not ilike '%marketplace_capability_is_active(v_buyer,''buyer'')%'
+     or private_definition not ilike '%p_rating<1 or p_rating>5%'
+     or private_definition not ilike '%char_length(v_title)>200%'
+     or private_definition not ilike '%char_length(v_content)>5000%'
+     or private_definition not ilike '%review_text_required%'
+     or private_definition not ilike '%o.buyer_id=v_buyer%'
+     or private_definition not ilike '%o.status=''delivered''%'
+     or private_definition not ilike '%o.payment_status in (''paid'',''partially_refunded'',''refunded'')%'
+     or private_definition not ilike '%oi.product_id=p_product_id%'
+     or private_definition not ilike '%review_already_submitted_for_order_product%'
+     or private_definition not ilike '%is_verified_purchase%'
+     or private_definition not ilike '%coalesce(p_is_anonymous,false)%'
+     or private_definition not ilike '%''pending''%'
+     or private_definition not ilike '%return v_review_id%' then
+    raise exception 'Buyer review private authority lost eligibility/validation/uniqueness/moderation controls';
+  end if;
+  if private_arguments ilike '%buyer_id%' or private_arguments ilike '%user_id%' then
+    raise exception 'Buyer review private authority accepts caller-supplied Buyer identity';
   end if;
 end;
 $$;
