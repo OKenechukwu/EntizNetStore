@@ -17,10 +17,6 @@ declare
     'mark_conversation_read(uuid)',
     'mark_notification_read(uuid)',
     'open_order_dispute(uuid,text,text)',
-    'seller_delete_product(uuid)',
-    'seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])',
-    'seller_set_product_publication(uuid,boolean)',
-    'seller_submit_product_for_review(uuid)',
     'submit_marketplace_report(text,uuid,text,text)'
   ];
   actual_authenticated text[];
@@ -184,6 +180,116 @@ begin
       and indexdef ilike '%(confirmed_by)%'
   ) then
     raise exception 'settlement confirmation confirmed_by FK index missing';
+  end if;
+end;
+$$;
+
+-- Seller catalogue mutation now follows the same exposed-wrapper/private-authority
+-- pattern. Existing audited function objects are moved into app_private, so their
+-- validation, ownership, moderation, variant and order-history semantics remain
+-- unchanged while elevated execution disappears from the exposed public schema.
+do $$
+declare
+  public_fns regprocedure[] := array[
+    'public.seller_save_product_v3(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])'::regprocedure,
+    'public.seller_delete_product(uuid)'::regprocedure,
+    'public.seller_set_product_publication(uuid,boolean)'::regprocedure,
+    'public.seller_submit_product_for_review(uuid)'::regprocedure
+  ];
+  private_fns regprocedure[] := array[
+    'app_private.seller_save_product_v3_authority(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])'::regprocedure,
+    'app_private.seller_delete_product_authority(uuid)'::regprocedure,
+    'app_private.seller_set_product_publication_authority(uuid,boolean)'::regprocedure,
+    'app_private.seller_submit_product_for_review_authority(uuid)'::regprocedure
+  ];
+  fn regprocedure;
+  definition text;
+  arguments text;
+  is_definer boolean;
+begin
+  foreach fn in array public_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'seller catalogue public wrapper privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if is_definer
+       or definition not ilike '%app_private.%authority%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog''%'
+         or definition ilike '%set search_path = pg_catalog%'
+       ) then
+      raise exception 'seller catalogue public wrapper % lost invoker/private delegation/search_path hardening', fn;
+    end if;
+    if arguments ilike '%seller_id%' or arguments ilike '%user_id%' then
+      raise exception 'seller catalogue public wrapper % accepts caller-supplied Seller identity', fn;
+    end if;
+  end loop;
+
+  foreach fn in array private_fns loop
+    if has_function_privilege('anon', fn, 'EXECUTE')
+       or not has_function_privilege('authenticated', fn, 'EXECUTE')
+       or not has_function_privilege('service_role', fn, 'EXECUTE') then
+      raise exception 'seller catalogue private authority privilege contract changed for %', fn;
+    end if;
+
+    select p.prosecdef, pg_get_functiondef(p.oid), pg_get_function_arguments(p.oid)
+      into is_definer, definition, arguments
+    from pg_proc p where p.oid = fn::oid;
+
+    if not is_definer
+       or definition not ilike '%auth.uid()%'
+       or not (
+         definition ilike '%set search_path to ''pg_catalog'', ''public''%'
+         or definition ilike '%set search_path = pg_catalog, public%'
+       ) then
+      raise exception 'seller catalogue private authority % lost definer/auth.uid/search_path hardening', fn;
+    end if;
+    if arguments ilike '%seller_id%' or arguments ilike '%user_id%' then
+      raise exception 'seller catalogue private authority % accepts caller-supplied Seller identity', fn;
+    end if;
+  end loop;
+
+  select pg_get_functiondef('app_private.seller_save_product_v3_authority(uuid,text,text,text,text,numeric,numeric,numeric,uuid,uuid[],text[],jsonb,boolean,boolean,boolean,boolean,integer,text,integer,text[],text[])'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%profiles_seller%'
+     or definition not ilike '%product_variants%'
+     or definition not ilike '%product_categories%'
+     or definition not ilike '%product_media%'
+     or definition not ilike '%product_moderation_events%'
+     or definition not ilike '%for update%' then
+    raise exception 'seller save private authority lost ownership/catalogue/moderation controls';
+  end if;
+
+  select pg_get_functiondef('app_private.seller_submit_product_for_review_authority(uuid)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%seller_verification_required%'
+     or definition not ilike '%product_category_required%'
+     or definition not ilike '%product_image_required%'
+     or definition not ilike '%active_product_variant_required%'
+     or definition not ilike '%moderation_status%pending%' then
+    raise exception 'seller review-submission private authority lost verification/completeness controls';
+  end if;
+
+  select pg_get_functiondef('app_private.seller_set_product_publication_authority(uuid,boolean)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%product_approval_required%'
+     or definition not ilike '%seller_verification_required%'
+     or definition not ilike '%product_moderation_events%' then
+    raise exception 'seller publication private authority lost approval/verification/audit controls';
+  end if;
+
+  select pg_get_functiondef('app_private.seller_delete_product_authority(uuid)'::regprocedure::oid)
+    into definition;
+  if definition not ilike '%seller_id = v_user_id%'
+     or definition not ilike '%order_items%'
+     or definition not ilike '%product_has_order_history%' then
+    raise exception 'seller delete private authority lost ownership/order-history controls';
   end if;
 end;
 $$;
