@@ -8,8 +8,7 @@ declare
     'buyer_request_order_refund(uuid,bigint,text,uuid)',
     'cancel_checkout_session(uuid)',
     'create_checkout_session_v2(uuid,uuid,uuid)',
-    'open_order_dispute(uuid,text,text)',
-    'submit_marketplace_report(text,uuid,text,text)'
+    'open_order_dispute(uuid,text,text)'
   ];
   actual_authenticated text[];
   unexpected text[];
@@ -589,6 +588,82 @@ begin
   end if;
   if private_arguments ilike '%buyer_id%' or private_arguments ilike '%user_id%' then
     raise exception 'Buyer review private authority accepts caller-supplied Buyer identity';
+  end if;
+end;
+$$;
+
+-- Marketplace report submission: public invoker over private authority while preserving
+-- reporter identity, validation, subject visibility/participation and active-report uniqueness.
+do $$
+declare
+  public_fn regprocedure := 'public.submit_marketplace_report(text,uuid,text,text)'::regprocedure;
+  private_fn regprocedure := 'app_private.submit_marketplace_report_authority(text,uuid,text,text)'::regprocedure;
+  public_definition text; private_definition text; public_arguments text; private_arguments text;
+  public_is_definer boolean; private_is_definer boolean;
+begin
+  if has_function_privilege('anon',public_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',public_fn,'EXECUTE')
+     or not has_function_privilege('service_role',public_fn,'EXECUTE') then
+    raise exception 'marketplace report public wrapper privilege contract changed';
+  end if;
+  if has_function_privilege('anon',private_fn,'EXECUTE')
+     or not has_function_privilege('authenticated',private_fn,'EXECUTE')
+     or not has_function_privilege('service_role',private_fn,'EXECUTE') then
+    raise exception 'marketplace report private authority privilege contract changed';
+  end if;
+
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into public_is_definer,public_definition,public_arguments
+    from pg_proc p where p.oid=public_fn::oid;
+  select p.prosecdef,pg_get_functiondef(p.oid),pg_get_function_arguments(p.oid)
+    into private_is_definer,private_definition,private_arguments
+    from pg_proc p where p.oid=private_fn::oid;
+
+  if public_is_definer
+     or public_definition not ilike '%app_private.submit_marketplace_report_authority%'
+     or not (public_definition ilike '%set search_path to ''pg_catalog''%' or public_definition ilike '%set search_path = pg_catalog%') then
+    raise exception 'marketplace report public wrapper lost invoker/private delegation/search_path hardening';
+  end if;
+  if public_arguments ilike '%reporter%' or public_arguments ilike '%actor%' or public_arguments ilike '%user_id%' then
+    raise exception 'marketplace report public wrapper accepts caller-supplied reporter identity';
+  end if;
+
+  if not private_is_definer
+     or private_definition not ilike '%auth.uid()%'
+     or not (private_definition ilike '%set search_path to ''pg_catalog'', ''public''%' or private_definition ilike '%set search_path = pg_catalog, public%')
+     or private_definition not ilike '%invalid_report_subject_type%'
+     or private_definition not ilike '%product%review%seller%buyer%order%dispute%content%'
+     or private_definition not ilike '%invalid_report_reason%'
+     or private_definition not ilike '%prohibited_product%counterfeit%fraud%spam%abuse%unsafe_content%policy_violation%other%'
+     or private_definition not ilike '%report_details_too_long%'
+     or private_definition not ilike '%report_details_required_for_other_reason%'
+     or private_definition not ilike '%report_subject_not_found%'
+     or private_definition not ilike '%profiles_seller%'
+     or private_definition not ilike '%profiles_buyer%'
+     or private_definition not ilike '%content_pages%'
+     or private_definition not ilike '%report_order_participant_required%'
+     or private_definition not ilike '%o.buyer_id = v_actor or o.seller_id = v_actor%'
+     or private_definition not ilike '%report_dispute_participant_required%'
+     or private_definition not ilike '%order_disputes%'
+     or private_definition not ilike '%active_report_already_exists%'
+     or private_definition not ilike '%reporter_user_id = v_actor%'
+     or private_definition not ilike '%status in (''open'',''in_review'')%'
+     or private_definition not ilike '%insert into public.marketplace_reports%'
+     or private_definition not ilike '%return v_report_id%' then
+    raise exception 'marketplace report private authority lost validation/subject/participant/uniqueness controls';
+  end if;
+  if private_arguments ilike '%reporter%' or private_arguments ilike '%actor%' or private_arguments ilike '%user_id%' then
+    raise exception 'marketplace report private authority accepts caller-supplied reporter identity';
+  end if;
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname='public' and tablename='marketplace_reports'
+      and indexname='marketplace_reports_one_active_per_reporter_subject'
+      and indexdef ilike '%unique index%'
+      and indexdef ilike '%(reporter_user_id, subject_type, subject_id)%'
+      and indexdef ilike '%status%open%in_review%'
+  ) then
+    raise exception 'marketplace report active-report uniqueness index missing or changed';
   end if;
 end;
 $$;
