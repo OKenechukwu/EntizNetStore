@@ -128,16 +128,13 @@ begin
     end if;
   end loop;
 
-  -- Business-management functions and trigger helpers remain reviewed public
-  -- definers. Buyer wholesale cart mutation is intentionally no longer in this
-  -- exposed definer inventory: it is an invoker wrapper over app_private.
+  -- Only trigger helpers remain public SECURITY DEFINER functions in M4A.
+  -- Buyer cart and BSM authoring mutations are invoker wrappers over app_private.
   select count(*) into v_bad
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname in (
-      'business_set_trading_roles',
-      'business_save_wholesale_offer',
       'guard_wholesale_offer_integrity',
       'guard_wholesale_cart_item_integrity'
     )
@@ -146,9 +143,101 @@ begin
       or not ('search_path=pg_catalog, public, app_private' = any(coalesce(p.proconfig, array[]::text[])))
     );
   if v_bad <> 0 then
-    raise exception '% retained M4A privileged functions lost SECURITY DEFINER or hardened app_private search_path', v_bad;
+    raise exception '% retained M4A trigger helpers lost SECURITY DEFINER or hardened app_private search_path', v_bad;
   end if;
 
+  -- BSM trading-role public wrapper/private authority.
+  select pg_get_functiondef('public.business_set_trading_roles(text[])'::regprocedure)
+    into v_public_definition;
+  if exists (
+    select 1 from pg_proc
+    where oid = 'public.business_set_trading_roles(text[])'::regprocedure
+      and prosecdef
+  ) then
+    raise exception 'Business trading-role public RPC must remain SECURITY INVOKER';
+  end if;
+  if v_public_definition not ilike '%app_private.business_set_trading_roles_authority%'
+     or not (
+       v_public_definition ilike '%set search_path to ''pg_catalog''%'
+       or v_public_definition ilike '%set search_path = pg_catalog%'
+     ) then
+    raise exception 'Business trading-role public RPC lost private delegation or pinned search_path';
+  end if;
+
+  if has_function_privilege('anon', 'app_private.business_set_trading_roles_authority(text[])', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'app_private.business_set_trading_roles_authority(text[])', 'EXECUTE')
+     or not has_function_privilege('service_role', 'app_private.business_set_trading_roles_authority(text[])', 'EXECUTE') then
+    raise exception 'Business trading-role private authority execution boundary incorrect';
+  end if;
+
+  select pg_get_functiondef('app_private.business_set_trading_roles_authority(text[])'::regprocedure)
+    into v_private_definition;
+  if not exists (
+    select 1 from pg_proc
+    where oid = 'app_private.business_set_trading_roles_authority(text[])'::regprocedure
+      and prosecdef
+  )
+     or v_private_definition not ilike '%auth.uid()%'
+     or v_private_definition not ilike '%profiles_business%'
+     or v_private_definition not ilike '%marketplace_capability_is_active%'
+     or v_private_definition not ilike '%business_trading_roles%'
+     or v_private_definition not ilike '%business_kind%'
+     or v_private_definition not ilike '%brand%'
+     or v_private_definition not ilike '%supplier%'
+     or v_private_definition not ilike '%manufacturer%'
+     or v_private_definition not ilike '%distributor%'
+     or v_private_definition not ilike '%wholesaler%'
+     or v_private_definition not ilike '%retailer%' then
+    raise exception 'Business trading-role private authority lost auth/capability/role synchronization controls';
+  end if;
+
+  -- BSM wholesale-offer public wrapper/private authority.
+  select pg_get_functiondef(
+    'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+  ) into v_public_definition;
+  if exists (
+    select 1 from pg_proc
+    where oid = 'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+      and prosecdef
+  ) then
+    raise exception 'Wholesale-offer public RPC must remain SECURITY INVOKER';
+  end if;
+  if v_public_definition not ilike '%app_private.business_save_wholesale_offer_authority%'
+     or not (
+       v_public_definition ilike '%set search_path to ''pg_catalog''%'
+       or v_public_definition ilike '%set search_path = pg_catalog%'
+     ) then
+    raise exception 'Wholesale-offer public RPC lost private delegation or pinned search_path';
+  end if;
+
+  if has_function_privilege('anon', 'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)', 'EXECUTE') then
+    raise exception 'Wholesale-offer private authority execution boundary incorrect';
+  end if;
+
+  select pg_get_functiondef(
+    'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+  ) into v_private_definition;
+  if not exists (
+    select 1 from pg_proc
+    where oid = 'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+      and prosecdef
+  )
+     or v_private_definition not ilike '%auth.uid()%'
+     or v_private_definition not ilike '%profiles_business%'
+     or v_private_definition not ilike '%profiles_seller%'
+     or v_private_definition not ilike '%marketplace_capability_is_active%'
+     or v_private_definition not ilike '%wholesale_offer_catalogue_not_owned%'
+     or v_private_definition not ilike '%minimum_order_quantity%'
+     or v_private_definition not ilike '%order_multiple%'
+     or v_private_definition not ilike '%wholesale_offer_tiers%'
+     or v_private_definition not ilike '%first_wholesale_tier_must_equal_moq%'
+     or v_private_definition not ilike '%wholesale_offer_activation_requires_verified_active_catalogue%' then
+    raise exception 'Wholesale-offer private authority lost auth/ownership/MOQ/tier/activation controls';
+  end if;
+
+  -- Buyer wholesale cart public wrapper/private authority.
   select pg_get_functiondef('public.buyer_set_wholesale_cart_item(uuid,integer)'::regprocedure)
     into v_public_definition;
   if exists (
@@ -289,10 +378,13 @@ begin
   end if;
 
   select pg_get_functiondef(
-    'public.business_save_wholesale_offer(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
+    'app_private.business_save_wholesale_offer_authority(uuid,uuid,uuid,text,integer,integer,text,integer,integer,text,timestamp with time zone,timestamp with time zone,jsonb)'::regprocedure
   ) into v_save_definition;
   if position('p_minimum_order_quantity % p_order_multiple' in v_save_definition) > 0 then
-    raise exception 'Wholesale save RPC reintroduced invalid MOQ divisibility coupling';
+    raise exception 'Wholesale save authority reintroduced invalid MOQ divisibility coupling';
+  end if;
+  if position('(v_minimum - p_minimum_order_quantity) % p_order_multiple' in v_save_definition) = 0 then
+    raise exception 'Wholesale save authority lost MOQ-relative order-multiple alignment';
   end if;
 
   if not exists (
