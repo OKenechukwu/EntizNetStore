@@ -2,7 +2,7 @@
 
 -- EntizNetStore M4A structural release gate.
 -- This file locks the wholesale authority shape independently of behavioral tests.
--- It is intentionally strict about RLS, direct-write denial, SECURITY DEFINER
+-- It is intentionally strict about RLS, direct-write denial, private authority
 -- execution, cart mode separation, and durable order pricing evidence.
 
 do $$
@@ -12,6 +12,8 @@ declare
   v_idx text;
   v_fn text;
   v_bad integer;
+  v_public_definition text;
+  v_private_definition text;
 begin
   foreach v_table in array array[
     'business_trading_roles',
@@ -126,6 +128,9 @@ begin
     end if;
   end loop;
 
+  -- Business-management functions and trigger helpers remain reviewed public
+  -- definers. Buyer wholesale cart mutation is intentionally no longer in this
+  -- exposed definer inventory: it is an invoker wrapper over app_private.
   select count(*) into v_bad
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
@@ -133,7 +138,6 @@ begin
     and p.proname in (
       'business_set_trading_roles',
       'business_save_wholesale_offer',
-      'buyer_set_wholesale_cart_item',
       'guard_wholesale_offer_integrity',
       'guard_wholesale_cart_item_integrity'
     )
@@ -142,7 +146,49 @@ begin
       or not ('search_path=pg_catalog, public, app_private' = any(coalesce(p.proconfig, array[]::text[])))
     );
   if v_bad <> 0 then
-    raise exception '% M4A privileged functions lost SECURITY DEFINER or hardened app_private search_path', v_bad;
+    raise exception '% retained M4A privileged functions lost SECURITY DEFINER or hardened app_private search_path', v_bad;
+  end if;
+
+  select pg_get_functiondef('public.buyer_set_wholesale_cart_item(uuid,integer)'::regprocedure)
+    into v_public_definition;
+  if exists (
+    select 1 from pg_proc
+    where oid = 'public.buyer_set_wholesale_cart_item(uuid,integer)'::regprocedure
+      and prosecdef
+  ) then
+    raise exception 'Wholesale cart public RPC must remain SECURITY INVOKER';
+  end if;
+  if v_public_definition not ilike '%app_private.buyer_set_wholesale_cart_item_authority%'
+     or not (
+       v_public_definition ilike '%set search_path to ''pg_catalog''%'
+       or v_public_definition ilike '%set search_path = pg_catalog%'
+     ) then
+    raise exception 'Wholesale cart public RPC lost private delegation or pinned search_path';
+  end if;
+
+  if has_function_privilege('anon', 'app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)', 'EXECUTE') then
+    raise exception 'Wholesale cart private authority execution boundary incorrect';
+  end if;
+
+  select pg_get_functiondef('app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)'::regprocedure)
+    into v_private_definition;
+  if not exists (
+    select 1 from pg_proc
+    where oid = 'app_private.buyer_set_wholesale_cart_item_authority(uuid,integer)'::regprocedure
+      and prosecdef
+  )
+     or v_private_definition not ilike '%auth.uid()%'
+     or v_private_definition not ilike '%set search_path to ''''%'
+     or v_private_definition not ilike '%profiles_business%'
+     or v_private_definition not ilike '%marketplace_capability_is_active%'
+     or v_private_definition not ilike '%minimum_order_quantity%'
+     or v_private_definition not ilike '%order_multiple%'
+     or v_private_definition not ilike '%wholesale_offer_tiers%'
+     or v_private_definition not ilike '%inventory_reservations%'
+     or v_private_definition not ilike '%purchase_mode%wholesale%' then
+    raise exception 'Wholesale cart private authority lost definer/auth/BSM/MOQ/tier/inventory hardening';
   end if;
 
   if not exists (
